@@ -1,0 +1,46 @@
+# ── secrets — NEVER commit ────────────────────────────────────────────────
+# Both P2 .env files hold live TENANT_ID / CLIENT_ID / CLIENT_SECRET with
+# Sites.ReadWrite.All, Files.ReadWrite.All and Mail.Send on the tenant.
+.env
+.env.txt
+*.env
+!.env.example
+local.settings.json
+
+# ── virtualenvs / build artefacts ─────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ── candidate data (PII) ──────────────────────────────────────────────────
+# Resumes and exported candidate lists are personal data; keep them out of
+# version control even though the folders are local-only.
+P2_Resumes/
+P2_Input/
+P2_Output/
+P2_Final_Results/
+Candidate_Resumes/
+*.xlsx
+!**/P1_Templates/*.xlsx
+
+# ── logs, runtime state, backups ──────────────────────────────────────────
+P2_Logs/
+Backups/
+archive/backups/
+*.log
+run_history.jsonl
+app_settings.json
+.agent.lock
+
+# ── OS noise ──────────────────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# runtime audit exports — bulk candidate PII, never version these
+archive/audits/
+*_live_state_audit_*.csv
+*_live_state_audit_*.md

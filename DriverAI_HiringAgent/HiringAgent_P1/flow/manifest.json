@@ -1,0 +1,112 @@
+{
+  "schema": "1.0",
+  "details": {
+    "displayName": "DriverAI_HiringAgent_P1_AutoReply",
+    "description": "",
+    "createdTime": "2026-06-18T09:15:47.7871053Z",
+    "packageTelemetryId": "97c73cfa-a076-4c69-b40d-1289b4d52dfc",
+    "creator": "N/A",
+    "sourceEnvironment": ""
+  },
+  "resources": {
+    "36d96cc9-25b1-4e7c-952c-378ba087f142": {
+      "type": "Microsoft.Flow/flows",
+      "suggestedCreationType": "Update",
+      "creationType": "Existing, New, Update",
+      "details": {
+        "displayName": "DriverAI_HiringAgent_P1_AutoReply"
+      },
+      "configurableBy": "User",
+      "hierarchy": "Root",
+      "dependsOn": [
+        "63c6de14-bd1e-49d4-aff5-30f4231202e4",
+        "58aab763-2e9c-4e41-8bdc-de85cf6394ce",
+        "2c45e03a-a4f3-46c6-a825-e7bf0efaeb4c",
+        "512bb262-d6cb-46bc-a75b-3f4fb3e0faea",
+        "6b30fadf-dfdd-41b4-81a4-6ad68dad4691",
+        "f70f3118-a0c4-4211-8f47-55af5fc4ad45"
+      ]
+    },
+    "63c6de14-bd1e-49d4-aff5-30f4231202e4": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+      "name": "shared_office365",
+      "type": "Microsoft.PowerApps/apis",
+      "suggestedCreationType": "Existing",
+      "details": {
+        "displayName": "Office 365 Outlook",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1812/1.0.1812.4763/office365/icon.png"
+      },
+      "configurableBy": "System",
+      "hierarchy": "Child",
+      "dependsOn": []
+    },
+    "58aab763-2e9c-4e41-8bdc-de85cf6394ce": {
+      "type": "Microsoft.PowerApps/apis/connections",
+      "suggestedCreationType": "Existing",
+      "creationType": "Existing",
+      "details": {
+        "displayName": "yashv@driverai.io",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1812/1.0.1812.4763/office365/icon.png"
+      },
+      "configurableBy": "User",
+      "hierarchy": "Child",
+      "dependsOn": [
+        "63c6de14-bd1e-49d4-aff5-30f4231202e4"
+      ]
+    },
+    "2c45e03a-a4f3-46c6-a825-e7bf0efaeb4c": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "name": "shared_sharepointonline",
+      "type": "Microsoft.PowerApps/apis",
+      "suggestedCreationType": "Existing",
+      "details": {
+        "displayName": "SharePoint",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1814/1.0.1814.4751/sharepointonline/icon.png"
+      },
+      "configurableBy": "System",
+      "hierarchy": "Child",
+      "dependsOn": []
+    },
+    "512bb262-d6cb-46bc-a75b-3f4fb3e0faea": {
+      "type": "Microsoft.PowerApps/apis/connections",
+      "suggestedCreationType": "Existing",
+      "creationType": "Existing",
+      "details": {
+        "displayName": "yashv@driverai.io",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1814/1.0.1814.4751/sharepointonline/icon.png"
+      },
+      "configurableBy": "User",
+      "hierarchy": "Child",
+      "dependsOn": [
+        "2c45e03a-a4f3-46c6-a825-e7bf0efaeb4c"
+      ]
+    },
+    "6b30fadf-dfdd-41b4-81a4-6ad68dad4691": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+      "name": "shared_excelonlinebusiness",
+      "type": "Microsoft.PowerApps/apis",
+      "suggestedCreationType": "Existing",
+      "details": {
+        "displayName": "Excel Online (Business)",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1808/1.0.1808.4695/excelonlinebusiness/icon.png"
+      },
+      "configurableBy": "System",
+      "hierarchy": "Child",
+      "dependsOn": []
+    },
+    "f70f3118-a0c4-4211-8f47-55af5fc4ad45": {
+      "type": "Microsoft.PowerApps/apis/connections",
+      "suggestedCreationType": "Existing",
+      "creationType": "Existing",
+      "details": {
+        "displayName": "yashv@driverai.io",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1808/1.0.1808.4695/excelonlinebusiness/icon.png"
+      },
+      "configurableBy": "User",
+      "hierarchy": "Child",
+      "dependsOn": [
+        "6b30fadf-dfdd-41b4-81a4-6ad68dad4691"
+      ]
+    }
+  }
+}

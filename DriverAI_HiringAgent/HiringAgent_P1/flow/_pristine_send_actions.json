@@ -1,0 +1,142 @@
+{
+  "Notify_failure": {
+    "runAfter": {
+      "HasResume": [
+        "Failed",
+        "TimedOut"
+      ]
+    },
+    "type": "OpenApiConnection",
+    "inputs": {
+      "parameters": {
+        "emailMessage/To": "yashv@driverai.io",
+        "emailMessage/Subject": "[Hiring Auto-Reply] A run needs attention (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a run did not complete.</strong></p><p>Something went wrong while handling an incoming email, so the applicant may not have received a reply and the candidate row or resume file may not have been saved.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(triggerOutputs()?['body/from'],'unknown')}</li><li>Subject: @{coalesce(triggerOutputs()?['body/subject'],'(none)')}</li><li>Received: @{coalesce(triggerOutputs()?['body/receivedDateTime'],'(unknown)')}</li></ul><p>Open the flow run history for the exact step and error. The email was left unread, so it can be reprocessed.</p></div>",
+        "emailMessage/Importance": "High"
+      },
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "connectionName": "shared_office365",
+        "operationId": "SendEmailV2"
+      },
+      "authentication": "@parameters('$authentication')"
+    }
+  },
+  "Send_acknowledgment": {
+    "runAfter": {
+      "Add_row": [
+        "Succeeded",
+        "Failed",
+        "Skipped"
+      ]
+    },
+    "type": "OpenApiConnection",
+    "inputs": {
+      "parameters": {
+        "emailMessage/MailboxAddress": "apply@driverai.io",
+        "emailMessage/To": "@triggerOutputs()?['body/from']",
+        "emailMessage/Subject": "Application Received - DriverAI (Ref: @{outputs('AppRef')})",
+        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for applying to <strong>DriverAI</strong>. Your application has been received and is under review.</p><p>Reference number: <strong>@{outputs('AppRef')}</strong></p><p>If you are selected, a member of our team will contact you to discuss next steps. You do not need to reply unless you are updating your resume. To do that, send a new or reply email to <em>apply@driverai.io</em> with the subject <strong>\"Update - @{outputs('AppRef')}\"</strong> and attach the new file.</p><p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+        "emailMessage/Importance": "Normal"
+      },
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "connectionName": "shared_office365",
+        "operationId": "SharedMailboxSendEmailV2"
+      },
+      "authentication": "@parameters('$authentication')"
+    }
+  },
+  "Send_duplicate_notice": {
+    "type": "OpenApiConnection",
+    "inputs": {
+      "parameters": {
+        "emailMessage/MailboxAddress": "apply@driverai.io",
+        "emailMessage/To": "@triggerOutputs()?['body/from']",
+        "emailMessage/Subject": "Your DriverAI Application Is Already On File (Ref: @{first(body('Filter_submitted'))?['Application ID']})",
+        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Your application is already on file with <strong>DriverAI</strong> and under review, so there's no need to resubmit.</p>@{if(greaterOrEquals(int(coalesce(first(body('Filter_submitted'))?['Application Updates'],'0')),2),'<p>This is our final automated reply regarding this application. If there is a match, a member of our team will contact you directly. You do not need to reply, and you are welcome to apply again after 90 days.</p>',concat('<p>If you are selected, a member of our team will contact you to discuss next steps. You do not need to reply unless you are updating your resume. To do that, send a new or reply email to <em>apply@driverai.io</em> with the subject <strong>\"Update - ',first(body('Filter_submitted'))?['Application ID'],'\"</strong> and attach the new file.</p>'))}<p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+        "emailMessage/Importance": "Normal"
+      },
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "connectionName": "shared_office365",
+        "operationId": "SharedMailboxSendEmailV2"
+      },
+      "authentication": "@parameters('$authentication')"
+    },
+    "runAfter": {}
+  },
+  "Send_CV_request": {
+    "runAfter": {},
+    "type": "OpenApiConnection",
+    "inputs": {
+      "parameters": {
+        "emailMessage/MailboxAddress": "apply@driverai.io",
+        "emailMessage/To": "@triggerOutputs()?['body/from']",
+        "emailMessage/Subject": "Please Attach Your Resume - DriverAI",
+        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for your interest in <strong>DriverAI</strong>. We didn't see a resume attached, so your application isn't complete yet.</p><p>Please reply with your resume attached in <strong>PDF or Word (.docx)</strong> format. Once we have it, your application goes under review, and if you are selected, a member of our team will contact you to discuss next steps.</p><p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+        "emailMessage/Importance": "Normal"
+      },
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "connectionName": "shared_office365",
+        "operationId": "SharedMailboxSendEmailV2"
+      },
+      "authentication": "@parameters('$authentication')"
+    }
+  },
+  "Send_wrong_format": {
+    "type": "OpenApiConnection",
+    "runAfter": {},
+    "inputs": {
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "connectionName": "shared_office365",
+        "operationId": "SharedMailboxSendEmailV2"
+      },
+      "parameters": {
+        "emailMessage/To": "@triggerOutputs()?['body/from']",
+        "emailMessage/Subject": "Please Resend Your Resume as PDF or Word - DriverAI",
+        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for your interest in <strong>DriverAI</strong>. We received your submission, but we couldn't open the attached file.</p><p>Please reply with your resume as a <strong>PDF (.pdf)</strong> or <strong>Word (.docx)</strong> file and we'll process it right away. If you are selected, a member of our team will contact you to discuss next steps.</p><p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+        "emailMessage/MailboxAddress": "apply@driverai.io"
+      },
+      "authentication": "@parameters('$authentication')"
+    }
+  },
+  "Send_update_ack": {
+    "type": "OpenApiConnection",
+    "runAfter": {},
+    "inputs": {
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "connectionName": "shared_office365",
+        "operationId": "SharedMailboxSendEmailV2"
+      },
+      "parameters": {
+        "emailMessage/To": "@triggerOutputs()?['body/from']",
+        "emailMessage/Subject": "Updated Resume Received - DriverAI (Ref: @{outputs('AppRef_from_subject')})",
+        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for sending your updated resume. Your application now reflects the latest version and our team will review it.</p>@{if(greaterOrEquals(int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'],'0')),2),'<p>This is our final automated reply regarding this application. If there is a match, a member of our team will contact you directly. You do not need to reply, and you are welcome to apply again after 90 days.</p>',concat('<p>If you are selected, a member of our team will contact you to discuss next steps. You do not need to reply unless you are updating your resume again. To do that, send a new or reply email to <em>apply@driverai.io</em> with the subject <strong>\"Update - ',outputs('AppRef_from_subject'),'\"</strong> and attach the new file.</p>'))}<p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+        "emailMessage/MailboxAddress": "apply@driverai.io"
+      },
+      "authentication": "@parameters('$authentication')"
+    }
+  },
+  "Send_noted_reply": {
+    "type": "OpenApiConnection",
+    "runAfter": {},
+    "inputs": {
+      "host": {
+        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "connectionName": "shared_office365",
+        "operationId": "SharedMailboxSendEmailV2"
+      },
+      "parameters": {
+        "emailMessage/To": "@triggerOutputs()?['body/from']",
+        "emailMessage/Subject": "Message Received - DriverAI (Ref: @{outputs('AppRef_from_subject')})",
+        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for following up. Your message has been noted alongside your application.</p>@{if(greaterOrEquals(int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'],'0')),2),'<p>This is our final automated reply regarding this application. If there is a match, a member of our team will contact you directly. You do not need to reply, and you are welcome to apply again after 90 days.</p>',concat('<p>If you are selected, a member of our team will contact you to discuss next steps. You do not need to reply unless you are updating your resume. To send one, reply with the subject <strong>\"Update - ',outputs('AppRef_from_subject'),'\"</strong> and attach the file (<strong>PDF or Word</strong>).</p>'))}<p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+        "emailMessage/MailboxAddress": "apply@driverai.io"
+      },
+      "authentication": "@parameters('$authentication')"
+    }
+  }
+}

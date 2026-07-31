@@ -1,0 +1,1575 @@
+{
+  "built_at": "2026-07-31T04:28:46",
+  "signature": "cb06411e5e650922",
+  "folder_fingerprint": null,
+  "roles": [
+    {
+      "title": "Finance Intern Job Announcement",
+      "skills": [
+        "computer vision",
+        "python",
+        "sql",
+        "excel",
+        "power bi",
+        "tableau",
+        "marketing",
+        "google sheets"
+      ]
+    },
+    {
+      "title": "Finance Intern Position Description",
+      "skills": [
+        "python",
+        "sql",
+        "automation",
+        "compliance",
+        "excel",
+        "power bi",
+        "tableau",
+        "marketing",
+        "data entry",
+        "google sheets"
+      ]
+    },
+    {
+      "title": "Business Analytics Marketing Intern Job Announcement",
+      "skills": [
+        "generative ai",
+        "natural language processing",
+        "computer vision",
+        "data analysis",
+        "python",
+        "sql",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing",
+        "content",
+        "social media",
+        "google analytics",
+        "google sheets"
+      ]
+    },
+    {
+      "title": "Business Analytics Marketing Intern Position Description",
+      "skills": [
+        "generative ai",
+        "natural language processing",
+        "computer vision",
+        "data analysis",
+        "python",
+        "sql",
+        "automation",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing",
+        "content",
+        "social media",
+        "google analytics",
+        "google sheets"
+      ]
+    },
+    {
+      "title": "Business Data Analyst Job Announcement",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "data science",
+        "python",
+        "javascript",
+        "sql",
+        "aws",
+        "automation",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing",
+        "social media",
+        "google analytics",
+        "google sheets"
+      ]
+    },
+    {
+      "title": "Business Data Analyst Position Description",
+      "skills": [
+        "machine learning",
+        "data analysis",
+        "data science",
+        "python",
+        "javascript",
+        "sql",
+        "aws",
+        "automation",
+        "cybersecurity",
+        "compliance",
+        "jira",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing",
+        "content",
+        "social media",
+        "google analytics",
+        "google sheets"
+      ]
+    },
+    {
+      "title": "Marketing Intern Job Announcement",
+      "skills": [
+        "computer vision",
+        "go",
+        "marketing",
+        "content",
+        "social media",
+        "microsoft office"
+      ]
+    },
+    {
+      "title": "Marketing Intern Position Description",
+      "skills": [
+        "go",
+        "automation",
+        "marketing",
+        "content",
+        "social media",
+        "microsoft office"
+      ]
+    },
+    {
+      "title": "AWS Lead Job Announcement",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "data science",
+        "data engineering",
+        "aws",
+        "docker",
+        "git",
+        "ci/cd",
+        "terraform",
+        "cybersecurity",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "AWS Lead Position Description",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "data engineering",
+        "aws",
+        "docker",
+        "git",
+        "ci/cd",
+        "terraform",
+        "automation",
+        "cybersecurity",
+        "incident response",
+        "compliance",
+        "agile"
+      ]
+    },
+    {
+      "title": "AWS Senior Engineer Position",
+      "skills": [
+        "aws",
+        "ci/cd",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cloud Database Engineer  PD",
+      "skills": [
+        "python",
+        "fastapi",
+        "sql",
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "etl",
+        "aws",
+        "azure",
+        "ci/cd",
+        "terraform",
+        "linux",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Software Cloud Developer Job Announcement",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c#",
+        "go",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "next.js",
+        "sql",
+        "postgresql",
+        "mongodb",
+        "aws",
+        "azure",
+        "gcp",
+        "docker",
+        "kubernetes",
+        "git",
+        "ci/cd",
+        "terraform",
+        "github actions",
+        "automation",
+        "cybersecurity",
+        "compliance",
+        "agile"
+      ]
+    },
+    {
+      "title": "Software Cloud Developer Position Description",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c#",
+        "go",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "next.js",
+        "sql",
+        "postgresql",
+        "mongodb",
+        "aws",
+        "azure",
+        "gcp",
+        "docker",
+        "kubernetes",
+        "git",
+        "ci/cd",
+        "terraform",
+        "github actions",
+        "automation",
+        "cybersecurity",
+        "compliance",
+        "agile",
+        "jira",
+        "content"
+      ]
+    },
+    {
+      "title": "CISO LinkedIn Announcement",
+      "skills": [
+        "incident response",
+        "compliance",
+        "risk management"
+      ]
+    },
+    {
+      "title": "CISO Job Announcement Updated v2",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "aws",
+        "automation",
+        "cybersecurity",
+        "firewalls",
+        "incident response",
+        "compliance",
+        "risk management"
+      ]
+    },
+    {
+      "title": "CISO Position Description Updated v2",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "automation",
+        "cybersecurity",
+        "firewalls",
+        "incident response",
+        "compliance",
+        "risk management"
+      ]
+    },
+    {
+      "title": "CMO LinkedIn Announcement",
+      "skills": [
+        "go",
+        "marketing",
+        "social media"
+      ]
+    },
+    {
+      "title": "CMO Job Announcement Updated",
+      "skills": [
+        "go",
+        "automation",
+        "cybersecurity",
+        "stakeholder management",
+        "marketing",
+        "content",
+        "social media"
+      ]
+    },
+    {
+      "title": "CMO Position Description Updated",
+      "skills": [
+        "go",
+        "automation",
+        "cybersecurity",
+        "project management",
+        "marketing",
+        "content",
+        "social media"
+      ]
+    },
+    {
+      "title": "Corporate Facilities Security Officer Job Announcement",
+      "skills": [
+        "computer vision",
+        "cybersecurity",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Corporate Facilities Security Officer Position Description",
+      "skills": [
+        "cybersecurity",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "CTO Position",
+      "skills": [
+        "ci/cd",
+        "cybersecurity",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cybersecurity Analyst Position Description Incident Response Updated",
+      "skills": [
+        "aws",
+        "azure",
+        "automation",
+        "cybersecurity",
+        "siem",
+        "network security",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Admin Manager JA AI Tools Updated",
+      "skills": [
+        "aws",
+        "cybersecurity",
+        "siem",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Admin Manager JA Updated",
+      "skills": [
+        "aws",
+        "cybersecurity",
+        "siem",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Admin Manager PD AI Tools Updated",
+      "skills": [
+        "cybersecurity",
+        "siem",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Admin Manager PD Updated",
+      "skills": [
+        "cybersecurity",
+        "siem",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Administrator JA",
+      "skills": [
+        "aws",
+        "azure",
+        "cybersecurity",
+        "siem",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Administrator JA Comprehensive",
+      "skills": [
+        "aws",
+        "azure",
+        "cybersecurity",
+        "siem",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Administrator PD",
+      "skills": [
+        "aws",
+        "azure",
+        "cybersecurity",
+        "siem",
+        "incident response",
+        "compliance",
+        "risk management"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Administrator PD Comprehensive",
+      "skills": [
+        "aws",
+        "azure",
+        "automation",
+        "cybersecurity",
+        "siem",
+        "incident response",
+        "compliance",
+        "risk management"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Administrator Position",
+      "skills": [
+        "aws",
+        "cybersecurity",
+        "siem",
+        "incident response",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Cybersecurity IT Intern Position",
+      "skills": [
+        "cybersecurity",
+        "compliance"
+      ]
+    },
+    {
+      "title": "Data Analyst Position Description",
+      "skills": [
+        "machine learning",
+        "data analysis",
+        "data science",
+        "python",
+        "javascript",
+        "sql",
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "snowflake",
+        "bigquery",
+        "aws",
+        "azure",
+        "automation",
+        "selenium",
+        "cybersecurity",
+        "compliance",
+        "jira",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing",
+        "google sheets"
+      ]
+    },
+    {
+      "title": "Data Analyst Job Announcement rev",
+      "skills": [
+        "machine learning",
+        "data analysis",
+        "python",
+        "javascript",
+        "sql",
+        "snowflake",
+        "bigquery",
+        "aws",
+        "azure",
+        "selenium",
+        "cybersecurity",
+        "compliance",
+        "jira",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing"
+      ]
+    },
+    {
+      "title": "Data Analyst Job Announcement",
+      "skills": [
+        "machine learning",
+        "data analysis",
+        "python",
+        "javascript",
+        "sql",
+        "snowflake",
+        "bigquery",
+        "aws",
+        "azure",
+        "selenium",
+        "cybersecurity",
+        "compliance",
+        "jira",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing"
+      ]
+    },
+    {
+      "title": "Data Engineer Job Announcement",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "pandas",
+        "data science",
+        "data engineering",
+        "python",
+        "sql",
+        "spark",
+        "airflow",
+        "etl",
+        "dbt",
+        "aws",
+        "docker",
+        "git",
+        "ci/cd",
+        "terraform",
+        "automation",
+        "cybersecurity",
+        "compliance",
+        "jira",
+        "power bi",
+        "tableau",
+        "looker"
+      ]
+    },
+    {
+      "title": "Data Engineer Position Description",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "pandas",
+        "data science",
+        "data engineering",
+        "python",
+        "sql",
+        "spark",
+        "airflow",
+        "etl",
+        "dbt",
+        "aws",
+        "docker",
+        "kubernetes",
+        "git",
+        "ci/cd",
+        "terraform",
+        "automation",
+        "cybersecurity",
+        "compliance",
+        "jira",
+        "power bi",
+        "tableau",
+        "looker"
+      ]
+    },
+    {
+      "title": "Gaming Position Announcement",
+      "skills": [
+        "java",
+        "c#",
+        "kotlin",
+        "swift",
+        "ios",
+        "android"
+      ]
+    },
+    {
+      "title": "Gaming Position",
+      "skills": [
+        "java",
+        "c#",
+        "kotlin",
+        "swift",
+        "rest",
+        "git",
+        "ci/cd",
+        "ios",
+        "android",
+        "firebase",
+        "agile",
+        "scrum",
+        "content"
+      ]
+    },
+    {
+      "title": "Graphics Position Announcement",
+      "skills": [
+        "marketing"
+      ]
+    },
+    {
+      "title": "Graphics Position",
+      "skills": [
+        "agile",
+        "jira",
+        "marketing",
+        "content",
+        "social media"
+      ]
+    },
+    {
+      "title": "AI ML Mobile Applications Developer Job Announcement",
+      "skills": [
+        "embeddings",
+        "computer vision",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c#",
+        "kotlin",
+        "swift",
+        "react",
+        "aws",
+        "docker",
+        "git",
+        "ci/cd",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "cybersecurity",
+        "agile",
+        "jira"
+      ]
+    },
+    {
+      "title": "AI ML Mobile Applications Developer Position Description",
+      "skills": [
+        "embeddings",
+        "computer vision",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c#",
+        "kotlin",
+        "swift",
+        "react",
+        "aws",
+        "docker",
+        "git",
+        "ci/cd",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "cybersecurity",
+        "project management",
+        "agile",
+        "jira"
+      ]
+    },
+    {
+      "title": "Automation Process Developer Position Description",
+      "skills": [
+        "power automate",
+        "automation",
+        "cybersecurity",
+        "project management",
+        "business analysis"
+      ]
+    },
+    {
+      "title": "Mobile Animation Design Intern  PD",
+      "skills": [
+        "c#",
+        "kotlin",
+        "swift",
+        "react",
+        "react native",
+        "flutter",
+        "agile"
+      ]
+    },
+    {
+      "title": "Mobile Application Lead Developer Job Announcement",
+      "skills": [
+        "computer vision",
+        "java",
+        "javascript",
+        "typescript",
+        "kotlin",
+        "swift",
+        "react",
+        "graphql",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "github actions",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "agile"
+      ]
+    },
+    {
+      "title": "Mobile Application Lead Developer Job Announcement With Overview",
+      "skills": [
+        "computer vision",
+        "java",
+        "javascript",
+        "typescript",
+        "kotlin",
+        "swift",
+        "react",
+        "graphql",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "github actions",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "cybersecurity",
+        "agile",
+        "jira"
+      ]
+    },
+    {
+      "title": "Mobile Application Lead Developer Position Description",
+      "skills": [
+        "computer vision",
+        "java",
+        "kotlin",
+        "swift",
+        "react",
+        "graphql",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "github actions",
+        "automation",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "cybersecurity",
+        "compliance",
+        "agile"
+      ]
+    },
+    {
+      "title": "Mobile Application Lead Developer Position Description v2",
+      "skills": [
+        "computer vision",
+        "java",
+        "kotlin",
+        "swift",
+        "react",
+        "graphql",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "github actions",
+        "automation",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "cybersecurity",
+        "compliance",
+        "agile"
+      ]
+    },
+    {
+      "title": "Mobile Application Software Developer Job Announcement",
+      "skills": [
+        "computer vision",
+        "java",
+        "javascript",
+        "typescript",
+        "kotlin",
+        "swift",
+        "react",
+        "graphql",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "github actions",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "agile",
+        "jira"
+      ]
+    },
+    {
+      "title": "Mobile Application Software Developer Position Description",
+      "skills": [
+        "computer vision",
+        "java",
+        "kotlin",
+        "swift",
+        "react",
+        "graphql",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "github actions",
+        "automation",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "cybersecurity",
+        "compliance",
+        "agile"
+      ]
+    },
+    {
+      "title": "Software and AWS Developer Job Announcement",
+      "skills": [
+        "computer vision",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c#",
+        "aws",
+        "docker",
+        "git",
+        "ci/cd",
+        "automation",
+        "cybersecurity"
+      ]
+    },
+    {
+      "title": "Software and AWS Developer Position Description",
+      "skills": [
+        "computer vision",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c#",
+        "aws",
+        "docker",
+        "git",
+        "ci/cd",
+        "automation",
+        "cybersecurity",
+        "compliance",
+        "project management",
+        "agile",
+        "jira"
+      ]
+    },
+    {
+      "title": "SIN 2   AI ML ENg Job Announcement",
+      "skills": [
+        "transformer",
+        "embeddings",
+        "computer vision",
+        "deep learning",
+        "tensorflow",
+        "pytorch",
+        "python",
+        "aws"
+      ]
+    },
+    {
+      "title": "SIN 2   AI ML Eng Postion Description",
+      "skills": [
+        "transformer",
+        "embeddings",
+        "computer vision",
+        "deep learning",
+        "tensorflow",
+        "pytorch",
+        "python",
+        "aws",
+        "ios",
+        "android"
+      ]
+    },
+    {
+      "title": "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
+      "skills": [
+        "llm",
+        "transformer",
+        "prompt engineering",
+        "embeddings",
+        "computer vision",
+        "neural networks",
+        "agentic",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "python",
+        "aws",
+        "git",
+        "automation",
+        "cybersecurity",
+        "agile"
+      ]
+    },
+    {
+      "title": "SIN2 Software Developer AgAI ML CV 3D Position Description",
+      "skills": [
+        "llm",
+        "transformer",
+        "prompt engineering",
+        "embeddings",
+        "computer vision",
+        "neural networks",
+        "agentic",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "data analysis",
+        "data science",
+        "python",
+        "aws",
+        "git",
+        "automation",
+        "cybersecurity",
+        "agile"
+      ]
+    },
+    {
+      "title": "SIN2 SWDev AI ML CV Job Announcement",
+      "skills": [
+        "transformer",
+        "embeddings",
+        "computer vision",
+        "neural networks",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "python",
+        "git"
+      ]
+    },
+    {
+      "title": "Software Developer - AI/ML, Computer Vision",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "python"
+      ]
+    },
+    {
+      "title": "SIN2 SWDev AI ML CV Position Description",
+      "skills": [
+        "transformer",
+        "embeddings",
+        "computer vision",
+        "neural networks",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "data analysis",
+        "data science",
+        "python",
+        "git"
+      ]
+    },
+    {
+      "title": "Computer Vision 3D Eng  PD",
+      "skills": [
+        "transformers",
+        "computer vision",
+        "deep learning",
+        "neural networks",
+        "mlops",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "pandas",
+        "numpy",
+        "data science",
+        "data engineering",
+        "python",
+        "c++",
+        "aws",
+        "azure",
+        "gcp",
+        "docker",
+        "ci/cd"
+      ]
+    },
+    {
+      "title": "IoT Developer Job Announcement",
+      "skills": [
+        "computer vision",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c++",
+        "c#",
+        "kotlin",
+        "swift",
+        "react",
+        "rest",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "automation",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "cybersecurity",
+        "agile",
+        "jira"
+      ]
+    },
+    {
+      "title": "IoT Developer Position Description",
+      "skills": [
+        "computer vision",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c++",
+        "c#",
+        "kotlin",
+        "swift",
+        "react",
+        "rest",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "automation",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "cybersecurity",
+        "compliance",
+        "project management",
+        "agile",
+        "jira"
+      ]
+    },
+    {
+      "title": "SIN3 3D CV Intern",
+      "skills": [
+        "computer vision"
+      ]
+    },
+    {
+      "title": "SIN3 3D CV Position Announcement",
+      "skills": [
+        "computer vision",
+        "deep learning",
+        "mlops",
+        "tensorflow",
+        "pytorch",
+        "python",
+        "airflow",
+        "aws",
+        "git"
+      ]
+    },
+    {
+      "title": "SIN3 3D CV Position",
+      "skills": [
+        "computer vision",
+        "deep learning",
+        "mlops",
+        "tensorflow",
+        "pytorch",
+        "python",
+        "airflow",
+        "aws",
+        "git"
+      ]
+    },
+    {
+      "title": "SIN3 3D CV AI Intern Position Announcement",
+      "skills": [
+        "computer vision",
+        "automation"
+      ]
+    },
+    {
+      "title": "SIN3 3D CV IoT Intern Position Description",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "pandas",
+        "numpy",
+        "data science",
+        "python",
+        "javascript",
+        "typescript",
+        "c++",
+        "c#",
+        "kotlin",
+        "swift",
+        "aws",
+        "docker",
+        "git",
+        "linux",
+        "automation",
+        "agile",
+        "jira"
+      ]
+    },
+    {
+      "title": "SIN3 AI ML CV Engineering Intern Position Description",
+      "skills": [
+        "fine-tuning",
+        "computer vision",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "pandas",
+        "numpy",
+        "data science",
+        "python",
+        "aws",
+        "azure",
+        "docker",
+        "git",
+        "linux",
+        "agile",
+        "jira"
+      ]
+    },
+    {
+      "title": "Full Stack Web Developer Job Announcement Revised",
+      "skills": [
+        "computer vision",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "vue",
+        "angular",
+        "next.js",
+        "html",
+        "css",
+        "sql",
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "aws",
+        "azure",
+        "docker",
+        "kubernetes",
+        "git",
+        "ci/cd",
+        "ios",
+        "android",
+        "cybersecurity",
+        "agile"
+      ]
+    },
+    {
+      "title": "Full Stack Web Developer Position Description Revised",
+      "skills": [
+        "computer vision",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "vue",
+        "angular",
+        "next.js",
+        "html",
+        "css",
+        "rest",
+        "sql",
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "aws",
+        "azure",
+        "gcp",
+        "docker",
+        "kubernetes",
+        "git",
+        "ci/cd",
+        "ios",
+        "android",
+        "cybersecurity",
+        "compliance",
+        "agile"
+      ]
+    },
+    {
+      "title": "Software and Website Developer Job Announcement",
+      "skills": [
+        "computer vision",
+        "python",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "vue",
+        "angular",
+        "next.js",
+        "html",
+        "css",
+        "git",
+        "agile",
+        "content"
+      ]
+    },
+    {
+      "title": "Software and Website Developer Position Description",
+      "skills": [
+        "computer vision",
+        "data science",
+        "python",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "vue",
+        "angular",
+        "next.js",
+        "express",
+        "html",
+        "css",
+        "sql",
+        "git",
+        "automation",
+        "cybersecurity",
+        "jira",
+        "marketing",
+        "content"
+      ]
+    },
+    {
+      "title": "Software Website Developer Intern PD",
+      "skills": [
+        "computer vision",
+        "data science",
+        "python",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "next.js",
+        "html",
+        "css",
+        "sql",
+        "git",
+        "automation",
+        "compliance",
+        "jira",
+        "content"
+      ]
+    },
+    {
+      "title": "Software Website Developer Intern Performance Metrics",
+      "skills": [
+        "git",
+        "compliance",
+        "content"
+      ]
+    },
+    {
+      "title": "UI UX Developer Job Announcement",
+      "skills": [
+        "typescript",
+        "kotlin",
+        "swift",
+        "react",
+        "ios",
+        "android",
+        "agile"
+      ]
+    },
+    {
+      "title": "UI UX Developer Position description",
+      "skills": [
+        "typescript",
+        "kotlin",
+        "swift",
+        "react",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "agile",
+        "stakeholder management"
+      ]
+    },
+    {
+      "title": "UI UX Mobile Web Developer Job Announcement Final",
+      "skills": [
+        "computer vision",
+        "python",
+        "javascript",
+        "typescript",
+        "kotlin",
+        "swift",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "html",
+        "css",
+        "git",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "agile",
+        "content"
+      ]
+    },
+    {
+      "title": "UI UX Mobile Web Developer Position Description Final",
+      "skills": [
+        "computer vision",
+        "python",
+        "javascript",
+        "typescript",
+        "kotlin",
+        "swift",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "html",
+        "css",
+        "git",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "project management",
+        "agile",
+        "content"
+      ]
+    },
+    {
+      "title": "Web Dev  Full Stack Position",
+      "skills": [
+        "computer vision",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "vue",
+        "angular",
+        "next.js",
+        "html",
+        "css",
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "aws",
+        "azure",
+        "docker",
+        "kubernetes",
+        "git",
+        "ci/cd",
+        "ios",
+        "android",
+        "agile",
+        "requirements gathering"
+      ]
+    },
+    {
+      "title": "Web Developer (Full Stack)  Position Announcement",
+      "skills": [
+        "computer vision",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "next.js",
+        "html",
+        "css",
+        "git"
+      ]
+    },
+    {
+      "title": "Website Developer Lead Developer Full Stack Job Announcement",
+      "skills": [
+        "computer vision",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "vue",
+        "angular",
+        "next.js",
+        "html",
+        "css",
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "aws",
+        "azure",
+        "docker",
+        "kubernetes",
+        "git",
+        "ci/cd",
+        "automation",
+        "ios",
+        "android",
+        "cybersecurity",
+        "agile",
+        "seo",
+        "marketing"
+      ]
+    },
+    {
+      "title": "Website Developer Lead Developer Full Stack Position Description",
+      "skills": [
+        "computer vision",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "react",
+        "node.js",
+        "node",
+        "fastapi",
+        "vue",
+        "angular",
+        "next.js",
+        "html",
+        "css",
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "aws",
+        "azure",
+        "docker",
+        "kubernetes",
+        "git",
+        "ci/cd",
+        "automation",
+        "ios",
+        "android",
+        "cybersecurity",
+        "compliance",
+        "agile",
+        "seo",
+        "marketing",
+        "content"
+      ]
+    }
+  ]
+}
