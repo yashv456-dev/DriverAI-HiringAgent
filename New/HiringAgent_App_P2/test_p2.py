@@ -2888,6 +2888,39 @@ ok(verdict is True,
    "strict recent audit keeps an explicit US city/state when the source file is unavailable")
 
 
+print("\n=== W1b. RESUME HEADER LOCATION FORMATS ===")
+# _extract_location was built entirely around a comma between city and state, so
+# 'Phoenix AZ 85004' - one of the commonest header shapes - extracted nothing. Live
+# rows then carried Location "Not extracted" and were rejected on geography they had
+# never actually failed. The full-state path also searched " ".join(lines), letting the
+# city pattern run backwards over a line break and swallow the candidate's own name.
+from hiring_agent.extraction import _extract_location as _loc
+
+for _text, _want, _why in [
+    ("Jane Doe\nAustin, TX\njane@x.com", "Austin, TX", "classic City, ST"),
+    ("Jane Doe\nPhoenix AZ 85004", "Phoenix, AZ", "no comma, trailing ZIP"),
+    ("Jane Doe\nDallas TX | (682) 409-2153", "Dallas, TX", "no comma, pipe-separated"),
+    ("Jane Doe\nSeattle WA", "Seattle, WA", "bare City ST"),
+    ("Jane Doe\nPhoenix, Arizona 85004", "Phoenix, Arizona", "full state + ZIP"),
+    ("Jane Doe\nBoston, Massachusetts", "Boston, Massachusetts", "full state name"),
+    ("Jane Doe\nNew York, NY 10001", "New York, NY", "City, ST + ZIP"),
+    ("Jane Doe\nemail | 480-277-5159 | Tempe, AZ", "Tempe, AZ", "after pipe fields"),
+]:
+    _got = str(_loc(_text) or "")
+    ok(_got == _want, f"location {_why}: {_got!r} == {_want!r}")
+
+_swallow = str(_loc("Jane Doe\nPhoenix, Arizona 85004") or "")
+ok("jane" not in _swallow.lower(),
+   f"full-state path never swallows the name across a line break (got {_swallow!r})")
+
+# The comma-less path must not fire on prose that merely contains a state abbreviation.
+for _text, _want, _why in [
+    ("Jane Doe\nSkills: Java OR Python\nAustin, TX", "Austin, TX", "'OR' (Oregon) in a skills line"),
+    ("Jane Doe\nMS SQL Server Developer\nDenver, CO", "Denver, CO", "'MS' (Mississippi) in a title"),
+]:
+    _got = str(_loc(_text) or "")
+    ok(_got == _want, f"no false positive from {_why}: {_got!r} == {_want!r}")
+
 print("\n=== W2. CLIENT EXPORT PERIOD SEPARATORS ===")
 from hiring_agent.sharepoint_scoring import _with_period_separators as _sep
 

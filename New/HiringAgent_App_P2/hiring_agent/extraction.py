@@ -169,12 +169,32 @@ def _extract_location(text: str) -> str | None:
             if m:
                 return f"{m.group(1)}, {m.group(2)}"
 
+    # 1b. Header "City ST" with NO comma ('Phoenix AZ 85004', 'Dallas TX | 682-...').
+    #     Extremely common in real resume headers and previously missed entirely, which
+    #     is how live rows ended up with Location "Not extracted" and were then rejected.
+    #     Kept deliberately tight to avoid false positives from prose like 'Java OR
+    #     Python': header lines only, the 2-letter token must be a real state abbrev,
+    #     and it must end the segment (optionally followed by a ZIP) rather than be
+    #     followed by another word.
+    _city_state_nocomma_re = re.compile(
+        r"^([A-Z][A-Za-z.\-]+(?:\s+[A-Z][A-Za-z.\-]+){0,2})\s+([A-Z]{2})"
+        r"(?:\s+\d{5}(?:-\d{4})?)?\s*$"
+    )
+    for ln in header:
+        for seg in re.split(r"\s*[|•·]\s*", ln):
+            m = _city_state_nocomma_re.match(seg.strip())
+            if m and m.group(2).lower() in US_STATE_ABBREVS:
+                return f"{m.group(1)}, {m.group(2)}"
+
     for ln in header:
         for seg in re.split(r"\s*[|]\s*", ln):
             seg_low = seg.strip().lower()
+            # Drop a trailing ZIP before comparing, so 'Phoenix, Arizona 85004' still
+            # resolves to the state instead of falling through to the fuzzy scan below.
+            seg_low = re.sub(r"\s+\d{5}(?:-\d{4})?$", "", seg_low)
             parts = re.split(r",\s*", seg_low)
             if len(parts) >= 2 and parts[-1].strip() in US_STATE_NAMES:
-                return seg.strip().title()
+                return ", ".join(p.strip().title() for p in parts)
             # "City, State, Country" — state in second-to-last part, strip trailing country
             if len(parts) >= 3 and parts[-2].strip() in US_STATE_NAMES:
                 return ", ".join(p.strip().title() for p in parts[:-1])
@@ -190,15 +210,20 @@ def _extract_location(text: str) -> str | None:
             if re.search(r"(?<![a-z])" + re.escape(city) + r"(?![a-z])", joined):
                 return city.title()
 
-    full_low = " ".join(lines).lower()
+    # Search line by line, NOT over " ".join(lines): joining lets the city pattern run
+    # backwards across a line break and swallow whatever preceded it, which turned
+    # "Jane Doe\nPhoenix, Arizona 85004" into the location "Jane Doe Phoenix, Arizona".
     for state in US_STATE_NAMES:
-        if re.search(r",\s*" + re.escape(state) + r"(?![a-z])", full_low):
-            m2 = re.search(
-                r"([A-Z][A-Za-z.\-]+(?:\s+[A-Z][A-Za-z.\-]+){0,2}),\s*"
-                + re.escape(state.title()), " ".join(lines))
+        state_re = re.compile(
+            r"([A-Z][A-Za-z.\-]+(?:\s+[A-Z][A-Za-z.\-]+){0,2}),\s*"
+            + re.escape(state.title()) + r"(?![a-z])")
+        for ln in lines:
+            m2 = state_re.search(ln)
             if m2:
                 return f"{m2.group(1)}, {state.title()}"
-            return state.title()
+        for ln in lines:
+            if re.search(r",\s*" + re.escape(state) + r"(?![a-z])", ln.lower()):
+                return state.title()
 
     # 6. Foreign country/city (header first, then full text) — so the geo filter can
     #    reject non-USA candidates instead of defaulting to "benefit of the doubt".
