@@ -148,6 +148,34 @@ ok(len(bad_waits) == 0,
 for name, iv, secs in bad_waits:
     print(f"    -> {name}: {iv} = {secs}s (must be 5s..30d, or it fails at runtime with BadRequest)")
 
+# Power Automate numbers top-level actions at nesting level 0 and rejects anything
+# beyond level 8. The scheduled unread guard must stay a sibling of the legacy graph;
+# wrapping the graph once pushed the update/follow-up paths to level 9 at import time.
+def _action_depths(action_map, level=0):
+    for action_name, action in action_map.items():
+        yield action_name, level
+        child_actions = action.get("actions")
+        if isinstance(child_actions, dict):
+            yield from _action_depths(child_actions, level + 1)
+        else_actions = action.get("else", {}).get("actions")
+        if isinstance(else_actions, dict):
+            yield from _action_depths(else_actions, level + 1)
+        for case in action.get("cases", {}).values():
+            case_actions = case.get("actions")
+            if isinstance(case_actions, dict):
+                yield from _action_depths(case_actions, level + 1)
+        default_actions = action.get("default", {}).get("actions")
+        if isinstance(default_actions, dict):
+            yield from _action_depths(default_actions, level + 1)
+
+depths = list(_action_depths(defn["actions"]))
+max_depth = max(level for _, level in depths)
+too_deep = [(name, level) for name, level in depths if level > 8]
+ok(not too_deep and max_depth == 8,
+   f"maximum action nesting is {max_depth}, within Power Automate's level-8 limit")
+ok("CONFIG" in defn["actions"] and "CurrentEmail" in defn["actions"],
+   "unread guard and existing processing graph are flat top-level siblings")
+
 # ── A. TRIGGER / SCHEDULE ────────────────────────────────────────────────────
 print("\n=== A. TRIGGER / SCHEDULE ===")
 trig  = defn.get("triggers", {})
@@ -157,14 +185,35 @@ trg   = trig[tname]
 rec   = trg.get("recurrence", {})
 ok(rec.get("interval") == cfg["trigger"]["interval_min"],
    f"poll interval = {rec.get('interval')} min (config {cfg['trigger']['interval_min']})")
-ok(trg.get("splitOn") is not None, "splitOn set (per-email fan-out)")
+ok(trg.get("type") == "Recurrence", "scheduled Recurrence trigger polls existing unread mail")
+ok(trg.get("splitOn") is None, "no new-arrival splitOn watermark remains")
 # Concurrency = 1 prevents double-row writes
 op_opts = trg.get("operationOptions", "") or ""
 limits  = trg.get("runtimeConfiguration", {}).get("concurrency", {})
 ok(limits.get("runs", 0) == 1 or "Single" in op_opts or "1" in json.dumps(limits),
    "concurrency = 1 (sequential, no parallel runs)")
-ok("shared" in tname.lower() or "shared_mailbox" in blob.lower(),
-   "trigger is shared-mailbox connector (not personal inbox)")
+get_unread = actions.get("Get_unread_emails", {})
+get_unread_params = get_unread.get("inputs", {}).get("parameters", {})
+ok(get_unread.get("inputs", {}).get("host", {}).get("operationId") == "GetEmailsV3",
+   "Get_unread_emails uses the supported Outlook Get emails (V3) action")
+ok(get_unread_params.get("mailboxAddress") == cfg["email"]["trigger_mailbox"],
+   "unread poll targets the configured shared mailbox")
+ok(get_unread_params.get("folderPath") == "Inbox"
+   and get_unread_params.get("fetchOnlyUnread") is True,
+   "unread poll selects only Inbox messages whose read flag is false")
+ok(get_unread_params.get("includeAttachments") is True,
+   "unread poll includes attachment content for resume saves")
+ok(get_unread_params.get("top") == cfg["trigger"]["unread_per_run"] == 1,
+   "exactly one unread message is claimed per sequential run")
+ok(actions.get("Has_unread_email", {}).get("runAfter") == {"Get_unread_emails": ["Succeeded"]},
+   "processing starts only after the unread poll succeeds")
+ok(actions.get("CurrentEmail", {}).get("inputs") ==
+   "@first(body('Get_unread_emails')?['value'])",
+   "CurrentEmail selects the single polled message")
+ok(actions.get("CONFIG", {}).get("runAfter") == {"CurrentEmail": ["Succeeded"]},
+   "the existing P1 graph starts after CurrentEmail is selected")
+ok("triggerOutputs" not in blob and "triggerBody" not in blob,
+   "all processing expressions read CurrentEmail, not a new-arrival trigger payload")
 
 # ── B. COLUMN CONTRACT (table = 30 cols; Add_row writes ONLY the 11 P1-owned ones) ───
 # The TABLE has 30 columns (defined by the workbook template header + P2's own schema additions
@@ -199,11 +248,13 @@ ok(all(c in p2cols for c in P2_OWNED), f"All {len(P2_OWNED)} P2-owned scoring/pr
 # 'Mail Sent' audit column: stamped only AFTER a reply actually sends — never at row creation.
 ok("Mail Sent" in p2cols, "'Mail Sent' audit column present in the table schema")
 ok("Mail Sent" not in item, "Add_row does NOT list 'Mail Sent' (stamped by Patch_mail_sent after the ack sends)")
-# Stamp-content checks depend on the build mode: a live build writes conditional
-# 'Sent <timestamp>' expressions; a suppress-mode build writes a flat TEST-MODE marker
+# Stamp-content checks depend on the applicant-mail setting: an enabled build writes
+# conditional 'Sent <timestamp>' expressions; a silent-intake build writes a suppression marker
 # (the Send_* actions are no-op Compose placeholders that always 'succeed', so a
 # conditional real-looking stamp would lie).
-_suppress_b = bool(cfg.get("test_mode", {}).get("suppress_emails", False))
+_send_applicant_mail = bool(cfg.get("email", {}).get("send_applicant_emails", True))
+_send_admin_alerts = bool(cfg.get("email", {}).get("send_admin_failure_alerts", True))
+_suppress_b = not _send_applicant_mail
 _pms = actions.get("Patch_mail_sent")
 ok(_pms is not None, "Patch_mail_sent action exists (ack-path 'Mail Sent' stamp)")
 if _pms is not None:
@@ -215,8 +266,8 @@ if _pms is not None:
        "Patch_mail_sent writes the 'Mail Sent' column")
     _pms_stamp = _pms["inputs"]["parameters"]["item"]["Mail Sent"]
     if _suppress_b:
-        ok("TEST-MODE (suppressed)" in _pms_stamp,
-           "Patch_mail_sent stamps the TEST-MODE marker (suppress mode - nothing was sent)")
+        ok("Suppressed (applicant email disabled)" in _pms_stamp,
+           "Patch_mail_sent records that applicant email was suppressed")
     else:
         ok("formatDateTime" in _pms_stamp and "'Sent '" in _pms_stamp,
            "Patch_mail_sent stamps a 'Sent <timestamp>' value (aligned with Rejected sheet's Decline Sent)")
@@ -226,8 +277,8 @@ for _patch_name, _patch_send in (("Patch_dup_attempts", "Send_duplicate_notice")
     _pa = actions.get(_patch_name)
     _ms = (_pa or {}).get("inputs", {}).get("parameters", {}).get("item", {}).get("Mail Sent", "")
     if _suppress_b:
-        ok("TEST-MODE (suppressed)" in _ms,
-           f"{_patch_name} stamps the TEST-MODE marker (suppress mode - nothing was sent)")
+        ok("Suppressed (applicant email disabled)" in _ms,
+           f"{_patch_name} records that applicant email was suppressed")
     else:
         ok(f"actions('{_patch_send}')?['status']" in _ms,
            f"{_patch_name} stamps 'Mail Sent' conditionally on {_patch_send} really succeeding")
@@ -235,6 +286,34 @@ for _patch_name, _patch_send in (("Patch_dup_attempts", "Send_duplicate_notice")
            f"{_patch_name} stamps a 'Sent <timestamp>' value when the reply sent")
         ok("coalesce" in _ms and "'Mail Sent'" in _ms,
            f"{_patch_name} preserves an earlier 'Mail Sent' stamp when the send failed/skipped")
+
+# Last Updated Date max-guard (fixed 2026-07-31): every patch stamps it, and never backward -
+# see _last_updated_expr in build_zip.py. Patch_followup_attempts previously omitted it entirely,
+# which corrupted P2's _updated_after_location_request() (sharepoint_scoring.py) into thinking a
+# candidate who replied with a text-only follow-up never responded.
+for _patch_name in ("Patch_dup_attempts", "Patch_update_attempts", "Patch_followup_attempts"):
+    _pa_item = (actions.get(_patch_name) or {}).get("inputs", {}).get("parameters", {}).get("item", {}) or {}
+    _lud = _pa_item.get("Last Updated Date", "")
+    ok("Last Updated Date" in _pa_item, f"{_patch_name} stamps Last Updated Date on every contact")
+    ok("greater(ticks(" in _lud and "Received Date" in _lud,
+       f"{_patch_name}'s Last Updated Date never moves backward (max-guard against the row's existing value)")
+
+# Resume filename uses the MATCHED ROW's real Application ID, not whatever ref the email text
+# happens to quote (fixed 2026-07-31): a sender still replying to a dead/old thread would have
+# their update resume saved under a stale AppRef that P2's file lookup - keyed strictly to the
+# row's own current Application ID (sharepoint_scoring.py _resume_name_slots) - could never find.
+ok("AppRef_current" in actions, "AppRef_current exists (the matched row's live Application ID)")
+ok("first(body('Get_rows_ref')" in actions.get("AppRef_current", {}).get("inputs", ""),
+   "AppRef_current is sourced from Get_rows_ref (matched by sender email), not the quoted text")
+_frs_inputs = actions.get("FileRef_from_subject", {}).get("inputs", "")
+ok("AppRef_current" in _frs_inputs and "AppRef_from_subject" not in _frs_inputs,
+   "FileRef_from_subject (the saved update-resume filename) is built from AppRef_current, not the text-quoted ref")
+if not _suppress_b:
+    for _email_action, _label in (("Send_update_ack", "Email 5"), ("Send_noted_reply", "Email 6")):
+        _subj = json.dumps(actions.get(_email_action, {}))
+        ok("AppRef_current" in _subj,
+           f"{_label} ({_email_action}) shows the applicant their real current reference (AppRef_current)")
+
 ok(p2cols[3]  == "Category",         f"Category at table position #4 (got '{p2cols[3]}')")
 ok(p2cols[4]  == "Resume Link",      f"Resume Link at table position #5 (moved 2026-07-24; got '{p2cols[4]}')")
 ok(p2cols[0]  == "Application ID",   "Application ID at position #1")
@@ -285,7 +364,7 @@ _filter_src = json.dumps(actions["Get_rows"]["inputs"]["parameters"])
 _row_email_src = json.dumps(item.get("Email", ""))
 for _label, _src in (("Get_rows $filter", _filter_src), ("Add_row Email value", _row_email_src)):
     ok("toLower(" in _src, f"{_label} lowercases the sender address")
-    ok("split(triggerOutputs()?['body/from'],'<')" in _src,
+    ok("split(outputs('CurrentEmail')?['from'],'<')" in _src,
        f"{_label} strips a 'Display Name <addr>' wrapper before comparing/storing")
 # Both sides must derive from the identical expression, not two hand-written copies that could
 # drift apart - Get_rows_ref shares the same _EMAIL_FILTER constant as Get_rows, confirmed here
@@ -409,8 +488,8 @@ final_threshold = reply_cap - 1
 old_threshold = cap - 1   # the threshold BEFORE this change (final notice on the 5th reply)
 ok(final_threshold == 2, f"final-notice threshold = reply_cap-1 = {final_threshold} (fires on exactly the 3rd reply, never twice)")
 # The final-notice swap lives inside the email BODIES, which only exist in a live build -
-# in suppress mode the Send_* actions are no-op Compose placeholders with no body at all.
-_suppress_mode = bool(cfg.get("test_mode", {}).get("suppress_emails", False))
+# when applicant mail is disabled the Send_* actions are no-op Compose placeholders with no body.
+_suppress_mode = not _send_applicant_mail
 if _suppress_mode:
     ok(blob.count(f"'0')),{final_threshold})") == 0,
        "final-notice closing absent in suppress mode (email bodies are suppressed no-ops)")
@@ -436,12 +515,12 @@ for a, requeues in (("Patch_dup_attempts_noreply", True),
     ok("Application Updates" in _item, f"{a} still increments Application Updates")
     ok((("Status" in _item) == requeues),
        f"{a} {'re-queues Status' if requeues else 'does not touch Status'} as expected")
-    if a.startswith(("Patch_dup", "Patch_update")):
-        ok("Last Updated Date" in _item,
-           f"{a} stamps Last Updated Date because a resume was saved")
-    else:
-        ok("Last Updated Date" not in _item,
-           f"{a} does not stamp Last Updated Date because no resume was saved")
+    # All three (fixed 2026-07-31): any patched contact - resume resend, ref-quoted update, or a
+    # text-only follow-up - is a genuine candidate touch and must move Last Updated Date. A
+    # follow-up used to be silently excluded, which corrupted P2's
+    # _updated_after_location_request() (sharepoint_scoring.py) into thinking a candidate who
+    # replied never did.
+    ok("Last Updated Date" in _item, f"{a} stamps Last Updated Date on every contact")
 # Send_duplicate_notice's subject carries the reference, matching Emails 1/5/6 (was missing
 # before) - only checkable in a live build (in suppress mode 'inputs' is a plain string).
 if not _suppress_mode:
@@ -556,6 +635,14 @@ for sheet_name, expected_cols in (("CandidateList", P2_COLUMNS), ("Rejected", P2
        f"({len(got_cols)} cols)" if got_cols == expected_cols
        else f"setup template '{sheet_name}' columns MISMATCH P2's canonical order "
             f"(got {got_cols}, expected {expected_cols})")
+    _sheet_tables = list(ws.tables.values())
+    ok(len(_sheet_tables) == 1,
+       f"setup template '{sheet_name}' has exactly one Excel table")
+    ok(bool(_sheet_tables) and str(_sheet_tables[0].ref).endswith("2"),
+       f"setup template '{sheet_name}' table includes the permanent row-2 spacer")
+    ok(all(ws.cell(row=2, column=i).value in ("", None)
+           for i in range(1, ws.max_column + 1)),
+       f"setup template '{sheet_name}' has one fully blank row directly after the header")
 
 # ── K. INBOX TIDY (2 destinations: legit->Archive read, spam->Junk Email unread) ─────
 print("\n=== K. INBOX TIDY (Archive vs Junk Email routing) ===")
@@ -599,23 +686,123 @@ ok(len(arch_moves) == 7, f"exactly 7 legit moves go to Archive (got {len(arch_mo
 mark_read = [n for n in actions if n.startswith("Mark_as_read")]
 ok(len(mark_read) == 7, f"exactly 7 mark-as-read (legit only; spam is unread) (got {len(mark_read)})")
 ok(len(all_moves) == 10, f"10 total moves (3 spam + 7 legit) (got {len(all_moves)})")
+for move_name in all_moves:
+    ok(actions[move_name].get("inputs", {}).get("retryPolicy", {}).get("type") == "none",
+       f"{move_name} disables automatic replay of the non-idempotent move")
+
+all_move_v2 = {
+    name: action for name, action in actions.items()
+    if isinstance(action.get("inputs"), dict)
+    and action["inputs"].get("host", {}).get("operationId") == "MoveV2"
+}
+ok(len(all_move_v2) == 11,
+   f"exactly 11 MoveV2 actions exist (10 outcome moves + 1 failure move; got {len(all_move_v2)})")
+for move_name, move_action in all_move_v2.items():
+    move_params = move_action.get("inputs", {}).get("parameters", {})
+    ok(move_params.get("messageId") == "@outputs('CurrentEmail')?['id']",
+       f"{move_name} uses the current polled message ID")
+    ok(move_params.get("mailboxAddress") == cfg["email"]["trigger_mailbox"],
+       f"{move_name} uses the configured shared mailbox")
+    ok(move_params.get("folderPath") in {"Archive", "Junk Email"},
+       f"{move_name} uses a portable well-known folder name")
+
+ok("Move_failed_to_recruiting_review" not in actions,
+   "legacy Recruiting Review failure move is absent")
+ok(not any(str(a.get("inputs", {}).get("parameters", {}).get("folderPath", "")).startswith("AAMk")
+           for a in all_move_v2.values()),
+   "no tenant-specific Outlook folder ID is baked into a MoveV2 action")
+
+# Every nested outcome move must have exactly one same-scope terminal continuation.
+# This reverse check catches a move that accidentally loses its downstream handler.
+branch_moves = [name for name in all_moves if name != "Move_to_processed"]
+ok(len(branch_moves) == 9, f"9 nested outcome moves require terminal handlers (got {len(branch_moves)})")
+for move_name in branch_moves:
+    dependents = [
+        (name, action) for name, action in actions.items()
+        if owner_of.get(name) == owner_of.get(move_name)
+        and move_name in action.get("runAfter", {})
+    ]
+    ok(len(dependents) == 1 and dependents[0][1].get("type") == "Terminate",
+       f"{move_name} has exactly one same-scope Terminate continuation")
+    if dependents:
+        ok(set(dependents[0][1].get("runAfter", {}).get(move_name, [])) ==
+           {"Succeeded", "Failed", "Skipped", "TimedOut"},
+           f"{move_name} continuation handles every terminal status")
+
+for mark_name in mark_read:
+    suffix = mark_name.removeprefix("Mark_as_read")
+    move_name = "Move_to_processed" + suffix
+    ok(actions.get(move_name, {}).get("runAfter", {}).get(mark_name) ==
+       ["Succeeded", "Failed", "TimedOut"],
+       f"{move_name} follows mark success/failure/timeout but never a skipped branch")
+
+# Terminal cleanup must be explicitly handled. Otherwise a benign Outlook 404 after
+# another actor has already moved the message marks a fully processed intake as Failed.
+processed_finalize = actions.get("Finalize_processed_cleanup", {})
+ok(processed_finalize.get("type") == "Compose",
+   "Finalize_processed_cleanup handles the terminal normal-move result")
+ok(processed_finalize.get("runAfter") ==
+   {"Move_to_processed": ["Succeeded", "Failed", "TimedOut"]},
+   "normal cleanup handles success/failure/timeout without activating on a skipped branch")
+
+for term_name, term in actions.items():
+    if not term_name.startswith("Terminate_"):
+        continue
+    run_after = term.get("runAfter", {})
+    move_dependencies = [name for name in run_after if name.startswith("Move_to_processed")]
+    for move_name in move_dependencies:
+        ok(set(run_after[move_name]) == {"Succeeded", "Failed", "Skipped", "TimedOut"},
+           f"{term_name} handles every terminal status from {move_name}")
 
 # ── L. ERROR HANDLING ────────────────────────────────────────────────────────
 print("\n=== L. ERROR HANDLING ===")
 ok("Notify_failure" in actions, "Notify_failure admin alert action present")
+ok("Notify_poll_failure" in actions, "Notify_poll_failure Inbox-read alert action present")
 nf_src = json.dumps(actions.get("Notify_failure", {}))
-if _suppress_b:
-    ok("TEST-MODE" in nf_src, "Notify_failure is a suppressed no-op (test mode - no admin email)")
+npf_src = json.dumps(actions.get("Notify_poll_failure", {}))
+if not _send_admin_alerts:
+    ok(actions.get("Notify_failure", {}).get("type") == "Compose",
+       "Notify_failure is a no-op because admin alerts are disabled")
 else:
+    ok(actions.get("Notify_failure", {}).get("type") == "OpenApiConnection",
+       "Notify_failure remains a real connector action")
     ok(cfg["email"]["admin_email"] in nf_src,
        f"failure alert targets {cfg['email']['admin_email']}")
     ok("AppRef" in nf_src or "app" in nf_src.lower(),
        "failure alert includes application reference for traceability")
+    ok(actions.get("Notify_poll_failure", {}).get("type") == "OpenApiConnection",
+       "unread-Inbox poll failure remains a real admin connector action")
+    ok(cfg["email"]["admin_email"] in npf_src,
+       "unread-Inbox poll failure targets the configured admin")
+    ok(actions["Notify_poll_failure"].get("runAfter") ==
+       {"Get_unread_emails": ["Failed", "TimedOut"]},
+       "poll failure alert runs only when Get_unread_emails fails or times out")
 # Error path leaves email UNREAD — verified by Notify_failure NOT being in
 # a "runAfter Mark_as_read" chain; its runAfter should be HasResume Failed/TimedOut
 nf_ra = actions["Notify_failure"].get("runAfter", {})
 ok(any("HasResume" in k or "IsSpam" in k or "IsSubject" in k
        for k in nf_ra), "Notify_failure runs after flow body (not after a tidy action)")
+failure_dest = cfg["inbox_tidy"]["failure_destination"]
+for _move_name in ("Move_failed_to_archive_unread",):
+    _move = actions.get(_move_name, {})
+    ok(_move.get("inputs", {}).get("host", {}).get("operationId") == "MoveV2",
+       f"{_move_name} is a real shared-mailbox move")
+    ok(_move.get("inputs", {}).get("parameters", {}).get("folderPath") == failure_dest,
+       f"{_move_name} targets the configured portable failure folder")
+    ok(_move.get("inputs", {}).get("retryPolicy", {}).get("type") == "none",
+       f"{_move_name} disables automatic replay of the non-idempotent move")
+    ok(_move.get("runAfter") ==
+       {"Notify_failure": ["Succeeded", "Failed", "TimedOut"]},
+       f"{_move_name} runs only after an actual processing-failure alert attempt")
+    ok("Skipped" not in _move.get("runAfter", {}).get("Notify_failure", []),
+       f"{_move_name} cannot race normal cleanup when Notify_failure is skipped on success")
+
+failed_finalize = actions.get("Finalize_failed_cleanup", {})
+ok(failed_finalize.get("type") == "Compose",
+   "Finalize_failed_cleanup handles failure-routing cleanup errors")
+ok(failed_finalize.get("runAfter") ==
+   {"Move_failed_to_archive_unread": ["Succeeded", "Failed", "TimedOut"]},
+   "failure cleanup handles success/failure/timeout without activating on normal success")
 
 # ── M. ROUTING SIMULATION ────────────────────────────────────────────────────
 print("\n=== M. ROUTING SIMULATION ===")
@@ -914,54 +1101,90 @@ ok(d["properties"].get("displayName") == cfg["flow_name"] or
    cfg["flow_name"] in json.dumps(d),
    f"flow displayName matches config flow_name '{cfg['flow_name']}'")
 
-# ── O. TEST MODE (email suppression) — definition must MATCH the config flag ──
-print("\n=== O. TEST MODE (suppress_emails) — definition matches config ===")
-_suppress = bool(cfg.get("test_mode", {}).get("suppress_emails", False))
+# ── O. OUTBOUND MAIL CONTROLS — definition must MATCH the config flags ──────
+print("\n=== O. OUTBOUND MAIL CONTROLS — definition matches config ===")
+_suppress = not _send_applicant_mail
 _MAIL_ACTIONS = ["Send_acknowledgment", "Send_duplicate_notice", "Send_CV_request",
-                 "Send_wrong_format", "Send_update_ack", "Send_noted_reply", "Notify_failure"]
+                 "Send_wrong_format", "Send_update_ack", "Send_noted_reply"]
 _n_send_ops = blob.count("SharedMailboxSendEmailV2") + blob.count("SendEmailV2")
-_n_test_stamps = blob.count("TEST-MODE (suppressed)")
+_n_applicant_send_ops = blob.count("SharedMailboxSendEmailV2")
+_n_suppressed_stamps = blob.count("Suppressed (applicant email disabled)")
 if _suppress:
-    print("  (config says SUPPRESSED - validating the silent build)")
+    print("  (config says APPLICANT MAIL DISABLED - validating silent live intake)")
     for a in _MAIL_ACTIONS:
         ok(actions.get(a, {}).get("type") == "Compose",
-           f"{a} is a no-op Compose (suppressed)")
+           f"{a} is a no-op Compose (applicant not contacted)")
         ok(len(actions.get(a, {}).get("runAfter", {})) >= 0 and "inputs" in actions.get(a, {}),
            f"{a} keeps a runAfter/inputs shape (wiring intact)")
-    ok(_n_send_ops == 0, f"NO send-mail connector operations remain anywhere (got {_n_send_ops})")
-    ok(_n_test_stamps >= 4,
-       f"Mail Sent stamps write 'TEST-MODE (suppressed) ...' in all 4 patches (got {_n_test_stamps})")
+    ok(_n_applicant_send_ops == 0,
+       f"NO applicant shared-mailbox send operations remain (got {_n_applicant_send_ops})")
+    ok(_n_suppressed_stamps >= 4,
+       f"Mail Sent stamps record suppression in all 4 patches (got {_n_suppressed_stamps})")
     ok("'Sent '" not in blob, "no real \"Sent <timestamp>\" stamp expression remains")
 else:
-    print("  (config says LIVE - validating real email actions)")
+    print("  (config says APPLICANT MAIL ENABLED - validating real email actions)")
     for a in _MAIL_ACTIONS:
         ok(actions.get(a, {}).get("type") == "OpenApiConnection",
            f"{a} is a real mail-connector action (live)")
-    ok(_n_send_ops >= 7, f"send-mail connector operations present (got {_n_send_ops}, expect >= 7)")
-    ok(_n_test_stamps == 0, f"no TEST-MODE stamps remain in a live build (got {_n_test_stamps})")
+    ok(_n_applicant_send_ops >= 6,
+       f"applicant send-mail connector operations present (got {_n_applicant_send_ops}, expect >= 6)")
+    ok(_n_suppressed_stamps == 0,
+       f"no applicant-suppression stamps remain (got {_n_suppressed_stamps})")
     ok(blob.count("'Sent '") >= 4, "real \"Sent <timestamp>\" stamp expressions present in the 4 patches")
+
+if _send_admin_alerts:
+    ok(actions.get("Notify_failure", {}).get("type") == "OpenApiConnection",
+       "admin failure alert remains enabled")
+    ok(actions.get("Notify_poll_failure", {}).get("type") == "OpenApiConnection",
+       "unread-Inbox poll failure alert remains enabled")
+    ok(_n_send_ops >= 2, f"two admin send operations remain (processing + poll; got {_n_send_ops})")
+else:
+    ok(actions.get("Notify_failure", {}).get("type") == "Compose",
+       "admin failure alert is suppressed exactly as configured")
 
 print("\n=== P. YEAR-BOUNDARY SEPARATOR (blank row before the first new-applicant row/year) ===")
 _ysep_cfg = cfg.get("year_separator", {"enabled": True})
+_any_rows = actions.get("Get_rows_any_applicant", {})
+ok(_any_rows.get("inputs", {}).get("host", {}).get("operationId") == "GetItems",
+   "Get_rows_any_applicant exists to distinguish the permanent header spacer from real rows")
+_any_params = _any_rows.get("inputs", {}).get("parameters", {})
+ok(_any_params.get("$filter") == "Email ne ''" and _any_params.get("$top") == 1,
+   "header-spacer guard queries at most one real applicant row")
 if _ysep_cfg.get("enabled", True):
-    ok("Get_rows_this_year" in actions, "Get_rows_this_year action exists")
+    ok("Get_rows_for_separators" in actions, "shared separator row scan exists")
+    ok("Filter_rows_this_year" in actions, "Filter_rows_this_year action exists")
     ok("IsFirstOfNewYear" in actions, "IsFirstOfNewYear action exists")
     ok("Add_row_year_separator" in actions, "Add_row_year_separator action exists")
 
-    _grty = actions.get("Get_rows_this_year", {})
-    ok(_grty.get("inputs", {}).get("host", {}).get("operationId") == "GetItems",
-       "Get_rows_this_year is a real Excel GetItems action")
-    _filt = _grty.get("inputs", {}).get("parameters", {}).get("$filter", "")
-    ok("Received Date ge" in _filt, "Get_rows_this_year filters on Received Date ge <thisYear>-01-01")
-    ok("formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy')" in _filt,
-       "the year in the filter is derived from THIS email's receivedDateTime, not a hardcoded year")
+    _scan = actions.get("Get_rows_for_separators", {})
+    _scan_params = _scan.get("inputs", {}).get("parameters", {})
+    ok(_scan.get("inputs", {}).get("host", {}).get("operationId") == "GetItems",
+       "separator scan is a real Excel GetItems action")
+    ok("$filter" not in _scan_params,
+       "separator scan has no OData filter on the spaced 'Received Date' column")
+    ok(_scan_params.get("$top") == 5000 and _scan_params.get("dateTimeFormat") == "ISO 8601",
+       "separator scan requests up to 5000 rows with ISO timestamps")
+    ok(_scan.get("runtimeConfiguration", {}).get("paginationPolicy", {}).get(
+       "minimumItemCount") == 5000,
+       "separator scan enables pagination to the Power Automate 5000-item limit")
+
+    _fy = actions.get("Filter_rows_this_year", {})
+    _fy_src = json.dumps(_fy.get("inputs", {}))
+    ok(_fy.get("type") == "Query" and
+       _fy.get("runAfter") == {"Get_rows_for_separators": ["Succeeded"]},
+       "year detection uses an in-memory Query after the shared scan")
+    ok("item()?['Received Date']" in _fy_src and "startsWith" in _fy_src and
+       "formatDateTime(outputs('CurrentEmail')?['receivedDateTime'],'yyyy')" in _fy_src,
+       "year Query compares the visible Received Date safely without Excel OData")
 
     _ifny = actions.get("IsFirstOfNewYear", {})
     ok(_ifny.get("type") == "If", "IsFirstOfNewYear is a real If condition")
-    ok(_ifny.get("runAfter", {}) == {"Get_rows_this_year": ["Succeeded"]},
-       "IsFirstOfNewYear waits on Get_rows_this_year")
-    ok(_ifny.get("expression") == {"equals": ["@length(body('Get_rows_this_year')?['value'])", 0]},
-       "IsFirstOfNewYear fires when zero rows already exist for this year")
+    ok(set(_ifny.get("runAfter", {})) == {"Filter_rows_this_year", "Get_rows_any_applicant"},
+       "IsFirstOfNewYear waits on both the year filter and real-applicant guard")
+    _yexpr = json.dumps(_ifny.get("expression", {}))
+    ok('"and"' in _yexpr and "Filter_rows_this_year" in _yexpr
+       and "Get_rows_any_applicant" in _yexpr,
+       "year separator requires no row this year AND at least one prior real applicant")
     ok("Add_row_year_separator" in _ifny.get("actions", {}),
        "IsFirstOfNewYear's TRUE branch inserts the separator row")
     ok(_ifny.get("else", {}).get("actions", {}) == {},
@@ -983,11 +1206,11 @@ if _ysep_cfg.get("enabled", True):
     # PATCH an existing row, so none of them should reference this feature's actions at all.
     for _no_touch in ("Patch_dup_attempts", "Patch_update_attempts", "Patch_followup_attempts"):
         _ra = actions.get(_no_touch, {}).get("runAfter", {})
-        ok("IsFirstOfNewYear" not in _ra and "Get_rows_this_year" not in _ra,
+        ok("IsFirstOfNewYear" not in _ra and "Filter_rows_this_year" not in _ra,
            f"{_no_touch} (a PATCH-only path) is untouched by the year-separator feature")
 else:
     print("  (config says year_separator DISABLED - validating clean removal)")
-    ok("Get_rows_this_year" not in actions, "Get_rows_this_year absent when disabled")
+    ok("Filter_rows_this_year" not in actions, "Filter_rows_this_year absent when disabled")
     ok("IsFirstOfNewYear" not in actions, "IsFirstOfNewYear absent when disabled")
     ok("Add_row_year_separator" not in actions, "Add_row_year_separator absent when disabled")
     ok("IsFirstOfNewYear" not in actions.get("Add_row", {}).get("runAfter", {}),
@@ -999,21 +1222,24 @@ _msep_cfg = cfg.get("month_separator", {"enabled": True})
 _add_row_ra2 = actions.get("Add_row", {}).get("runAfter", {})
 if not _msep_cfg.get("enabled", True):
     print("  (config says month_separator DISABLED - validating clean removal)")
-    ok("Get_rows_this_month" not in actions, "Get_rows_this_month absent when disabled")
+    ok("Filter_rows_this_month" not in actions, "Filter_rows_this_month absent when disabled")
     ok("IsFirstOfNewMonth" not in actions, "IsFirstOfNewMonth absent when disabled")
     ok("IsFirstOfNewMonth" not in _add_row_ra2, "no dangling runAfter reference")
 else:
-    _gm = actions.get("Get_rows_this_month", {})
+    _gm = actions.get("Filter_rows_this_month", {})
     _im = actions.get("IsFirstOfNewMonth", {})
-    ok(_gm.get("inputs", {}).get("host", {}).get("operationId") == "GetItems",
-       "Get_rows_this_month is a real Excel GetItems action")
-    _mf = str(_gm.get("inputs", {}).get("parameters", {}).get("$filter", ""))
-    ok("startOfMonth" in _mf and "addToTime" in _mf,
-       "month filter is bounded to one month (startOfMonth .. +1 Month), never a full scan")
-    ok(" ge " in _mf and " lt " in _mf, "month filter uses a ge/lt range")
+    _mf = json.dumps(_gm.get("inputs", {}))
+    ok(_gm.get("type") == "Query" and
+       _gm.get("runAfter") == {"Get_rows_for_separators": ["Succeeded"]},
+       "month detection uses an in-memory Query after the shared scan")
+    ok("item()?['Received Date']" in _mf and "startsWith" in _mf and "yyyy-MM" in _mf,
+       "month Query compares the visible Received Date safely without Excel OData")
     ok(_im.get("type") == "If", "IsFirstOfNewMonth is a real If condition")
-    ok(set(_im.get("runAfter", {})) == {"Get_rows_this_month"},
-       "IsFirstOfNewMonth waits on Get_rows_this_month")
+    _expected_month_deps = {"Filter_rows_this_month", "Get_rows_any_applicant"}
+    if _ysep_cfg.get("enabled", True):
+        _expected_month_deps.add("Filter_rows_this_year")
+    ok(set(_im.get("runAfter", {})) == _expected_month_deps,
+       "IsFirstOfNewMonth waits on every array referenced by its condition")
     _msep = _im.get("actions", {}).get("Add_row_month_separator", {})
     ok(_msep.get("inputs", {}).get("host", {}).get("operationId") == "AddRowV2",
        "Add_row_month_separator is a real Excel AddRowV2 action")
@@ -1022,19 +1248,31 @@ else:
     # The point of the compound condition: a January row must produce ONE blank row
     # (the year separator), never two stacked separators.
     _mexpr = json.dumps(_im.get("expression", {}))
+    ok("Get_rows_any_applicant" in _mexpr,
+       "month separator is suppressed on a brand-new workbook (row 2 already supplies the gap)")
     if _ysep_cfg.get("enabled", True):
-        ok('"and"' in _mexpr and "Get_rows_this_year" in _mexpr,
+        ok('"and"' in _mexpr and "Filter_rows_this_year" in _mexpr,
            "month check also requires rows already exist this year (year separator wins in January)")
     else:
-        ok("Get_rows_this_year" not in _mexpr,
+        ok("Filter_rows_this_year" not in _mexpr,
            "with year separator off, month check does not reference it")
     ok("IsFirstOfNewMonth" in _add_row_ra2, "Add_row waits on IsFirstOfNewMonth")
     ok(set(_add_row_ra2.get("IsFirstOfNewMonth", [])) == {"Succeeded", "Failed", "Skipped"},
        "Add_row proceeds regardless of the month check's outcome")
     for _nt in ("Patch_dup_attempts", "Patch_update_attempts", "Patch_followup_attempts"):
         _r = actions.get(_nt, {}).get("runAfter", {})
-        ok("IsFirstOfNewMonth" not in _r and "Get_rows_this_month" not in _r,
+        ok("IsFirstOfNewMonth" not in _r and "Filter_rows_this_month" not in _r,
            f"{_nt} (a PATCH-only path) is untouched by the month-separator feature")
+
+_bad_spaced_date_filters = []
+for _name, _action in actions.items():
+    _inputs = _action.get("inputs", {})
+    _parameters = _inputs.get("parameters", {}) if isinstance(_inputs, dict) else {}
+    _filter_value = _parameters.get("$filter", "") if isinstance(_parameters, dict) else ""
+    if "Received Date" in str(_filter_value):
+        _bad_spaced_date_filters.append((_name, _filter_value))
+ok(not _bad_spaced_date_filters,
+   "no Excel OData filter references the non-alphanumeric 'Received Date' header")
 
 print(f"\n{'='*60}")
 print(f"  P1 RESULT: {P} passed, {F} failed")

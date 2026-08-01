@@ -22,10 +22,42 @@ status_values:
   # this many times in a row is moved to Rejected under this status - a permanently
   # unprocessable row would otherwise retry forever, once per --score-sharepoint run.
   processing_failed: "Rejected - Processing Error"
+  # P1 already screens incoming mail for spam/scam/vendor-pitch content before a row is
+  # ever created (see HiringAgent_P1/flow/flow_config.json spam_filters). This is P2's
+  # secondary safety net for the rare row that still slips through: the resume/mail text
+  # itself gets checked against content_safety.suspicious_phrases below, and a match stops
+  # normal scoring, alerts admin_email, and leaves the row here for a human to look at -
+  # added 2026-08-01 after the Futurism Technologies vendor-pitch incident.
+  needs_review_spam: "Needs Review - Possible Spam"
 
 # How many times a row may fail processing (unreadable resume OR an exception during
 # scoring) before it's given up on and moved to Rejected. Env override: HIRING_SCORE_RETRY_MAX.
 score_retry_max: 3
+
+# P2's secondary content-safety net (see status_values.needs_review_spam above). Checked
+# against the resume text AND mail body of every row before normal extraction runs.
+# Deliberately short and specific - each phrase should be one essentially no genuine
+# resume or cover email would ever contain, to keep false positives near zero. Not meant
+# to be a comprehensive spam filter (that is P1's job, in flow_config.json) - only a
+# backstop for the rare row that slips past it.
+content_safety:
+  suspicious_phrases:
+    # vendor/agency self-promotion mistaken for a resume - live case, Futurism
+    # Technologies (2026-08-01): a services vendor's "Company Profile and Corporate
+    # Deck" was scored as if it were a candidate's resume.
+    - "company profile and corporate deck"
+    - "capability deck"
+    - "engagement models"
+    # unambiguous phishing/scam boilerplate - never appears in a genuine resume
+    - "click here to claim"
+    - "verify your account"
+    - "wire transfer"
+    - "crypto investment"
+    - "you have won"
+    - "claim your prize"
+    - "your account has been suspended"
+    - "confirm your identity"
+    - "urgent action required"
 
 # Admin alert email when a row is given up on after score_retry_max failures - separate
 # from the non-USA decline (geo_reject_email) and from P1's own Notify_failure. Env

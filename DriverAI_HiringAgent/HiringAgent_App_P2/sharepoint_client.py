@@ -42,6 +42,23 @@ _TIMEOUT = 60
 _WB_NAME = "Sharepoint_Master_File.xlsx"
 _DEFAULT_WORKBOOK_FOLDER = "/Master_Files"
 
+# Must stay byte-identical to hiring_agent.sharepoint_scoring._RESUME_LINK_FORMULA - kept
+# as a separate copy here (not imported) to avoid a circular import (sharepoint_scoring
+# imports SharePointClient from this module). Needed here, not just there, because
+# add_main_row/add_rejected_row (below) must re-apply it after every add - fixed
+# 2026-08-01, live finding: a genuine Excel table calculated-column formula does NOT
+# automatically extend itself onto a row added through Graph's rows/add endpoint the way
+# it would for a row typed into the workbook's UI. Every row added this way (confirmed on
+# 3 live rows: Sai Krishna Yallapu on Rejected, plus two rows manually moved back to Main)
+# came back with a genuinely blank 'Resume Link' cell despite a valid 'Resume URL' sitting
+# right next to it - "not visible, unable to open" from the user's perspective, because
+# there was no formula there to compute a link from at all.
+_RESUME_LINK_FORMULA = ('=IF([@[Resume URL]]="","",'
+                        'HYPERLINK([@[Resume URL]],'
+                        'IF(TRIM([@[Original Filename]])="",'
+                        'TRIM(RIGHT(SUBSTITUTE([@[Resume URL]],"/",REPT(" ",300)),300)),'
+                        'TRIM([@[Original Filename]]))))')
+
 
 class SharePointError(RuntimeError):
     """Any Graph/config failure - carries a human-readable message for the logs."""
@@ -826,6 +843,24 @@ class SharePointClient:
         values = [[fields.get(c, "") for c in cols]]
         url = f"{self._wb_base()}/tables/{tbl}/rows/add"
         self._req("POST", url, json={"values": values})
+        self._refresh_resume_link_formula(tbl, cols)
+
+    def _refresh_resume_link_formula(self, table_name: str, cols: list) -> None:
+        """Re-apply the 'Resume Link' calculated-column formula immediately after a row
+        add - fixed 2026-08-01. Excel's table calculated-column behaviour (a formula
+        entered once auto-extends to every future row) does NOT reliably extend onto a row
+        added through Graph's rows/add endpoint the way it does for a row typed into the
+        workbook's own UI - confirmed live: rows added this way came back with a genuinely
+        blank 'Resume Link' cell despite a valid 'Resume URL' right next to it. Best-effort:
+        a failure here must never fail the row add itself, which already succeeded."""
+        if "Resume Link" not in cols:
+            return
+        try:
+            self.set_calculated_column(table_name, "Resume Link", _RESUME_LINK_FORMULA)
+        except SharePointError as e:
+            from hiring_agent.config import logger
+            logger.warning(f"   WARNING   Could not refresh 'Resume Link' formula on "
+                            f"{table_name} after row add: {e}")
 
     def ensure_rejected_columns(self, required: list) -> list:
         """Add any missing columns to the Rejected table (if it exists yet), inserted at
@@ -867,6 +902,7 @@ class SharePointClient:
         values = [[fields.get(c, "") for c in cols]]
         url = f"{self._wb_base()}/tables/{self.table}/rows/add"
         self._req("POST", url, json={"values": values})
+        self._refresh_resume_link_formula(self.table, cols)
 
     # ---- reconcile helpers (used by --recheck-all) -------------------------
     def _table_columns_of(self, table_name: str) -> list:

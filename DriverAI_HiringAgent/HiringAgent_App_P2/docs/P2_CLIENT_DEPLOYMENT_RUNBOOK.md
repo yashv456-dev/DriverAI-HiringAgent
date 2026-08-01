@@ -247,7 +247,7 @@ Affected rows are stamped `TEST-MODE (suppressed) Sent <timestamp>` instead of
 own: they cover the decline and the admin alert, but the missing-info nudge has no flag of
 its own and would still be sent. Use `HIRING_SUPPRESS_EMAILS`.
 
-P1 has its own separate switch (`flow/flow_config.json` -> `test_mode.suppress_emails`,
+P1 has its own separate switch (`flow/flow_config.json` -> `email.send_applicant_emails`,
 then rebuild and re-import the zip). Silencing one does not silence the other.
 
 **Set it back to `false` when the replay is done**, or genuine new applicants get no email at all.

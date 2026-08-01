@@ -25,9 +25,10 @@ _AI_PROMPT = (
     "'country' is the country name (e.g. 'United States' or 'India' or 'UK') — "
     "always infer the country from context clues (area codes, universities, "
     "addresses, currency, employer names). "
-    "'skills' is a short comma-separated list of individual technical skills or tools only "
-    "(e.g. Python, AWS, Docker, React, Swift) - never section headings, categories, or "
-    "descriptive phrases; 'looking_for_role' is the job title/role they seek. "
+    "'skills' is a short comma-separated list of individual skills or tools ACTUALLY NAMED "
+    "in the text below - never invent or add a skill that is not written in the resume, "
+    "and never return section headings, categories, or descriptive phrases; "
+    "'looking_for_role' is the job title/role they seek. "
     "'education' is the candidate's highest degree and field of study, plus school if given "
     "(e.g. 'B.S. Computer Science, Arizona State University') - empty string if the resume "
     "doesn't mention any degree or schooling."
@@ -58,17 +59,55 @@ def _ai_fields(data: dict, text: str) -> dict:
 
 # ── Name resolution ──────────────────────────────────────────────────────────
 
+# Words that essentially never appear in a real person's first/last name but are
+# extremely common in a company/entity name - added 2026-08-01, live case (Futurism
+# Technologies / APP-20260717-0559-CCE1): "Transforming Business Models" (a marketing
+# tagline from a vendor's company-brochure PDF, not a resume) is 3 alphabetic tokens with
+# no digits or section-word overlap, so it passed the existing structural shape check
+# outright and was stored as the candidate's Full Name. A word-list veto catches this
+# class of mistake without needing a real name database: none of these words are
+# plausible as a genuine first or last name.
+_COMPANY_NAME_WORDS = {
+    "inc", "llc", "ltd", "corp", "corporation", "company", "co",
+    "technologies", "technology", "solutions", "systems", "software", "digital",
+    "group", "enterprises", "industries", "consulting", "partners", "associates",
+    "ventures", "holdings", "capital", "labs", "global", "international", "worldwide",
+    "services", "transforming", "business", "models",
+}
+
+
+def _looks_like_company_name(s: str) -> bool:
+    """True if any token in s is common company/entity vocabulary, never a real name."""
+    tokens = [t.strip(".,'-").lower() for t in (s or "").split()]
+    return any(t in _COMPANY_NAME_WORDS for t in tokens)
+
+
 def _looks_like_name(s: str) -> bool:
-    """True if s looks like a real person's name: 2-3 alpha tokens, none a section word."""
+    """True if s looks like a real person's name: 2-3 alpha tokens, none a section word.
+
+    A single-character token is allowed as a MIDDLE INITIAL ('Christopher L. Feld',
+    'Jane Q Public') - fixed 2026-08-01, found by the offline dry-run harness: the old
+    `len(core) < 2` rule rejected every name carrying an initial, so the offline parser
+    returned 'Not extracted' for them. Live rows looked fine only because Ollama (Tier 2)
+    resolves the name independently; the bug was invisible until Ollama was disabled,
+    which is exactly the documented fallback path. At least TWO full-length tokens are
+    still required, so an initial can never carry the name on its own ('A B', 'I am' are
+    still rejected).
+    """
     s = (s or "").strip()
     if not s or "@" in s or any(ch.isdigit() for ch in s):
+        return False
+    if _looks_like_company_name(s):
         return False
     tokens = s.split()
     if not (2 <= len(tokens) <= 3):
         return False
+    _cores = [t.replace(".", "").replace("'", "").replace("-", "") for t in tokens]
+    if sum(1 for c in _cores if len(c) >= 2) < 2:
+        return False
     for t in tokens:
         core = t.replace(".", "").replace("'", "").replace("-", "")
-        if len(core) < 2 or not core.isalpha() or t.lower() in SECTION_WORDS:
+        if len(core) < 1 or not core.isalpha() or t.lower() in SECTION_WORDS:
             return False
     return True
 
@@ -90,6 +129,8 @@ def _plausible_name_shape(s: str) -> bool:
     """
     s = (s or "").strip()
     if not s or "@" in s or any(ch.isdigit() for ch in s):
+        return False
+    if _looks_like_company_name(s):
         return False
     tokens = s.split()
     if not (1 <= len(tokens) <= 4):
@@ -120,10 +161,15 @@ def resolve_full_name(parsed_name: str, sender_name: str, resume_text: str) -> s
 # ── Title / location helpers ─────────────────────────────────────────────────
 
 def _normalize_title(s: str) -> str:
-    """Title-case a role line but keep short acronyms upper: 'AI', 'ML', 'QA'."""
+    """Title-case a role line but keep short acronyms upper: 'AI', 'ML', 'QA', 'CISO'.
+
+    Cap raised 3 -> 4 chars - fixed 2026-08-01, live case (Brett Worker /
+    APP-20260721-0122-E743): 'CISO' (a genuine 4-letter role acronym extracted from his
+    mail body) was getting reduced to 'Ciso'.
+    """
     out = []
     for w in (s or "").split():
-        if w.isupper() and len(w) <= 3:
+        if w.isupper() and len(w) <= 4:
             out.append(w)
         else:
             out.append(w.title() if w.isupper() else w)
@@ -139,11 +185,24 @@ def _extract_header_role(text: str) -> str | None:
             if not seg or _looks_like_name(seg):
                 continue
             words = seg.split()
-            if 1 <= len(words) <= 6 and any(w.lower().rstrip("s") in ROLE_WORDS for w in words):
+            # Cap raised 6 -> 8 words - fixed 2026-08-01, live case (Mindy Anderson /
+            # APP-20260723-2034-12DF): her actual title line, "Fractional/Interim Chief
+            # Marketing Officer & Marketing Advisor" (7 words), was rejected outright for
+            # being one word over the old cap, so nothing caught her real title and
+            # extraction fell through to a generic keyword-bucket guess instead ("Data
+            # Scientist / Analyst" for a CMO). A compound "X & Y" / "X/Y" executive title
+            # is common enough that 8 is still tight relative to a genuine descriptive
+            # sentence, which routinely runs well past 8 words.
+            if 1 <= len(words) <= 8 and any(w.lower().rstrip("s") in ROLE_WORDS for w in words):
                 if seg.lower() not in ("work experience", "professional experience",
                                        "experience", "education", "employment history"):
                     return _normalize_title(seg)
     return None
+
+
+_INSTITUTION_LINE_RE = re.compile(
+    r"(?i)\b(university|college|institute|academy|polytechnic|school\s+of)\b"
+)
 
 
 def _extract_location(text: str) -> str | None:
@@ -158,6 +217,14 @@ def _extract_location(text: str) -> str | None:
     """
     lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
     header = lines[:6]
+
+    # Steps 4 and 6 below scan the WHOLE document (not just the header) for a bare
+    # city/country name, so a city that only appears as part of a school's own name
+    # ('Daulat Ram College, University of Delhi', 'University of Phoenix', 'San Jose
+    # State University') was being returned as the candidate's current location - fixed
+    # 2026-08-01, live case (Prerna Saluja / APP-20260716-2052-6112): her only 'Delhi'
+    # mention is her undergrad alma mater; her current, most recent affiliation is
+    # Arizona State University. Skip any match whose line is naming an institution.
 
     _city_state_re = re.compile(
         r"([A-Z][A-Za-z.\-]+(?:\s+[A-Z][A-Za-z.\-]+){0,2}),\s*([A-Z]{2})\b"
@@ -200,14 +267,30 @@ def _extract_location(text: str) -> str | None:
                 return ", ".join(p.strip().title() for p in parts[:-1])
 
     for ln in lines:
-        m = _city_state_re.search(ln)
-        if m and m.group(2).lower() in US_STATE_ABBREVS:
+        for m in re.finditer(_city_state_re, ln):
+            if m.group(2).lower() not in US_STATE_ABBREVS:
+                continue
+            # A genuine work-history "City, ST" address ends there (end of line, a date,
+            # a pipe, punctuation) - it is never immediately followed by another bare
+            # capitalized word continuing a comma-separated list. Fixed 2026-08-01, live
+            # case (Syyed Nazir Ali / APP-20260727-1431-6F75): "Bloomberg Terminal, MS
+            # Project, MS Office Suite" is a tools list ('MS' = Microsoft), not an
+            # address, but matched "Bloomberg Terminal, MS" as a "City, ST" location.
+            if re.match(r"\s+[A-Z][a-z]", ln[m.end():]):
+                continue
             return f"{m.group(1)}, {m.group(2)}"
 
     for scope in (header, lines):
         joined = " \n ".join(scope).lower()
         for city in LOCATION_KEYWORDS:
             if re.search(r"(?<![a-z])" + re.escape(city) + r"(?![a-z])", joined):
+                hit_line = next(
+                    (ln for ln in scope if re.search(
+                        r"(?<![a-z])" + re.escape(city) + r"(?![a-z])", ln.lower())),
+                    "",
+                )
+                if _INSTITUTION_LINE_RE.search(hit_line):
+                    continue
                 return city.title()
 
     # Search line by line, NOT over " ".join(lines): joining lets the city pattern run
@@ -218,10 +301,14 @@ def _extract_location(text: str) -> str | None:
             r"([A-Z][A-Za-z.\-]+(?:\s+[A-Z][A-Za-z.\-]+){0,2}),\s*"
             + re.escape(state.title()) + r"(?![a-z])")
         for ln in lines:
+            if _INSTITUTION_LINE_RE.search(ln):
+                continue
             m2 = state_re.search(ln)
             if m2:
                 return f"{m2.group(1)}, {state.title()}"
         for ln in lines:
+            if _INSTITUTION_LINE_RE.search(ln):
+                continue
             if re.search(r",\s*" + re.escape(state) + r"(?![a-z])", ln.lower()):
                 return state.title()
 
@@ -237,6 +324,8 @@ def _extract_location(text: str) -> str | None:
         for country in FOREIGN_COUNTRIES:
             if re.search(r"(?<![a-z])" + re.escape(country) + r"(?![a-z])", joined):
                 for ln in scope:
+                    if _INSTITUTION_LINE_RE.search(ln):
+                        continue
                     for seg in re.split(r"\s*[|]\s*", ln):
                         if country in seg.lower():
                             seg = seg.strip()
@@ -244,6 +333,8 @@ def _extract_location(text: str) -> str | None:
         for city in FOREIGN_CITIES:
             if re.search(r"(?<![a-z])" + re.escape(city) + r"(?![a-z])", joined):
                 for ln in scope:
+                    if _INSTITUTION_LINE_RE.search(ln):
+                        continue
                     for seg in re.split(r"\s*[|]\s*", ln):
                         if city in seg.lower():
                             seg = seg.strip()
@@ -254,9 +345,18 @@ def _extract_location(text: str) -> str | None:
 
 # Degree keywords, longest/most-specific alternatives first so e.g. "Bachelor of Science"
 # matches whole rather than stopping at a shorter overlapping alternative.
+#
+# Bachelor/Master/Associate require a qualifying suffix ('s / of X) rather than matching
+# bare - fixed 2026-07-31 after a live case (Syyed Nazir Ali, APP-20260727-1431-6F75) where
+# "Scrum Master" on line 2 (a job-title line right under the name) matched bare "Master"
+# and got returned as the Education value, entirely preempting the real "Bachelor of
+# Science" degree line near the end of the resume. A genuine degree mention essentially
+# always includes "'s"/"s" or "of <field>"; a bare "Master"/"Bachelor"/"Associate" is far
+# more likely to be a job title ("Scrum Master", "Associate Director", a bachelor party
+# planner, etc.) than a degree.
 _DEGREE_RE = re.compile(
-    r"\b(Bachelor(?:'s)?(?:\s+of\s+\w+)?|Master(?:'s)?(?:\s+of\s+\w+)?|"
-    r"Associate(?:'s)?(?:\s+of\s+\w+)?|Ph\.?D\.?|MBA|B\.?Tech\.?|M\.?Tech\.?|"
+    r"\b(Bachelor(?:'s|s)\b|Bachelor\s+of\s+\w+|Master(?:'s|s)\b|Master\s+of\s+\w+|"
+    r"Associate(?:'s|s)\b|Associate\s+of\s+\w+|Ph\.?D\.?|MBA|B\.?Tech\.?|M\.?Tech\.?|"
     r"B\.?S\.?[Cc]?\.?|M\.?S\.?[Cc]?\.?|B\.?A\.?|M\.?A\.?|B\.?E\.?|M\.?E\.?)\b"
 )
 
@@ -325,6 +425,51 @@ def normalize_education(value: str) -> str:
     return text or "Not extracted"
 
 
+def _collapse_letter_spacing(line: str) -> str:
+    """'E D U C A T I O N' -> 'EDUCATION'; 'M a s t e r  o f  S c i e n c e' -> 'Master of
+    Science'. PDF extraction preserves a stylized letter-spaced layout (a common resume-
+    template design) as literal single-character tokens separated by ONE space, with word
+    boundaries marked by a DOUBLE space - fixed 2026-07-31, live case (Divy Parmar /
+    APP-20260720-1013-09AC) where an ENTIRE resume was letter-spaced this way (name, phone,
+    email, every line), not just a section header. A plain '^education\\b' style regex, or
+    any word-boundary keyword scan, can't match single-character tokens at all - so
+    extraction silently fails wherever this pattern appears. Only collapses when the line
+    actually looks letter-spaced (at least 4 single-character tokens), so normal prose is
+    never touched."""
+    tokens = line.split(" ")
+    single_char_tokens = [t for t in tokens if t]
+    if not (len(single_char_tokens) >= 4 and all(len(t) == 1 for t in single_char_tokens)):
+        return line
+    words: list[str] = []
+    current: list[str] = []
+    for t in tokens:
+        if t == "":
+            if current:
+                words.append("".join(current))
+                current = []
+        else:
+            current.append(t)
+    if current:
+        words.append("".join(current))
+    return " ".join(words)
+
+
+def _normalize_letterspaced_document(text: str) -> str:
+    """Collapse letter-spacing across an ENTIRE resume, not just a section header - fixed
+    2026-07-31, live case (Divy Parmar / APP-20260720-1013-09AC): some PDF export/template
+    pipelines apply the same stylistic letter-spacing to EVERY line, not just headers - name
+    ('D I V Y  P A R M A R'), phone ('7 4 0 5 4 6 5 2 0 4'), even the email address
+    ('d i v y p a r m a r 1 9 @ g m a i l . c o m'). _collapse_letter_spacing already fixed
+    the narrower single-header case (Education); this applies the exact same per-line
+    heuristic across every line up front, before any field-level extraction runs, so name/
+    phone/email/skills/location all see clean text instead of failing independently. Called
+    once at the top of extract_candidate_details[_smart] - idempotent on already-normal
+    text, since a line that isn't actually letter-spaced is returned unchanged."""
+    if not text:
+        return text
+    return "\n".join(_collapse_letter_spacing(ln) for ln in text.splitlines())
+
+
 def _extract_education(text: str) -> str | None:
     """Best-effort degree/school line, most reliable first.
 
@@ -337,13 +482,21 @@ def _extract_education(text: str) -> str | None:
 
     header_re = re.compile(r"^education\b[:\-]?\s*(.*)$", re.IGNORECASE)
     for i, ln in enumerate(lines):
-        m = header_re.match(ln)
+        m = header_re.match(_collapse_letter_spacing(ln))
         if not m:
             continue
         same_line = m.group(1).strip()
         if len(same_line) > 3:
             candidate = normalize_education(same_line.rstrip(".,;"))
-            if candidate != "Not extracted":
+            # Require an actual degree keyword before trusting same-line content - fixed
+            # 2026-07-31, live case (Brett Worker / APP-20260721-0122-E743): a compound
+            # header "EDUCATION & EXECUTIVE DEVELOPMENT" had its "& EXECUTIVE DEVELOPMENT"
+            # remainder returned as the Education value outright (not in the small hardcoded
+            # exclusion set below), completely skipping the real degree lines just below it
+            # ("Robert Morris University" / "Master of Information Systems... Bachelor of
+            # Science..."). A header with descriptive trailing words but no real degree
+            # content must fall through to scanning the lines under it, same as a bare header.
+            if candidate != "Not extracted" and _DEGREE_RE.search(candidate):
                 return candidate
         fallback = None
         for nxt in lines[i + 1:i + 6]:
@@ -438,14 +591,86 @@ def split_location_country(raw: str) -> tuple[str, str]:
 
 # ── Skill scanning ───────────────────────────────────────────────────────────
 
+# Skill keywords that collide with an unrelated ALL-CAPS acronym once the scan text is
+# lowercased - fixed 2026-07-31, live case (Syyed Nazir Ali / APP-20260727-1431-6F75):
+# 'SWIFT' (the banking payment-messaging standard, always written all-caps - "UPI, NEFT,
+# RTGS, IMPS, SWIFT, ISO 20022") matched the "Swift" (Apple's language) skill keyword once
+# both sides were lowercased to 'swift', which then triggered a mobile-developer Category
+# override for a Business Analyst candidate who has never written a line of Swift. These
+# keywords require their canonical mixed-case spelling in the ORIGINAL (non-lowercased)
+# text - an all-caps-only hit doesn't count. Add more entries here as other collisions turn
+# up; do not lowercase-blanket-match a short/acronym-prone keyword without checking first.
+_CASE_SENSITIVE_SKILL_FORMS = {"swift": "Swift"}
+
+# Skill keywords that collide with a common English phrase regardless of case - fixed
+# 2026-07-31, live case (Mindy Anderson / APP-20260723-2034-12DF): 'Go' (the language)
+# matched "Go To Market"/"go-to-market" (ubiquitous marketing/business jargon, and
+# title-cased in headings just like the language name would be, so case-sensitivity alone
+# can't disambiguate it the way it does for 'Swift') in a resume with zero mention of the
+# Go language anywhere. Each pattern is stripped out of the scan text before that keyword's
+# bare-word check runs, so a genuine standalone mention elsewhere is still caught.
+_SKILL_EXCLUDE_PHRASES = {
+    # "go-live"/"go live" added 2026-07-31, live case (Syyed Nazir Ali / APP-20260727-1431-
+    # 6F75): "...business sign-off and go-live approval..." and "Release & Go-Live
+    # Governance" - standard IT/project-management deployment terminology, not the Go
+    # language, same false-positive class as "Go To Market".
+    "go": (r"go[\s-]*to[\s-]*market", r"go[\s-]*live"),
+    # Marketing-metric "SQL"/"MQL" phrases added 2026-08-01, live case (Sai Krishna Yallapu
+    # / APP-20260717-1100-7BDA): "reported MQLs, SQLs, pipeline...", "MQL-to-SQL handoff",
+    # "SQL acceptance rates" - Sales-/Marketing-Qualified-Lead counts, standard B2B
+    # marketing terminology, not the SQL database language (this candidate's resume never
+    # mentions a database anywhere). Only these marketing collocations are excluded; a
+    # genuine standalone "SQL" mention (e.g. "SQL Server", "MySQL") is still caught.
+    "sql": (r"sqls\b", r"mqls\b", r"mql[\s-]*to[\s-]*sql", r"sql\s+acceptance"),
+    # "AWS re:Invent" added 2026-08-01, same Sai Krishna Yallapu row: "Led Oracle AI World,
+    # AWS re:Invent, Cloud World, Ascend" names a conference he led sponsorship/marketing
+    # for, not a personal cloud-computing skill - this candidate's resume never claims
+    # hands-on AWS use anywhere. A genuine standalone "AWS" mention is still caught.
+    "aws": (r"aws\s*re:?\s*invent",),
+}
+
+
 def _scan_skill_keywords(text: str) -> list:
     """Return the SKILL_KEYWORDS present in text (lowercased, word-bounded)."""
-    low = (text or "").lower()
+    raw = text or ""
+    low = raw.lower()
     found = []
     for sk in SKILL_KEYWORDS:
-        if sk not in found and re.search(r'(?<![a-z0-9])' + re.escape(sk) + r'(?![a-z0-9])', low):
+        if sk in found:
+            continue
+        canonical = _CASE_SENSITIVE_SKILL_FORMS.get(sk)
+        haystack, needle, boundary = (
+            (raw, canonical, r'[a-zA-Z0-9]') if canonical else (low, sk, r'[a-z0-9]')
+        )
+        for phrase in _SKILL_EXCLUDE_PHRASES.get(sk, ()):
+            haystack = re.sub(phrase, ' ', haystack, flags=re.IGNORECASE)
+        if re.search(r'(?<!' + boundary + r')' + re.escape(needle) + r'(?!' + boundary + r')', haystack):
             found.append(sk)
     return found
+
+
+def _strip_unconfirmed_ambiguous_skills(skills_str: str, text: str) -> str:
+    """Remove an ambiguous skill (one with a _CASE_SENSITIVE_SKILL_FORMS or
+    _SKILL_EXCLUDE_PHRASES entry) from a free-text skills string (e.g. Ollama's own
+    extraction) unless _scan_skill_keywords independently confirms it against the same
+    resume text. An LLM's free-text skill reading isn't bound by that function's
+    disambiguation - it can independently misread the same all-caps acronym or common-
+    phrase collision as the ambiguous skill, same root cause, different layer. Reuses
+    _scan_skill_keywords as the single source of truth rather than re-implementing the
+    same checks a second way."""
+    if not skills_str:
+        return skills_str
+    ambiguous = set(_CASE_SENSITIVE_SKILL_FORMS) | set(_SKILL_EXCLUDE_PHRASES)
+    confirmed = set(_scan_skill_keywords(text))
+    kept = []
+    for part in skills_str.split(","):
+        p = part.strip()
+        if not p:
+            continue
+        if p.lower() in ambiguous and p.lower() not in confirmed:
+            continue
+        kept.append(p)
+    return ", ".join(kept)
 
 
 # ── Portfolio URL extraction ─────────────────────────────────────────────
@@ -468,6 +693,12 @@ _SKIP_DOMAINS = frozenset({
     "greenhouse", "lever", "workable", "smartrecruiters", "jobvite",
     # document/QR utilities embedded by resume generators are not portfolios
     "qrcode",
+    # tech/library brand names that happen to use a "personal-site-shaped" TLD (.io/.dev/
+    # .me) are not portfolios either - fixed 2026-08-01, live case (Muhammad Ahsan Hussain
+    # / APP-20260721-2030-3AA7): "Socket.io" (a real-time messaging library he uses, never
+    # written as a link anywhere in his resume) matched the bare 'word.io' shape and the
+    # '.io' personal-site heuristic below, and was stored as Portfolio 1.
+    "socket",
 })
 
 # Embedded profile URLs (searched INSIDE a matched token — text layers often glue a
@@ -586,8 +817,17 @@ def extract_portfolios(text: str) -> tuple[str, str, str]:
             # Only accept URLs the candidate wrote with a scheme, or that are clearly
             # personal sites. Check the ORIGINAL token — _clean_url prepends https://
             # to bare domains, so checking `low` here would always be True.
-            if (token.lower().startswith(("http://", "https://")) or "portfolio" in low
-                    or low.split(".")[-1].split("/")[0] in ("io", "dev", "me", "design", "art")):
+            #
+            # A bare TLD match (word.io/word.dev/word.me/...) with no scheme and no
+            # "portfolio" nearby used to be accepted outright - removed 2026-08-01 after
+            # TWO independent live false positives in the same afternoon: "Socket.io" (a
+            # library Hussain mentions, never a link) and "Loquatinc.io" (a client company
+            # name in Mindy Anderson's contracts list, "Contracts include: Loquatinc.io,
+            # BNY Mellon, EY..."). Resumes are full of company/technology names that happen
+            # to use these trendy TLDs; a bare match alone is not enough signal. Missing a
+            # genuine bare "janesmith.io" mention (no scheme, no "portfolio" nearby) now
+            # falls through to N/A instead - a safe default, not a fabricated wrong link.
+            if token.lower().startswith(("http://", "https://")) or "portfolio" in low:
                 personal = url
 
     p1 = linkedin or personal or "N/A"
@@ -748,7 +988,7 @@ def extract_from_mail_body(body: str) -> dict:
                 result["location"], result["country"] = split_location_country(loc2)
                 break
 
-    found = _scan_skill_keywords(body.lower())
+    found = _scan_skill_keywords(body)
     if found:
         from hiring_agent.config import SKILL_DISPLAY, SCORING_MAX_SKILLS
         seen, display = set(), []
@@ -771,8 +1011,25 @@ def _extract_role_from_body(body: str) -> str | None:
     """Extract a job title from the email body (signature lines, explicit statements)."""
     if not body:
         return None
+    # Tried first - fixed 2026-08-01, live case (Brett Worker / APP-20260721-0122-E743):
+    # "I came across Tracy Simon's LinkedIn post for the CISO position. The role caught my
+    # attention because it combines..." - the role name here comes BEFORE "position", so
+    # the keyword-then-role pattern below never had a letter to capture right after
+    # "position" (a period followed it) and fell through to matching "role" in the NEXT
+    # sentence instead, capturing "caught my attention because it combines" as the desired
+    # role. "for/the X position/role" is at least as common a phrasing as "role: X" and
+    # must be checked before the fallback pattern gets a chance to latch onto an unrelated
+    # later sentence.
+    before_match = re.search(
+        r'\b(?:for|in)\s+(?:the\s+|an?\s+)?([A-Za-z][A-Za-z0-9 /&\-]{1,39}?)\s+'
+        r'(?:position|role|opening|opportunity)\b',
+        body, re.IGNORECASE,
+    )
+    if before_match:
+        return _normalize_title(before_match.group(1).strip().rstrip(".,;"))
+
     role_match = re.search(
-        r'(?:applying for|interested in|position|role|objective)\s*[:\-]?\s*'
+        r'\b(?:applying for|interested in|position|role|objective)\s*[:\-]?\s*'
         r'([A-Za-z][A-Za-z /&\-]{2,39})',
         body, re.IGNORECASE,
     )
@@ -822,7 +1079,7 @@ def merge_mail_body_fallback(extracted: dict, body: str) -> dict:
 
 def extract_candidate_details(text: str) -> dict:
     """Best-effort OFFLINE extraction from the combined email + resume text."""
-    text = text or ""
+    text = _normalize_letterspaced_document(text or "")
     low = text.lower()
     extracted = {
         "full_name": "Not extracted",
@@ -860,31 +1117,54 @@ def extract_candidate_details(text: str) -> dict:
     if header_role:
         extracted["looking_for_role"] = header_role
     else:
+        # Scoped to the header/summary area only (first 15 lines), not the whole document -
+        # fixed 2026-07-31, live case (Prerna Saluja / APP-20260716-2052-6112): "position"
+        # and "role" are common English words far beyond "job position" - an Experience
+        # bullet reading "...identifying an investment position that appreciated
+        # approximately 3x..." matched "position" and returned "that appreciated
+        # approximately" as the candidate's desired role. A genuine "seeking X" / "Objective:
+        # X" statement lives in the header/summary, same reasoning as the location/name
+        # header-first heuristics already used elsewhere in this file.
+        # \b after the alternation - fixed 2026-08-01, live case (Mindy Anderson /
+        # APP-20260723-2034-12DF): without a trailing word boundary, "position" matched as
+        # a bare substring inside "brand positioning" (a business term, not a job-role
+        # statement), and the capture group grabbed the word's own leftover letters ("ing")
+        # as the "desired role" - identical zero-separator collision to the "rpa" inside
+        # "counterparties" bug fixed on the same day.
+        _role_header_text = "\n".join(text.splitlines()[:15])
         role_match = re.search(
-            r'(?:applying for|application for|position|role|objective)\s*[:\-]?\s*([A-Za-z][A-Za-z /&]{2,39})',
-            text, re.IGNORECASE,
+            r'(?:applying for|application for|position|role|objective)\b\s*[:\-]?\s*([A-Za-z][A-Za-z /&]{2,39})',
+            _role_header_text, re.IGNORECASE,
         )
+        # Word-boundary matching, not bare substring - fixed 2026-08-01, live case (Prerna
+        # Saluja / APP-20260716-2052-6112): 'rpa' in low matched inside 'counterparties',
+        # tagging a Financial/Audit Analyst as wanting an "Automation / RPA Engineer" role
+        # she never mentioned. Short tokens ('rpa', 'sre', 'seo') are exactly the ones prone
+        # to landing mid-word, same root cause as the Swift/Go skill collisions fixed above.
+        def _kw_hit(kw: str) -> bool:
+            return bool(re.search(r"(?<![a-z])" + re.escape(kw) + r"(?![a-z])", low))
+
         if role_match:
             extracted["looking_for_role"] = role_match.group(1).strip().rstrip(".")
-        elif any(kw in low for kw in ["uipath", "power automate", "rpa", "automation engineer", "process automation"]):
+        elif any(_kw_hit(kw) for kw in ["uipath", "power automate", "rpa", "automation engineer", "process automation"]):
             extracted["looking_for_role"] = "Automation / RPA Engineer"
-        elif any(kw in low for kw in ["machine learning", "deep learning", "llm", "genai", "generative ai", "ai engineer", "ml engineer"]):
+        elif any(_kw_hit(kw) for kw in ["machine learning", "deep learning", "llm", "genai", "generative ai", "ai engineer", "ml engineer"]):
             extracted["looking_for_role"] = "AI / ML Engineer"
-        elif any(kw in low for kw in ["data scientist", "data science", "analytics", "data analyst"]):
+        elif any(_kw_hit(kw) for kw in ["data scientist", "data science", "analytics", "data analyst"]):
             extracted["looking_for_role"] = "Data Scientist / Analyst"
-        elif any(kw in low for kw in ["devops", "kubernetes", "terraform", "ci/cd", "site reliability", "sre"]):
+        elif any(_kw_hit(kw) for kw in ["devops", "kubernetes", "terraform", "ci/cd", "site reliability", "sre"]):
             extracted["looking_for_role"] = "DevOps / SRE Engineer"
-        elif any(kw in low for kw in ["react", "angular", "vue", "frontend", "front-end", "ui/ux"]):
+        elif any(_kw_hit(kw) for kw in ["react", "angular", "vue", "frontend", "front-end", "ui/ux"]):
             extracted["looking_for_role"] = "Frontend Developer"
-        elif any(kw in low for kw in ["full stack", "fullstack", "full-stack"]):
+        elif any(_kw_hit(kw) for kw in ["full stack", "fullstack", "full-stack"]):
             extracted["looking_for_role"] = "Full-Stack Engineer"
-        elif any(kw in low for kw in ["python", "django", "flask", "backend", "developer", "engineer", "software"]):
+        elif any(_kw_hit(kw) for kw in ["python", "django", "flask", "backend", "developer", "engineer", "software"]):
             extracted["looking_for_role"] = "Software Developer / Backend Engineer"
-        elif any(kw in low for kw in ["marketing", "content", "seo", "growth"]):
+        elif any(_kw_hit(kw) for kw in ["marketing", "content", "seo", "growth"]):
             extracted["looking_for_role"] = "Marketing / Growth"
-        elif any(kw in low for kw in ["product manager", "product owner", "scrum master", "agile"]):
+        elif any(_kw_hit(kw) for kw in ["product manager", "product owner", "scrum master", "agile"]):
             extracted["looking_for_role"] = "Product Manager"
-        elif any(kw in low for kw in ["project manager", "program manager", "pmp"]):
+        elif any(_kw_hit(kw) for kw in ["project manager", "program manager", "pmp"]):
             extracted["looking_for_role"] = "Project / Program Manager"
 
     loc = _extract_location(text)
@@ -895,7 +1175,7 @@ def extract_candidate_details(text: str) -> dict:
     if edu:
         extracted["education"] = edu
 
-    found = _scan_skill_keywords(low)
+    found = _scan_skill_keywords(text)
     if found:
         seen, display = set(), []
         for s in found:
@@ -1174,6 +1454,7 @@ def extract_candidate_details_smart(text: str) -> dict:
     Falls back to the pure offline parser if Ollama is disabled or the call fails -
     nothing here ever raises.
     """
+    text = _normalize_letterspaced_document(text or "")   # see its own docstring
     baseline = extract_candidate_details(text)   # deterministic baseline - always computed
 
     result = {
@@ -1217,7 +1498,17 @@ def extract_candidate_details_smart(text: str) -> dict:
 
     # Tier 1 skills: deterministic vocabulary scan is the floor; Ollama's free-text
     # skills only ADD to it (same union pattern as before this plan).
-    result = _merge_keyword_skills({**result, "skills": ollama.get("skills", baseline.get("skills", ""))}, text)
+    #
+    # Ollama's own free-text skill reading isn't bound by _scan_skill_keywords' case-
+    # sensitive disambiguation - it can independently misread the same all-caps acronym
+    # (fixed 2026-07-31: 'SWIFT' the banking payment standard, in the presence of the
+    # word 'Swift' as this prompt's OWN few-shot example) as the ambiguous skill, same
+    # root cause as the regex scanner, just at the LLM layer. Strip any such term from
+    # Ollama's output unless its canonical mixed-case spelling genuinely appears in the
+    # resume text, before it ever reaches the union merge.
+    ollama_skills = _strip_unconfirmed_ambiguous_skills(
+        str(ollama.get("skills", "") or ""), text)
+    result = _merge_keyword_skills({**result, "skills": ollama_skills or baseline.get("skills", "")}, text)
 
     # Tier 2: Ollama is the actual decision-maker, confirming or correcting the hint;
     # only fall back to the deterministic guess if Ollama's answer for that field is
@@ -1235,6 +1526,37 @@ def extract_candidate_details_smart(text: str) -> dict:
         loc = result.get("location", "")
         if loc and loc != "Not extracted":
             result["location"], result["country"] = split_location_country(loc)
+
+    # Consistency guard: Ollama can correct 'location' from real text evidence while
+    # still echoing a now-stale 'country' hint verbatim - fixed 2026-08-01, live case
+    # (Syyed Nazir Ali / APP-20260727-1431-6F75): a stray 'MS' in his skills list made
+    # the baseline mis-hint location as "Bloomberg Terminal, MS" and country as "United
+    # States"; Ollama correctly read the resume's own header ("Location: India") and
+    # fixed location, but left country as the stale "United States" hint, producing a
+    # self-contradictory India/United-States row that could pass a country-only geo
+    # check. Location is grounded in a confirm/correct step against real text; when the
+    # resolved location is ITSELF a bare recognized country name that conflicts with the
+    # resolved country, location wins.
+    loc_low = str(result.get("location", "")).strip().lower()
+    country_low = str(result.get("country", "")).strip().lower()
+    if loc_low in FOREIGN_COUNTRIES and country_low in US_COUNTRY_TERMS:
+        result["country"] = str(result["location"]).strip().title()
+    elif loc_low in US_COUNTRY_TERMS and country_low in FOREIGN_COUNTRIES:
+        result["country"] = "United States"
+
+    # Location must hold city/state only - Country is the dedicated field for the country
+    # name itself. Fixed 2026-08-01, live case (Syyed Nazir Ali / APP-20260727-1431-6F75):
+    # his resume's only location statement is "Location: India" - no city anywhere - so
+    # 'India' ended up duplicated into both the Location AND Country columns. If nothing
+    # more specific than a bare country name was ever found, don't leave the country name
+    # sitting in Location too: use 'Remote' when the text itself says so (this candidate's
+    # header also reads "Open to Remote / Global"), else 'N/A' rather than a guess.
+    final_loc_low = str(result.get("location", "")).strip().lower()
+    if final_loc_low and (final_loc_low in FOREIGN_COUNTRIES or final_loc_low in US_COUNTRY_TERMS):
+        if re.search(r'\bremote\b|\bwork[\s-]*from[\s-]*home\b|\bwfh\b', text, re.IGNORECASE):
+            result["location"] = "Remote"
+        else:
+            result["location"] = "N/A"
 
     return result
 

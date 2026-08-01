@@ -4,7 +4,7 @@
 **Single source of truth:** `flow/flow_config.json` â€” edit this, run `python flow/build_zip.py`, re-import.  
 **Generated artifacts (never hand-edit):** `flow/definition.json` Â· `flow/DriverAI-Hiring-AutoReply-apply.zip`
 
-Power Automate watches `apply@driverai.io`, filters spam and non-applications, saves each resume + a candidate row to SharePoint, and emails the applicant back â€” serverless, no machine required. Phase 2 (`../HiringAgent_App_P2/`) scores the queued rows.
+Power Automate watches `apply@driverai.io`, filters spam and non-applications, and saves each resume + candidate row to SharePoint. Applicant replies are controlled by `email.send_applicant_emails`; the current silent-live setting is `false`, so intake runs without contacting applicants. Phase 2 (`../HiringAgent_App_P2/`) scores the queued rows.
 
 ---
 
@@ -73,10 +73,10 @@ the package usually imported with a workbook binding Power Automate could not re
 ```
 bad_senders         : 31
 bad_subjects        : 24 (config; self-loop guard is sender-based)
-spam/safety gate    : 111 (30 scam + 36 offensive + 20 malware/exe + 25 non-EN); scans subject+body+attachment names
+spam/safety gate    : 114 (30 scam + 36 offensive + 20 malware/exe + 25 non-EN + 3 vendor-pitch); scans subject+body+attachment names
 app_keywords        : 21 (OR clauses: 42; E3 gated on no-attachment)
 row extras          : Subject + body preview (~255 chars, bodyPreview) columns + improved Full Name guess
-year separator      : ON - one blank row before the first new-applicant row of each year
+year separator      : ON - one blank row before the first new-applicant row of each year; the permanent header spacer is reused for the first-ever applicant
 month separator     : ON - one blank row before the first new-applicant row of each month (suppressed at a year boundary so only ONE blank row lands)
 ```
 
@@ -90,23 +90,28 @@ month separator     : ON - one blank row before the first new-applicant row of e
 
 | Setting | Value |
 |---|---|
-| Connector | Office 365 Outlook â€” When a new email arrives in a shared mailbox (V2) |
+| Trigger | Power Automate `Recurrence` |
+| Mail action | Office 365 Outlook â€” Get emails (V3), shared mailbox |
 | Mailbox | `apply@driverai.io` |
 | Folder | Inbox |
+| Read filter | Unread only (`fetchOnlyUnread=true`) |
 | Include Attachments | Yes â€” content bytes are included; no second download needed |
-| Has Attachments filter | No â€” not all application emails have attachments; we filter ourselves |
-| Poll interval | **1 min** (`trigger.interval_min`) â€” only takes effect after re-import. This is the platform-enforced minimum for this trigger type (paid plans); Power Automate does not support sub-minute polling. |
-| Concurrency | **1** â€” one run per email, strictly sequential; prevents double-row writes |
-| splitOn | true â€” each email in the batch is its own run |
+| Poll interval | **1 min** (`trigger.interval_min`) â€” only takes effect after re-import |
+| Messages per run | **1** (`trigger.unread_per_run`) |
+| Concurrency | **1** â€” one scheduled run at a time; prevents double-row writes |
 
-The trigger watermark ensures each email is processed exactly once. **Correction (verified 2026-07-03):** the watermark is based on received date/time, not read status â€” a failed run's email is left unread as a signal for a human, but the next poll will **not** automatically reprocess it (the watermark has already moved past its timestamp). See "Error handling" below for what actually happens on failure.
+Every scheduled run fetches one unread message from the shared Inbox, so both newly delivered and older mail moved back to Inbox can be processed. A backlog of 41 unread messages takes about 41 minutes plus connector/runtime overhead. Successful legitimate mail is marked read and archived; spam is moved unread to Junk Email. A permanently failing item is moved **unread** to `Archive` after its admin alert so it cannot block the rest of the unread queue. Success and failure cleanup are mutually exclusive: the failure move cannot run when `Notify_failure` is skipped on a successful message. This prevents two `MoveV2` actions racing for the same Outlook message ID. Automatic retries are disabled for terminal moves, and their outcomes are explicitly finalized. The nested `Recruiting Review` folder is not used by `MoveV2`: its Graph ID was visible but the imported connector rejected it as `NotFound` at runtime.
+
+The unread guard and the existing processing graph are top-level siblings. This is deliberate: Power Automate permits action nesting only through level 8, and wrapping the legacy graph would push its deepest update/follow-up actions to invalid level 9. The build and ZIP audits now reject any definition deeper than level 8.
 
 ---
 
 ## Full flow
 
 ```
-TRIGGER â€” new email arrives in apply@driverai.io (polls every 1 min)
+TRIGGER â€” recurrence every 1 minute
+â”‚
+â””â”€ Get_unread_emails â€” first unread Inbox message from apply@driverai.io
 â”‚
 â”œâ”€ SETUP (all run in parallel after trigger)
 â”‚   CONFIG       Compose  { sharepoint_site, resumes_folder }
@@ -116,20 +121,20 @@ TRIGGER â€” new email arrives in apply@driverai.io (polls every 1 min)
 â”‚   LowerBody    Compose  toLower(body + " " + join(AttachNames))
 â”‚   BadSenders   Compose  [31 sender fragments]
 â”‚   BadSubjects  Compose  [24 subject strings]
-â”‚   SpamPhrases  Compose  [111 always-on = 30 scam + 36 offensive + 20 malware/exe + 25 non-EN]
+â”‚   SpamPhrases  Compose  [114 always-on = 30 scam + 36 offensive + 20 malware/exe + 25 non-EN + 3 vendor-pitch]
 â”‚   LinkShortenerPhrases Compose [12 URL shorteners â€” checked separately, bypassed if
 â”‚                                 HasValidResumeEarly is true (a real resume was attached)]
 â”‚
 â”œâ”€ GATE 1 â€” IsSystem
 â”‚   MatchSender: filter BadSenders where fragment is contained in LowerFrom
 â”‚   IF length(MatchSender) > 0:
-â”‚     Mark_as_read_spam_sender â†’ Move_to_processed_spam_sender â†’ Terminate [silent]
+â”‚     Move_to_processed_spam_sender â†’ Terminate [silent; remains unread in Junk]
 â”‚   else:
 â”‚
 â”œâ”€ GATE 2 â€” IsSubject
 â”‚   MatchSubject: filter BadSubjects where string is contained in LowerSubject
 â”‚   IF length(MatchSubject) > 0:
-â”‚     Mark_as_read_spam_subject â†’ Move_to_processed_spam_subject â†’ Terminate [silent]
+â”‚     Move_to_processed_spam_subject â†’ Terminate [silent; remains unread in Junk]
 â”‚   else:
 â”‚
 â”œâ”€ GATE 3 â€” IsSpam
@@ -137,7 +142,7 @@ TRIGGER â€” new email arrives in apply@driverai.io (polls every 1 min)
 â”‚   HasValidResumeEarly Compose [true if ResumeFilesEarly is non-empty]
 â”‚   MatchSpam: filter SpamPhrases where phrase in LowerSubject OR LowerBody
 â”‚   IF length(MatchSpam) > 0:
-â”‚     Mark_as_read_spam_body â†’ Move_to_processed_spam_body â†’ Terminate [silent]
+â”‚     Move_to_processed_spam_body â†’ Terminate [silent; remains unread in Junk]
 â”‚   else: â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ WORK BRANCH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 â”‚
 â”œâ”€ MINT REFERENCE
@@ -163,7 +168,14 @@ TRIGGER â€” new email arrives in apply@driverai.io (polls every 1 min)
 â”‚       â”œâ”€ TRUE â€” known applicant:
 â”‚       â”‚   RefSrc              subject if "app-20" in subject, else body
 â”‚       â”‚   AppRef_from_subject extract "APP-YYYYMMDD-HHMM-XXXX" token from RefSrc
-â”‚       â”‚   FileRef_from_subject replace("/", "-") on AppRef_from_subject
+â”‚       â”‚                       (display/audit only since 2026-07-31 - see AppRef_current)
+â”‚       â”‚   AppRef_current      first(Get_rows_ref.value)?['Application ID'] - the MATCHED
+â”‚       â”‚                       row's real, live Application ID (fixed 2026-07-31: a sender
+â”‚       â”‚                       replying to an old dead thread keeps quoting a stale ref
+â”‚       â”‚                       forever; Get_rows_ref still finds their real current row by
+â”‚       â”‚                       email, but the saved file/displayed Ref used to trust the
+â”‚       â”‚                       quoted text instead, orphaning the resume from that row)
+â”‚       â”‚   FileRef_from_subject replace("/", "-") on AppRef_current
 â”‚       â”‚   â”‚
 â”‚       â”‚   â””â”€ Has_resume_in_update  IF length(ResumeFiles) > 0:
 â”‚       â”‚       â”‚
@@ -232,8 +244,10 @@ TRIGGER â€” new email arrives in apply@driverai.io (polls every 1 min)
 â”‚   â”‚       Save_resumes_to_SharePoint  ForEach â†’ Create_file
 â”‚   â”‚         folderPath = resumes_folder/<yyyy>/<MMMM>
 â”‚   â”‚         name       = <FirstLast>_<FileRef>.<ext>  (changed 2026-07-12; was <FileRef>_<original-filename>)
-â”‚   â”‚       Get_rows_this_year  â†’ IsFirstOfNewYear  â†’ Add_row_year_separator   [blank row]
-â”‚   â”‚       Get_rows_this_month â†’ IsFirstOfNewMonth â†’ Add_row_month_separator  [blank row]
+â”‚   â”‚       Get_rows_for_separators â†’ Filter_rows_this_year  â†’ IsFirstOfNewYear
+â”‚   â”‚                               â””â†’ Filter_rows_this_month â†’ IsFirstOfNewMonth
+â”‚   â”‚         (one paginated Excel scan; date filtering is done in memory because Excel
+â”‚   â”‚          OData Filter Query rejects the spaced `Received Date` column name)
 â”‚   â”‚         (month check also requires rows already exist this year, so a January
 â”‚   â”‚          arrival inserts ONE blank row, not two stacked)
 â”‚   â”‚       Add_row   Status="New Email Received", Application Updates=0  (11 P1 fields)
@@ -257,21 +271,21 @@ TRIGGER â€” new email arrives in apply@driverai.io (polls every 1 min)
 â”‚   Has_application_keyword and HasWrongFormat are mutually exclusive:
 â”‚   the keyword check requires zero attachments; wrong-format requires at least one.
 â”‚
-â”œâ”€ INBOX TIDY (two destinations by category)
+â”œâ”€ INBOX TIDY (three outcome categories, two well-known folders)
 â”‚   Legit mail: Mark_as_read â†’ Move_to_processed (Archive, read)
 â”‚   Spam/junk:  Move_to_processed only (Junk Email, left UNREAD â€” no mark)
-â”‚   17 tidy actions total: 7 mark-read + 10 move
+â”‚   20 tidy actions total: 7 mark-read + 11 move + 2 terminal finalizers
 â”‚     3 spam-gate moves â†’ Junk Email, unread (no mark)
 â”‚     6 ref-reply pairs â†’ Archive, read (update, update-noreply, update-cap,
 â”‚                                        followup, followup-noreply, followup-cap)
 â”‚     1 top-level pair â†’ Archive, read (new-applicant / duplicate / CV-request / wrong-format / ignored)
+â”‚     1 failure move â†’ Archive, unread; only after an actual Notify_failure attempt
+â”‚     2 finalizers handle terminal move outcomes without cross-activating skipped paths
 â”‚
 â””â”€ ERROR HANDLER â€” Notify_failure
     Runs after HasResume Failed or TimedOut
     Sends high-priority admin alert to yashv@driverai.io
-    Email stays UNREAD in Inbox â€” a visual flag for an admin, NOT an automatic retry
-    (the trigger's watermark is time-based, so the next poll will not re-fetch it;
-    the admin alert email is the actual recovery mechanism â€” see "Error handling")
+    Best-effort move of the failed message unread to Archive; admin alert remains authoritative
 ```
 
 **Resume folder path**: `<Year>/<Month>` from the email's `receivedDateTime` â€” no week-level
@@ -302,7 +316,7 @@ The last 3 are legacy outbound subjects from a prior flow version â€” kept 
 
 > **Narrowed 2026-07-31.** Five entries were bare words that also appear in ordinary job titles, and each would have silently junked a real applicant: `alert` ("Alert Systems Engineer"), `invoice` ("Invoice Processing Specialist"), `receipt` ("Receipt Reconciliation Analyst"), `payment` ("Senior Engineer | Payments Platform"), `survey` ("Land Surveyor"). They are now the specific spam phrases shown above. Keep new entries multi-word for the same reason.
 
-### Gate 3 â€” Content (111 always-on phrases + 12 conditional, against lowercased Subject + Body + all attachment filenames)
+### Gate 3 â€” Content (114 always-on phrases + 12 conditional, against lowercased Subject + Body + all attachment filenames)
 
 Attachment filenames are merged into the scan field via `AttachNames` â†’ `join`, so `invoice.exe` is caught even with an innocent subject. The join is followed by **one trailing space** (`build_zip.py`, `LowerBody`), which space-terminates the last filename â€” see the malware row below.
 
@@ -312,9 +326,12 @@ Attachment filenames are merged into the scan field via `AttachNames` â†’ `
 | Offensive / harassment | 36 | Yes | Sexual content phrases, racial slurs, explicit threats (`kill yourself`, `i will kill you`, `rape you`, `i will find you`, `i will rape`) |
 | Malware / executables | 20 | Yes | `.exe ` `.scr ` `.bat ` `.cmd ` `.vbs ` `.ps1 ` `.lnk ` `.iso ` `.dll ` `.hta ` `.cpl ` `.pif ` (**trailing space is part of the term**) Â· `enable macros` `disable antivirus` `download and run` |
 | Non-English scams | 25 | Yes | Spanish Â· French Â· German Â· Portuguese Â· Russian Â· Chinese Â· Japanese Â· Hindi Â· Arabic â€” lottery, wire-transfer, and inheritance phrases |
+| Vendor / agency solicitation | 3 | Yes | `company profile and corporate deck`, `capability deck`, `engagement models` |
 | **URL shorteners** | **12** | **No â€” bypassed if a real PDF/DOCX is attached** (`HasValidResumeEarly`) | `bit.ly/` `tinyurl.com/` `t.me/` `ow.ly/` `rb.gy/` `is.gd/` `rebrand.ly/` `cutt.ly/` `shorturl.at/` `v.gd/` `s.id/` `urlzs.com/` |
 
 All matching is lowercase substring. No reply is sent on a Gate 3 hit â€” replying confirms a live mailbox to the sender.
+
+> **Vendor / agency solicitation phrases (added 2026-08-01).** B2B vendors pitching their own services to the recruiting mailbox are not applicants, but nothing in their wording is malicious, so none of the other four groups touched them. Live case: a services vendor emailed `apply@driverai.io` three times sharing a "Company Profile and Corporate Deck" and offering "engagement models"; P1 created a candidate row each time and sent real applicant lifecycle replies ("Please Resend Your Resume", "we don't have your location on file") to a sales rep. The three phrases are deliberately narrow B2B sales-deck language that essentially never appears in a genuine application — verified against all live candidate resumes with zero false positives. **Known limit:** this catches wording, not intent. A staffing agency submitting someone else's CV ("please find the attached resume of my developer") uses ordinary polite English and still passes — those are removed manually. A stronger structural signal (corporate sender domain **plus** a business-title signature such as *Business Development Manager* / *Team Lead*) was validated offline at 5/5 vendors caught, 0/9 real candidates flagged, but is **not implemented**; it must live in P1 because the `Mail Body` column stores only ~256 characters and email signatures fall past that cutoff.
 
 > **Executable extensions are space-anchored (2026-07-31).** Each is stored with a trailing space (`".exe "`, not `".exe"`) because the scan field is prose *plus* filenames. Unanchored, `.exe` matched `www.exeter.ac.uk` and `.iso` matched `www.iso.org` â€” so a University of Exeter graduate, or any ISO 27001 / CISSP candidate citing the standards body, was classified as malware and silently junked. With the trailing space, `invoice.exe` still matches (`...invoice.exe `) while `.exet` and `.iso.` do not. If you add an extension, include the trailing space; if you change `LowerBody`, keep its final `' '`. The shortener list is separate on purpose: email signature generators commonly wrap a LinkedIn/social icon in one of these redirect domains, so a real resume attachment is treated as a strong enough good-faith signal to let it through â€” the other four groups have no such exception, since there's no legitimate reason a real applicant's email would contain that content.
 
@@ -354,14 +371,14 @@ Email 3 (no-CV reply) is **not capped** â€” no row means no counter. Each d
 | Duplicate resubmit, `Application Updates â‰¥ 5` | `IsUnderDupCap = false` | No |
 | Contact 4th/5th (`reply_cap â‰¤ Application Updates < 5`), any of the 3 capped scenarios | `IsUnderReplyCap_* = false` | No new row â€” the existing row IS still updated (resume re-saved + re-queued for dup/update); only the email is skipped |
 | No attachment AND no hiring keyword | Falls through all branches | No |
-| Any flow action errors | `Notify_failure` â†’ admin alert; email stays unread as a manual-followup flag | No |
+| Core candidate-processing branch errors | Admin alert â†’ move message unread to `Archive` | No |
 
-**Inbox tidy â€” two destinations (changed 2026-07-04):**
-- **Legitimate application mail** (new CV, non-CV request, duplicate, wrong-format, update, follow-up, and the "ignored / not an application" fall-through) â†’ **marked read + moved to `Archive`**. So Archive holds only real application traffic.
+**Inbox tidy â€” three outcome categories, two folders:**
+- **Legitimate application mail** (new CV, non-CV request, duplicate, wrong-format, update, follow-up, and the "ignored / not an application" fall-through) â†’ **marked read + moved to `Archive`**.
 - **Spam / junk** caught by the 3 gates (bad sender, bad subject, scam / phishing / malware / virus / offensive / foreign-scam) â†’ **moved to `Junk Email`, left UNREAD** (just moved, not marked read) so it stands out as junk. No reply is ever sent to these.
-- **Error-path emails** stay **unread in the Inbox** â€” on purpose, so an admin can find them (`Notify_failure` also alerts); the trigger does not auto-retry (it reads the Inbox and its watermark is time-based â€” see "Trigger / Schedule").
+- **Error-path emails** trigger an admin alert and make a best-effort move **unread** to **`Archive`**. On a successful move, this quarantines the failed item and lets the next unread message run on the next minute. If Outlook itself rejects that cleanup, the admin alert remains the authoritative recovery signal. Unread state distinguishes failed Archive items from successfully processed mail.
 
-Config: `inbox_tidy.destination` (`Archive`) for legit, `inbox_tidy.spam_destination` (`Junk Email`) for spam. Moving an email out of the Inbox means it is never re-polled, so "unread in Junk" is safe.
+Config: `inbox_tidy.destination` (`Archive`) for legit, `inbox_tidy.spam_destination` (`Junk Email`) for spam, and `inbox_tidy.failure_destination` for failures. Moving an email out of Inbox prevents it from being polled again.
 
 ---
 
@@ -522,6 +539,7 @@ This is an auto-generated email and this mailbox is not monitored.
 ### Email 5 â€” Updated Resume Received (`Send_update_ack`)
 
 **Fires:** Email quotes `APP-20...` ref + sender in workbook + new PDF/DOCX attached + `Application Updates < 5`.  
+**Ref shown/used for the saved filename (fixed 2026-07-31):** always the matched row's real, current Application ID (`AppRef_current`, sourced from `Get_rows_ref` by sender email) - never the `APP-20...` text the sender's email happened to quote. A sender still replying to an old dead thread otherwise gets told (and the file gets saved under) a stale reference that no longer corresponds to any live row.  
 **Writes row:** No new row, but **re-queues the existing row** â€” saves the new resume into the original application's dated folder under the same `<FirstLast>_<FullAppID>` name P1 always uses (fixed 2026-07-04), increments `Application Updates`, and flips `Status` back to `New Email Received` so **P2 re-scores with the updated CV**. `Original Filename` is deliberately left unchanged. On a row that's never been scored, this is a true in-place overwrite (one CV, never a second file). On a row that's **already been scored once**, P2 has since renamed the file to its `<FirstLast>_<Category>_<tail>` shape (2026-07-15 filename convention) â€” so this write lands as a *new* file under the old name, not an overwrite of the renamed one. **P2's re-score pass is what reconciles this** (`_download_resume_text` in `sharepoint_scoring.py`, fixed 2026-07-15): it always prefers a `<FirstLast>_<FullAppID>`-shaped file over a `<FirstLast>_<Category>_<tail>`-shaped one for the same Application ID â€” since that shape can only exist post-scoring if P1 just wrote a fresh update â€” scores off it alone (never blended with the stale prior content), then deletes the stale sibling once the rename lands. Net effect for the candidate is still exactly one current resume file, just resolved a run later by P2 rather than by P1's write itself. Cap: 5.
 
 Subject: `Updated Resume Received - DriverAI (Ref: APP-20260630-1430-A3F9)`
@@ -573,7 +591,8 @@ This is an auto-generated email and this mailbox is not monitored.
 ### Email 6 â€” Message Received (`Send_noted_reply`)
 
 **Fires:** Email quotes `APP-20...` ref + sender in workbook + no new resume + `Application Updates < 5`.  
-**Writes row:** No. Increments `Application Updates`. Cap: 5.
+**Writes row:** No, but now also stamps `Last Updated Date` (fixed 2026-07-31 - previously the one patch path that silently skipped it). Increments `Application Updates`. Cap: 5.  
+**Ref shown (fixed 2026-07-31):** same `AppRef_current` fix as Email 5 - always the matched row's real Application ID, never the sender's possibly-stale quoted text.
 
 Subject: `Message Received - DriverAI (Ref: APP-20260630-1430-A3F9)`
 
@@ -625,7 +644,7 @@ This is an auto-generated email and this mailbox is not monitored.
 **Fires:** Any action in the flow fails or times out.  
 **Sent from:** Connection owner account â€” not `apply@`; works regardless of Send As rights.  
 **To:** `yashv@driverai.io` (`email.admin_email`). No shared footer.  
-**Effect:** Triggering email stays **unread** as a visual flag for whoever handles `yashv@driverai.io` â€” this alert email is the actual recovery path, since the trigger's time-based watermark will NOT re-fetch the email on a later poll just because it's unread. `flowFailureAlertSubscribed: true` is also set as a backup PA-level alert. Reprocessing requires manual action (e.g. resending the original email).
+**Effect:** The failed message is moved unread to `Archive` only after `Notify_failure` actually runs (or fails/times out), preventing one bad message from becoming the first unread item forever. A skipped alert is the normal success path and never activates this failure move. After correcting the cause, move it back to Inbox (still unread) to retry. `flowFailureAlertSubscribed: true` remains a backup PA-level alert.
 
 Subject: `[Hiring Auto-Reply] A run needs attention (Ref APP-20260630-1430-A3F9)`
 
@@ -642,7 +661,7 @@ resume file may not have been saved.
   Received: 2026-06-30T14:30:52Z
 
 Open the flow run history for the exact step and error.
-The email was left unread, so it can be reprocessed.
+The email was moved unread to Archive so the remaining unread queue can continue.
 ```
 
 ---
@@ -655,7 +674,7 @@ Phase 1 writes intake fields; Phase 2 fills scored fields and flips Status.
 |---|---|---|---|
 | 1 | Application ID | P1 | `APP-YYYYMMDD-HHMM-XXXX` â€” from `receivedDateTime` plus a 4-char random hex tail so it's unique even if two emails arrive in the same minute. Format is `flow_config.json`'s `appref.time_format`/`appref.hex_length`, not hardcoded. |
 | 2 | Received Date | P1 | `body/receivedDateTime` |
-| 3 | Last Updated Date | P1 | Same as Received Date on first intake; refreshed only when P1 saves a resume update/resend. |
+| 3 | Last Updated Date | P1 | Same as Received Date on first intake; refreshed on every patched contact (resume update/resend AND text-only follow-up). Guarded (fixed 2026-07-31) to never move backward - `max(existing value, this email's own time)` - since backlog replay can process an older queued reply after a newer one already patched the row. |
 | 4 | Category | P2 | Business **department** derived from Suggested Role 1 â€” one of: `Senior & Executive`, `AI/ML/CV (SIN2)`, `Data Analytics`, `3D/CV/ IoT/ AI Agents (SIN3)`, `Cloud and DevOps`, `Web Team (Full stack/Back end & UI/UX)`, `Graphics`, `Mobile Apps (Android IOS)`, `Business Analytics`, `Supply Chain`, `Finance`, `Cybersecurity and IT Admin`, `Data Center`, `Satellite`, `General`. `Graphics` added 2026-07-15 (design/rendering/gaming roles, split out of Web Team); marketing roles route to `Business Analytics` (also 2026-07-15). **Every scored candidate always gets a department** (an unmatched / role-less candidate falls back to `General`) so the client's Category filter never hides anyone. Blank until P2 scores the row. Config-driven in `role_categories.rules` (config.yaml) â€” add a JD â†’ no code change needed. |
 | 5 | Resume Link | P2 | Calculated column formula displaying the candidate's clickable resume. **Moved to 5th position (right after Category, before Full Name) at client request, 2026-07-24.** |
 | 6 | Full Name | P1 (P2 may refine) | Display name before `<`; else email local-part with `.`/`_` â†’ spaces |
@@ -721,6 +740,7 @@ Edit `flow/flow_config.json`, run `python flow/build_zip.py`, re-import.
 | `email.trigger_mailbox` | `apply@driverai.io` | Watched inbox and reply "from" |
 | `email.admin_email` | `yashv@driverai.io` | Failure alert recipient |
 | `trigger.interval_min` | `1` | Poll frequency â€” only takes effect after re-import |
+| `trigger.unread_per_run` | `1` | One unread Inbox message per sequential run |
 | `business_rules.duplicate_check_days` | `90` | Re-application window in days |
 | `business_rules.duplicate_notice_max` | `5` | Overall cap for Email 2 (counter ceiling, not all 5 get an email) |
 | `business_rules.update_resume_max` | `5` | Overall cap for Email 5 |
@@ -737,13 +757,15 @@ Edit `flow/flow_config.json`, run `python flow/build_zip.py`, re-import.
 | `inbox_tidy.enabled` | `true` | Move each processed email out of the Inbox by category |
 | `inbox_tidy.destination` | `Archive` | Legit application mail â†’ marked read + moved here. Well-known folder name (capitalized) or a mail-folder ID |
 | `inbox_tidy.spam_destination` | `Junk Email` | Spam/junk â†’ moved here, left **unread**. Well-known folder name (capitalized) or a mail-folder ID |
+| `inbox_tidy.failure_destination` | `Archive` | Failed messages move here unread; avoids the nested custom-folder `MoveV2` runtime failure |
 | `appref.date_format` | `yyyyMMdd` | Date part of the reference token |
 | `appref.detect_pattern` | `app-20` | Substring that flags a quoted ref in a reply; decade-proof (2000â€“2099) |
 | `appref.time_format` | `HHmm` | Time part of the reference token |
 | `appref.hex_length` | `4` | Length of the random hex tail (`toUpper(substring(guid(),0,4))`) |
-| `year_separator.enabled` | `true` | Insert one truly blank row before the first candidate row of each new calendar year (see Â§1A in `p1_detailed_summary.md`) |
+| `year_separator.enabled` | `true` | Insert one truly blank row before the first candidate row of each new calendar year. The first-ever row uses the template's permanent blank row below the header, so a fresh workbook never gets two blanks (see Â§1A in `p1_detailed_summary.md`) |
 | `month_separator.enabled` | `true` | Same, per calendar **month**. At a January boundary the year separator wins, so exactly **one** blank row lands, never two stacked (see Â§1A) |
-| `test_mode.suppress_emails` | `false` | `true` replaces every applicant/admin send with a no-op Compose + "TEST-MODE (suppressed) ..." Mail Sent stamp instead of a real send â€” for historical-replay/testing runs only; must be `false` for a live build |
+| `email.send_applicant_emails` | `false` | `false` suppresses all six applicant-facing sends while trigger/filter/save/row/tidy processing remains active; suppression is recorded in `Mail Sent` |
+| `email.send_admin_failure_alerts` | `true` | Keeps `Notify_failure` enabled even while applicant mail is disabled |
 | `spam_filters.bad_senders` | 32 fragments | Gate 1 list |
 | `spam_filters.bad_subjects` | 24 strings | Gate 2 list |
 | `spam_filters.spam_phrases` | 30 scam phrases | Gate 3 group 1 |
@@ -765,8 +787,8 @@ Edit `flow/flow_config.json`, run `python flow/build_zip.py`, re-import.
 
 ## Test / reset the PA trigger
 
-`trigger_reset.py` marks archived emails as unread and moves them back to Inbox
-so the PA delta-query trigger picks them up again on the next 1-minute poll.
+`trigger_reset.py` marks archived emails as unread and moves them back to Inbox.
+The scheduled unread poll then processes them one at a time on successive 1-minute runs.
 
 ```
 # Preview â€” no changes:
@@ -856,6 +878,7 @@ the P2 README).
 | Admin alert "to" | `yashv@driverai.io` | `email.admin_email` |
 | Legit mail moves to | **Archive** folder (marked read) | `inbox_tidy.destination` |
 | Spam/junk moves to | **Junk Email** folder (left unread) | `inbox_tidy.spam_destination` |
+| Failed mail moves to | **Archive** (left unread) | `inbox_tidy.failure_destination` |
 
 ### SharePoint runtime tree
 

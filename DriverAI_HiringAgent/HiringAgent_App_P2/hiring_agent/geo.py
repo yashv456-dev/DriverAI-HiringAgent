@@ -367,6 +367,17 @@ def _looks_like_us_phone(phone: str) -> bool:
     if len(d) == 11 and d.startswith("1"):
         return d[1:4] not in _CANADIAN_AREA_CODES
     if len(d) == 10 and not raw.lstrip().startswith("+"):
+        # A bare, unformatted 10-digit string (no separators at all) is indistinguishable
+        # from a foreign mobile number written without its country code - fixed 2026-08-01,
+        # live case (Divy Parmar / APP-20260720-1013-09AC): his real Indian number
+        # "7405465204", written with zero separators, coincidentally matched the NANP
+        # area-code shape and was trusted as "looks like a US phone" strongly enough to
+        # override his resume's own explicit "Khokhra, Ahmedabad" location, leaving a
+        # clearly non-US candidate sitting in Needs Review instead of Rejected. Every
+        # protected US-phone regression case already carries a visual separator (dash,
+        # space, dot, or parens) or a '+' country code, so requiring one here costs nothing.
+        if not any(c in raw for c in " -.()"):
+            return False
         # NANP area code and exchange code cannot start with 0 or 1, and N11 (911, etc.) is not an area code
         if d[1:3] == "11":
             return False

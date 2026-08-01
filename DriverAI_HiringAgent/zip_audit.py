@@ -1,6 +1,6 @@
 """
 zip_audit.py -- Deep audit of the P1 ZIP before uploading to Power Automate.
-Checks: ZIP integrity, actions, orphans, waits, test mode, config gaps, send actions.
+Checks: ZIP integrity, actions, orphans, waits, outbound-mail controls, config gaps, send actions.
 """
 import json, zipfile, re, sys
 from pathlib import Path
@@ -37,6 +37,23 @@ def walk(o):
             walk(x)
 walk(defn)
 
+def action_depths(action_map, level=0):
+    for action_name, action in action_map.items():
+        yield action_name, level
+        child_actions = action.get("actions")
+        if isinstance(child_actions, dict):
+            yield from action_depths(child_actions, level + 1)
+        else_actions = action.get("else", {}).get("actions")
+        if isinstance(else_actions, dict):
+            yield from action_depths(else_actions, level + 1)
+        for case in action.get("cases", {}).values():
+            case_actions = case.get("actions")
+            if isinstance(case_actions, dict):
+                yield from action_depths(case_actions, level + 1)
+        default_actions = action.get("default", {}).get("actions")
+        if isinstance(default_actions, dict):
+            yield from action_depths(default_actions, level + 1)
+
 P = F = 0
 def ok(c, label):
     global P, F
@@ -66,12 +83,15 @@ display = (d.get("properties", {}).get("displayName")
 ok(cfg["flow_name"] in blob, f"flow_name '{cfg['flow_name']}' baked into definition")
 
 # ═══════════════════════════════════════════════════════════════════
-print("\n=== 3. TEST MODE / LIVE MODE CHECK ===")
-suppress = bool(cfg.get("test_mode", {}).get("suppress_emails", False))
-ok(not suppress, "suppress_emails = false  (LIVE mode, real emails will send)")
-test_stamps = blob.count("TEST-MODE (suppressed)")
-ok(test_stamps == 0, f"No TEST-MODE stamps in definition (got {test_stamps})")
-ok(blob.count("formatDateTime") > 0, "Real formatDateTime timestamp stamps present")
+print("\n=== 3. OUTBOUND MAIL CONTROLS ===")
+send_applicant_mail = bool(cfg.get("email", {}).get("send_applicant_emails", True))
+send_admin_alerts = bool(cfg.get("email", {}).get("send_admin_failure_alerts", True))
+ok(not send_applicant_mail, "Applicant email delivery is disabled (silent live intake)")
+ok(send_admin_alerts, "Admin failure alerts remain enabled")
+suppressed_stamps = blob.count("Suppressed (applicant email disabled)")
+ok(suppressed_stamps >= 4,
+   f"Suppression audit stamps present in all Mail Sent patches (got {suppressed_stamps})")
+ok(blob.count("formatDateTime") > 0, "Timestamp expressions present")
 
 # ═══════════════════════════════════════════════════════════════════
 print("\n=== 4. TRIGGER ===")
@@ -81,11 +101,26 @@ trg = list(triggers.values())[0]
 ok(trg.get("recurrence", {}).get("interval") == cfg["trigger"]["interval_min"],
    f"Poll interval = {cfg['trigger']['interval_min']} min (config-driven)")
 ok(cfg["email"]["trigger_mailbox"] in blob, f"Trigger mailbox '{cfg['email']['trigger_mailbox']}' in definition")
-ok(trg.get("splitOn") is not None, "splitOn = true (per-email fan-out, not batched)")
+ok(trg.get("type") == "Recurrence", "Scheduled Recurrence trigger drains unread Inbox backlog")
+ok(trg.get("splitOn") is None, "No new-arrival splitOn watermark remains")
 limits = trg.get("runtimeConfiguration", {}).get("concurrency", {})
 op_opts = trg.get("operationOptions", "") or ""
 ok(limits.get("runs", 0) == 1 or "Single" in op_opts or "1" in json.dumps(limits),
    "Concurrency = 1 (sequential, no double-row writes)")
+poll = actions.get("Get_unread_emails", {})
+poll_params = poll.get("inputs", {}).get("parameters", {})
+ok(poll.get("inputs", {}).get("host", {}).get("operationId") == "GetEmailsV3",
+   "Unread poll uses supported Outlook Get emails (V3)")
+ok(poll_params.get("mailboxAddress") == cfg["email"]["trigger_mailbox"],
+   "Unread poll targets the configured shared mailbox")
+ok(poll_params.get("folderPath") == "Inbox" and poll_params.get("fetchOnlyUnread") is True,
+   "Unread poll reads only unread Inbox messages")
+ok(poll_params.get("includeAttachments") is True,
+   "Unread poll includes resume attachment content")
+ok(poll_params.get("top") == cfg["trigger"].get("unread_per_run") == 1,
+   "Exactly one unread message is processed per run")
+ok("triggerOutputs" not in json.dumps(defn) and "triggerBody" not in json.dumps(defn),
+   "Processing graph no longer depends on new-arrival trigger payload")
 
 # ═══════════════════════════════════════════════════════════════════
 print("\n=== 5. ACTIONS INVENTORY ===")
@@ -129,20 +164,89 @@ if waits:
         print(f"    WAIT: {n}  {actions[n].get('inputs',{}).get('interval',{})}")
 
 # ═══════════════════════════════════════════════════════════════════
-print("\n=== 8. SEND ACTIONS (all live, no suppressed no-ops) ===")
-send_actions = {n: a for n, a in actions.items()
-                if a.get("type") == "OpenApiConnection"
-                and "Mail" in json.dumps(a.get("inputs", {}))}
-ok(len(send_actions) >= 7, f"At least 7 send-mail actions present (got {len(send_actions)})")
-expected_sends = [
+print("\n=== 8. SEND ACTIONS (applicant disabled, admin alert live) ===")
+expected_applicant_sends = [
     "Send_acknowledgment", "Send_duplicate_notice", "Send_CV_request",
-    "Send_wrong_format", "Send_update_ack", "Send_noted_reply", "Notify_failure"
+    "Send_wrong_format", "Send_update_ack", "Send_noted_reply"
 ]
-for s in expected_sends:
+for s in expected_applicant_sends:
     ok(s in actions, f"Send action present: {s}")
     if s in actions:
         a_type = actions[s].get("type")
-        ok(a_type == "OpenApiConnection", f"  {s} is real OpenApiConnection (not suppressed Compose) -- type={a_type}")
+        ok(a_type == "Compose", f"  {s} is suppressed Compose (applicant not contacted) -- type={a_type}")
+ok(blob.count("SharedMailboxSendEmailV2") == 0,
+   "No applicant shared-mailbox send operation remains")
+ok("Notify_failure" in actions, "Admin failure action present: Notify_failure")
+ok(actions.get("Notify_failure", {}).get("type") == "OpenApiConnection",
+   "Notify_failure is a real OpenApiConnection")
+ok(actions.get("Notify_poll_failure", {}).get("type") == "OpenApiConnection",
+   "Notify_poll_failure is a real admin connector action")
+ok(cfg["email"]["admin_email"] in json.dumps(actions.get("Notify_poll_failure", {})),
+   "Notify_poll_failure targets the configured admin")
+for failure_move in ("Move_failed_to_archive_unread",):
+    fm = actions.get(failure_move, {})
+    ok(fm.get("inputs", {}).get("host", {}).get("operationId") == "MoveV2",
+       f"{failure_move} is a real mailbox move")
+    ok(fm.get("inputs", {}).get("parameters", {}).get("folderPath") ==
+       cfg["inbox_tidy"].get("failure_destination"),
+       f"{failure_move} routes failures to the configured portable folder")
+    ok(fm.get("inputs", {}).get("retryPolicy", {}).get("type") == "none",
+       f"{failure_move} disables automatic replay of the non-idempotent move")
+    ok(fm.get("runAfter") ==
+       {"Notify_failure": ["Succeeded", "Failed", "TimedOut"]},
+       f"{failure_move} runs only after an actual processing-failure alert attempt")
+    ok("Skipped" not in fm.get("runAfter", {}).get("Notify_failure", []),
+       f"{failure_move} cannot race the success-path move")
+
+for move_name, move_action in actions.items():
+    if (isinstance(move_action.get("inputs"), dict)
+            and move_action["inputs"].get("host", {}).get("operationId") == "MoveV2"):
+        ok(move_action.get("inputs", {}).get("retryPolicy", {}).get("type") == "none",
+           f"{move_name} has retryPolicy=none")
+
+move_v2 = {
+    name: action for name, action in actions.items()
+    if isinstance(action.get("inputs"), dict)
+    and action["inputs"].get("host", {}).get("operationId") == "MoveV2"
+}
+ok(len(move_v2) == 11, f"Exactly 11 terminal MoveV2 actions exist (got {len(move_v2)})")
+for move_name, move_action in move_v2.items():
+    params = move_action.get("inputs", {}).get("parameters", {})
+    ok(params.get("messageId") == "@outputs('CurrentEmail')?['id']",
+       f"{move_name} uses CurrentEmail.id")
+    ok(params.get("mailboxAddress") == cfg["email"]["trigger_mailbox"],
+       f"{move_name} uses the configured shared mailbox")
+    ok(params.get("folderPath") in {"Archive", "Junk Email"},
+       f"{move_name} has a portable well-known destination")
+    downstream = [
+        action for action in actions.values()
+        if move_name in action.get("runAfter", {})
+        and {"Failed", "TimedOut"}.issubset(
+            set(action.get("runAfter", {}).get(move_name, []))
+        )
+    ]
+    ok(len(downstream) == 1,
+       f"{move_name} has exactly one explicit failure/timeout continuation")
+
+ok("Move_failed_to_recruiting_review" not in actions,
+   "Legacy Recruiting Review failure move is absent")
+ok(not any(str(a.get("inputs", {}).get("parameters", {}).get("folderPath", "")).startswith("AAMk")
+           for a in move_v2.values()),
+   "No tenant-specific Outlook folder ID is baked into MoveV2")
+
+ok(actions.get("Finalize_processed_cleanup", {}).get("runAfter") ==
+   {"Move_to_processed": ["Succeeded", "Failed", "TimedOut"]},
+   "Normal terminal move is explicitly finalized on success/failure/timeout")
+ok(actions.get("Finalize_failed_cleanup", {}).get("runAfter") ==
+   {"Move_failed_to_archive_unread": ["Succeeded", "Failed", "TimedOut"]},
+   "Failure-route terminal move is explicitly finalized on success/failure/timeout")
+
+depths = list(action_depths(defn["actions"]))
+max_depth = max(level for _, level in depths)
+ok(max_depth == 8 and all(level <= 8 for _, level in depths),
+   f"Maximum action nesting is level {max_depth} (Power Automate limit: 8)")
+ok("CONFIG" in defn["actions"] and "CurrentEmail" in defn["actions"],
+   "Unread guard does not wrap the legacy processing graph")
 
 # ═══════════════════════════════════════════════════════════════════
 print("\n=== 9. SHAREPOINT + EXCEL ADDRESSING ===")
@@ -158,6 +262,30 @@ for param_key in ["source", "drive", "file", "table"]:
     val = cfg["excel"][param_key]
     ok("@" not in val and "outputs(" not in val,
        f"excel.{param_key} is a static literal (no expression -- prevents DynamicParameterInputInvalid on import)")
+
+# Excel Online only supports alphanumeric column names in OData Filter Query.
+# "Received Date" therefore has to be filtered after the row scan.
+separator_scan = actions.get("Get_rows_for_separators", {})
+separator_inputs = separator_scan.get("inputs", {}) if isinstance(separator_scan.get("inputs"), dict) else {}
+separator_params = separator_inputs.get("parameters", {})
+separator_paging = separator_scan.get("runtimeConfiguration", {}).get("paginationPolicy", {})
+ok(separator_inputs.get("host", {}).get("operationId") == "GetItems" and "$filter" not in separator_params,
+   "Separator scan reads Excel rows without an invalid OData filter on 'Received Date'")
+ok(separator_params.get("$top") == 5000 and separator_paging.get("minimumItemCount") == 5000,
+   "Separator scan is paginated to 5000 rows")
+ok(actions.get("Filter_rows_this_year", {}).get("type") == "Query" and
+   actions.get("Filter_rows_this_month", {}).get("type") == "Query",
+   "Year and month separators filter rows in-flow after the Excel scan")
+received_date_odata = []
+for action_name, action in actions.items():
+    action_inputs = action.get("inputs")
+    if not isinstance(action_inputs, dict):
+        continue
+    filter_query = action_inputs.get("parameters", {}).get("$filter")
+    if isinstance(filter_query, str) and "Received Date" in filter_query:
+        received_date_odata.append(action_name)
+ok(not received_date_odata,
+   f"No Excel OData Filter Query references spaced column 'Received Date' (found: {received_date_odata})")
 
 # ═══════════════════════════════════════════════════════════════════
 print("\n=== 10. RESUME FOLDER PATH ===")
@@ -176,7 +304,7 @@ for ensure, save in ensure_pairs:
 # ═══════════════════════════════════════════════════════════════════
 print("\n=== 11. SPAM GATE COUNTS ===")
 sf = cfg["spam_filters"]
-ok(len(sf["bad_senders"])           == 32,  f"bad_senders        = 32  (got {len(sf['bad_senders'])})")
+ok(len(sf["bad_senders"])           == 31,  f"bad_senders        = 31  (got {len(sf['bad_senders'])})")
 ok(len(sf["bad_subjects"])          == 24,  f"bad_subjects       = 24  (got {len(sf['bad_subjects'])})")
 ok(len(sf["spam_phrases"])          == 30,  f"spam_phrases       = 30  (got {len(sf['spam_phrases'])})")
 ok(len(sf["offensive_phrases"])     == 36,  f"offensive_phrases  = 36  (got {len(sf['offensive_phrases'])})")
@@ -264,7 +392,7 @@ for gate in ["IsUnderReplyCap_dup","IsUnderReplyCap_update","IsUnderReplyCap_fol
 print("\n=== 18. KNOWN UNUSED / CONFIG-ONLY FIELDS (expected gaps) ===")
 # These are intentionally not in the flow (config keeps them for build tooling only)
 unused_expected = ["_comment", "_comment_interval", "_comment_loopguard",
-                   "_comment_flowname", "_comment_testmode", "_comment_rules",
+                   "_comment_flowname", "_comment_outbound_mail", "_comment_rules",
                    "_comment_dated", "_comment_libid", "_comment_selfheal",
                    "_comment_excel", "_comment_tidy", "_comment_appref"]
 print(f"  {len(unused_expected)} config comment/doc fields (all start with '_', ignored by builder):")
@@ -282,3 +410,4 @@ if F == 0:
     print("  VERDICT: ZIP is CLEAN -- safe to upload to Power Automate")
 else:
     print(f"  VERDICT: {F} issue(s) found -- review FAILs above before uploading")
+    sys.exit(1)

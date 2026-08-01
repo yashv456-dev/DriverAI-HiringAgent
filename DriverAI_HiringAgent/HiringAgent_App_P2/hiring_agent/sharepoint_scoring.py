@@ -227,10 +227,21 @@ def _client_export_path() -> tuple:
 
 
 def _client_export_sort_key(row: dict) -> tuple:
-    """Stable visual order for the export: Received Date, then Application ID."""
+    """Visual order for the export: Received Date descending (current month first), then
+    Application ID - reverse=True in export_client_results() applies the descending part.
+    Mirrors the CandidateList sheet's own order (resort_candidate_sheets.py, 2026-07-31:
+    current month first, newest within a month first) so the client workbook reads the
+    same way, per this function's whole reason for existing (see _with_period_separators)."""
     received = _parse_received(row.get("Received Date"))
     app_id = str(row.get("Application ID", "") or "")
     return (received, app_id)
+
+
+# Must stay in sync with resort_candidate_sheets.py's SEP_LABEL_FMT/YEAR_LABEL_COLUMN - both
+# implement the same "current month first, labeled year boundary" convention, just for two
+# different artifacts (the live SharePoint sheet vs. this client export workbook).
+_YEAR_SEP_LABEL_FMT = "-- {year} --"
+_YEAR_SEP_LABEL_COLUMN = "Full Name"
 
 
 def _client_export_sharepoint_folder(client) -> str:
@@ -245,8 +256,10 @@ def _ensure_rejected_period_separator(client, received_raw) -> bool:
     """Insert ONE blank row before the first Rejected row of a new month or year.
 
     The Rejected sheet is appended to a row at a time (unlike the client export, which
-    is rebuilt whole), so the separator has to be decided per insert: look at the
-    periods already present and add a spacer only when this row opens a new one.
+    is rebuilt whole), so the separator has to be decided per insert: compare the
+    incoming row with the last nonblank row and add a spacer when the period changes.
+    Comparing with the last row (rather than any historical occurrence) also handles
+    out-of-order repairs that reopen an older month at the bottom of the sheet.
 
     A year change is also a month change, so this deliberately inserts a single blank
     either way - matching P1's rule on CandidateList, where the year check suppresses
@@ -273,7 +286,7 @@ def _ensure_rejected_period_separator(client, received_raw) -> bool:
         logger.warning(f"       WARNING  : could not check Rejected separators: {e}")
         return False
 
-    periods = set()
+    last_period = None
     for r in rows:
         vals = r.get("values", r) if isinstance(r, dict) else {}
         raw = str(vals.get("Received Date", "") or "").strip()
@@ -281,12 +294,12 @@ def _ensure_rejected_period_separator(client, received_raw) -> bool:
             continue                      # blank spacer / seed row
         parsed = _parse_received(raw)
         if parsed is not None:
-            periods.add((parsed.year, parsed.month))
+            last_period = (parsed.year, parsed.month)
 
-    if not periods:
+    if last_period is None:
         return False                      # header spacer already separates the first row
-    if (received.year, received.month) in periods:
-        return False                      # same month as an existing row
+    if (received.year, received.month) == last_period:
+        return False                      # same month as the last appended row
 
     try:
         client.add_rejected_row({})
@@ -297,16 +310,18 @@ def _ensure_rejected_period_separator(client, received_raw) -> bool:
 
 
 def _with_period_separators(rows: list) -> list:
-    """Insert one fully-blank row between calendar months, and one after the header.
+    """Insert one fully-blank row between calendar months, one after the header, and a
+    LABELED row (e.g. '-- 2025 --') at a year boundary instead of a plain blank.
 
-    Mirrors P1's year/month separators on the CandidateList sheet so the client
-    workbook reads the same way. A year change is also a month change, so only ONE
-    blank row is inserted at a year boundary - never two stacked. Blank rows carry no
-    Application ID, so every reader (P1, P2, the audits) skips them.
+    Mirrors the CandidateList sheet's own convention (resort_candidate_sheets.py,
+    2026-07-31) so the client workbook reads the same way - including for rows that were
+    NOT re-sorted here (this function only inserts separators; sort order is the caller's
+    job, see export_client_results). Blank/labeled rows carry no Application ID, so every
+    reader (P1, P2, the audits) skips them.
     """
-    if not rows:
-        return rows
     blank = {col: "" for col in _CLIENT_EXPORT_COLUMNS}
+    if not rows:
+        return [dict(blank)]              # permanent spacer directly under the header
 
     def period(r):
         # A blank/gap Received Date must yield None, not _parse_received's fallback
@@ -323,7 +338,12 @@ def _with_period_separators(rows: list) -> list:
     for r in rows:
         cur = period(r)
         if prev is not None and cur is not None and cur != prev:
-            out.append(dict(blank))
+            if cur[0] != prev[0]:
+                sep = dict(blank)
+                sep[_YEAR_SEP_LABEL_COLUMN] = _YEAR_SEP_LABEL_FMT.format(year=cur[0])
+                out.append(sep)
+            else:
+                out.append(dict(blank))
         out.append(r)
         if cur is not None:
             prev = cur
@@ -348,7 +368,7 @@ def export_client_results(client, upload_to_sharepoint: bool = False) -> str:
         if str(vals.get("Status", "") or "").strip() != STATUS_SCORED:
             continue
         rows.append({col: vals.get(col, "") for col in _CLIENT_EXPORT_COLUMNS})
-    rows.sort(key=_client_export_sort_key)
+    rows.sort(key=_client_export_sort_key, reverse=True)
     rows = _with_period_separators(rows)
 
     out_path, latest_path = _client_export_path()
@@ -611,13 +631,20 @@ def _merge_duplicate_candidates(client, dry_run: bool = False) -> dict:
     for i in eligible:
         components.setdefault(_find(i), []).append(i)
 
-    def _recency_key(pos: int) -> tuple[int, int]:
+    def _recency_key(pos: int) -> tuple[int, str]:
         ts = _received_timestamp(all_rows[pos][0]["values"].get("Received Date"))
         try:
             tick = int(pd.Timestamp(ts).value) if ts is not None else -1
         except (TypeError, ValueError, OverflowError):
             tick = -1
-        return tick, -pos  # on an exact tie, retain the earlier workbook row
+        # On an exact tie (same Received Date to the second - a genuine near-simultaneous
+        # duplicate), break by Application ID instead of physical table position. Position
+        # (`-pos`) used to double as "earlier-created row" because rows were always in
+        # insertion order, but resort_candidate_sheets.py (2026-07-31) can reorder the table
+        # for display, which would silently repoint this tiebreak at an unrelated row. The
+        # Application ID is stable regardless of where a row physically sits.
+        app_id = str(all_rows[pos][0]["values"].get("Application ID", "") or "")
+        return tick, app_id
 
     plan: list[tuple[int, list[int], dict]] = []
     for members in components.values():
@@ -772,6 +799,40 @@ def _send_error_alert(client, app_id: str, sender_email: str, reason: str) -> No
         logger.warning(f"       WARNING  : could not send error alert: {e}")
 
 
+def _detect_suspicious_content(resume_text: str, mail_body: str) -> list:
+    """Return the suspicious phrase(s) found in the resume text or mail body, else [].
+
+    P2's secondary content-safety net (config.yaml content_safety.suspicious_phrases).
+    P1 already screens incoming mail for spam/scam/vendor-pitch content before a row is
+    ever created (HiringAgent_P1/flow/flow_config.json spam_filters) - this only catches
+    the rare row that still slips through. Added 2026-08-01 after a services vendor's
+    company-brochure PDF ("Futurism Technologies") was scored as if it were a resume."""
+    haystack = f"{resume_text or ''}\n{mail_body or ''}".lower()
+    return [p for p in _cfg.SUSPICIOUS_CONTENT_PHRASES if p in haystack]
+
+
+def _send_suspicious_content_alert(client, app_id: str, sender_email: str, matched: list) -> None:
+    """Best-effort admin alert when P2's secondary content-safety net catches a row that
+    reached SharePoint despite P1's spam gate. Never raises. Gated on ERROR_EMAIL_ENABLED
+    and a configured ADMIN_EMAIL, same as _send_error_alert."""
+    if not _cfg.ERROR_EMAIL_ENABLED or not _cfg.ADMIN_EMAIL:
+        return
+    try:
+        subject = f"[Hiring Agent] Row flagged as possible spam/vendor pitch ({app_id or 'no ref'})"
+        body = (
+            f"<p>P2's secondary content-safety check found suspicious content in a row that "
+            f"reached SharePoint despite P1's spam gate. It has been marked "
+            f"'{_cfg.STATUS_NEEDS_REVIEW_SPAM}' and otherwise left untouched (no scoring, no "
+            f"resume rename/move) - please review it manually.</p>"
+            f"<ul><li>Application ID: {app_id or '(none)'}</li>"
+            f"<li>Sender: {sender_email or '(unknown)'}</li>"
+            f"<li>Matched phrase(s): {', '.join(matched)}</li></ul>"
+        )
+        client.send_mail(_cfg.ADMIN_EMAIL, subject, body)
+    except Exception as e:
+        logger.warning(f"       WARNING  : could not send suspicious-content alert: {e}")
+
+
 def _send_missing_workbook_alert(client, reason: str) -> None:
     """Best-effort admin alert when the candidate workbook itself can't be confirmed. P2
     never creates or restores the workbook (same non-destructive design as Phase 1) - a
@@ -893,6 +954,7 @@ def _give_up_and_reject(client, index: int, vals: dict, app_id: str, stored: lis
         except SharePointError as e:
             logger.warning(f"       WARNING  : could not move resume file(s) while giving up: {e}")
     try:
+        merged = _complete_row_before_reject(merged, app_id)
         _ensure_rejected_period_separator(client, merged.get("Received Date"))
         client.add_rejected_row(merged)
         client.delete_row(index)
@@ -1122,9 +1184,45 @@ def _validate_all_columns(fields: dict, p1_vals: dict, mail_body: str,
             (ok if not _is_gap(v) else accepted_na).append(col)
             continue
 
-        if col in ("Suggested Role 1", "Suggested Role 2", "Suggested Role 3",
-                   "Category", "Status"):
+        # Scored columns. Category and Status must NEVER be blank - both have a
+        # deterministic non-blank fallback, so a gap here is a real defect, not an
+        # "accepted N/A". Fixed 2026-08-01: this branch used to mark all five columns
+        # 'ok' unconditionally without looking at their values at all, which is exactly
+        # how rows reached the Rejected sheet with a blank Category and blank Suggested
+        # Roles (live cases: Syyed Nazir Ali / APP-20260727-1431-6F75 and Divy Parmar /
+        # APP-20260720-1013-09AC) while the run still logged a clean column check.
+        if col == "Category":
+            if _is_gap(fields.get(col, "")):
+                fields[col] = assign_category(
+                    str(fields.get("Suggested Role 1", "") or ""),
+                    str(fields.get("Current Skills", "") or ""))
+                healed.append(col)
+                logger.info(f"       Healed     : Category was blank → {fields[col]}")
             ok.append(col)
+            continue
+
+        if col == "Status":
+            if _is_gap(fields.get(col, "")):
+                logger.warning("       WARNING  : Status is blank after scoring - "
+                               "this row would be invisible to the scoring queue.")
+                accepted_na.append(col)
+            else:
+                ok.append(col)
+            continue
+
+        # Suggested Role 2/3 are legitimately blank when the scorer found fewer than
+        # three matching JDs; Role 1 blank means role matching produced nothing at all.
+        if col == "Suggested Role 1":
+            if _is_gap(fields.get(col, "")):
+                logger.warning("       WARNING  : Suggested Role 1 is blank - role "
+                               "matching returned no JD match for this candidate.")
+                accepted_na.append(col)
+            else:
+                ok.append(col)
+            continue
+
+        if col in ("Suggested Role 2", "Suggested Role 3"):
+            (ok if not _is_gap(fields.get(col, "")) else accepted_na).append(col)
             continue
 
         # P2 extractable column — final state only; all extraction stages already ran.
@@ -1478,6 +1576,43 @@ def _download_resume_text(client, app_id: str, resume_filename_cell: str, subpat
     return text, used, raw_by_name
 
 
+def _complete_row_before_reject(merged: dict, app_id: str = "") -> dict:
+    """Last-chance completeness gate: no row reaches the Rejected sheet half-filled.
+
+    Added 2026-08-01 after two live rows (Syyed Nazir Ali / APP-20260727-1431-6F75 and
+    Divy Parmar / APP-20260720-1013-09AC) landed on the Rejected sheet with a blank
+    Category and blank Suggested Roles. The Rejected sheet is terminal - nothing re-scores
+    a row once it is there - so a gap that slips through here is permanent and silent.
+
+    Every rejection path funnels through _finish_rejection, so this single chokepoint
+    covers them all. Deterministic repairs only (no network, no LLM): Category is
+    re-derived via assign_category, which is guaranteed non-blank. Anything still missing
+    is logged loudly rather than silently accepted, so a real gap is visible in the run
+    log instead of only being noticed weeks later on the sheet.
+    """
+    if _is_gap(merged.get("Category")):
+        merged["Category"] = assign_category(
+            str(merged.get("Suggested Role 1", "") or ""),
+            str(merged.get("Current Skills", "") or ""))
+        logger.info(f"       Pre-reject : Category was blank → {merged['Category']}")
+
+    for _num_col in ("Application Updates", "Retry Count"):
+        if _is_gap(merged.get(_num_col)):
+            merged[_num_col] = 0
+
+    for _na_col in ("Portfolio 1", "Portfolio 2", "Portfolio 3"):
+        if _is_gap(merged.get(_na_col)):
+            merged[_na_col] = "N/A"
+
+    _still_missing = [c for c in ("Full Name", "Location", "Country", "Status",
+                                  "Current Skills", "Suggested Role 1")
+                      if _is_gap(merged.get(c))]
+    if _still_missing:
+        logger.warning(f"       Pre-reject : {app_id or '(no ref)'} moving to Rejected with "
+                       f"{len(_still_missing)} unfilled column(s): {', '.join(_still_missing)}")
+    return merged
+
+
 def _finish_rejection(client, index: int, app_id: str, vals: dict, fields: dict,
                       stored: list, subpath: str, dry_run: bool, rej_ids: set,
                       rej_emails: set, rej_phones: set, reason_label: str,
@@ -1543,6 +1678,7 @@ def _finish_rejection(client, index: int, app_id: str, vals: dict, fields: dict,
             if resume_url:
                 refreshed["Resume URL"] = resume_url
                 refreshed["Resume Folder Path"] = resume_path
+            refreshed = _complete_row_before_reject(refreshed, app_id)
             client.update_rejected_row(
                 matching["index"], refreshed, current_values=old_vals
             )
@@ -1582,6 +1718,7 @@ def _finish_rejection(client, index: int, app_id: str, vals: dict, fields: dict,
         merged["Application Updates"] = 0
     if _is_gap(merged.get("Retry Count")):
         merged["Retry Count"] = 0
+    merged = _complete_row_before_reject(merged, app_id)
     _ensure_rejected_period_separator(client, merged.get("Received Date"))
     client.add_rejected_row(merged)
     client.delete_row(index)
@@ -1846,6 +1983,28 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False) -> di
                     if _score_attempts_of(vals) + 1 >= _cfg.SCORE_RETRY_MAX else
                     "Needs Review - Unreadable Resume"
                 )
+                continue
+
+            # Secondary content-safety net - P1 already screens incoming mail for spam/
+            # scam/vendor-pitch content before a row is ever created; this only catches
+            # the rare row that still slips through. Checked before any extraction runs
+            # so a suspicious row is never scored, renamed, or moved like a real candidate.
+            _early_mail_body = html_to_text(str(vals.get("Mail Body", "") or ""))
+            _suspicious_hits = _detect_suspicious_content(text, _early_mail_body)
+            if _suspicious_hits:
+                logger.warning(f"       SKIP     : suspicious content matched "
+                               f"{_suspicious_hits} — flagging for review, alerting admin.")
+                if not dry_run:
+                    client.update_row(
+                        index, {"Status": _cfg.STATUS_NEEDS_REVIEW_SPAM},
+                        current_values=vals)
+                    _send_suspicious_content_alert(
+                        client, app_id, str(vals.get("Email", "")), _suspicious_hits)
+                candidate_result = (
+                    "Would flag as possible spam" if dry_run
+                    else "Needs Review - Possible Spam"
+                )
+                processed += 1
                 continue
 
             # Step A - snapshot all configured columns' starting state before any extraction runs,
@@ -2604,6 +2763,7 @@ def recheck_all_rows(dry_run: bool = False) -> dict:
                             if url:
                                 merged["Resume URL"] = url
                                 merged["Resume Folder Path"] = path
+                        merged = _complete_row_before_reject(merged, app_id)
                         _ensure_rejected_period_separator(
                             client, merged.get("Received Date"))
                         client.add_rejected_row(merged)
@@ -2955,6 +3115,7 @@ def recheck_selected_rows(app_ids: list[str] | set[str], dry_run: bool = False,
                             if url:
                                 merged["Resume URL"] = url
                                 merged["Resume Folder Path"] = path
+                        merged = _complete_row_before_reject(merged, app_id)
                         _ensure_rejected_period_separator(
                             client, merged.get("Received Date"))
                         client.add_rejected_row(merged)

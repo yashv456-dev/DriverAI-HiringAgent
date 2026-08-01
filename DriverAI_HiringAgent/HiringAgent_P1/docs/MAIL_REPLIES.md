@@ -6,7 +6,7 @@ All 6 applicant-facing emails P1 can send, verbatim, with exact trigger conditio
 
 State as of **2026-07-24**.
 
-> ⚠️ **Currently suppressed (set 2026-07-31).** `flow/flow_config.json` has `test_mode.suppress_emails: true`, so the build replaces all 6 applicant emails below — plus `Notify_failure` — with no-op `Compose` actions. **None of this content is being delivered right now.** The rest of the flow is untouched: resumes still save, rows are still added and patched, inbox tidy still runs. Rows handled while suppressed are stamped `TEST-MODE (suppressed) <timestamp>` instead of `Sent <timestamp>`. This is for a historical replay of the existing mailbox; set `suppress_emails` back to `false`, run `python flow/build_zip.py`, and re-import the zip to restore delivery. P2's equivalent switch is separate (`HIRING_SUPPRESS_EMAILS` in its `.env`).
+> ⚠️ **Applicant mail is currently disabled.** `flow/flow_config.json` has `email.send_applicant_emails: false`, so the build replaces all 6 applicant emails below with no-op `Compose` actions. **None of this applicant-facing content is delivered.** Resume saves, row adds/patches, and inbox tidy remain active. Suppressed contacts are stamped `Suppressed (applicant email disabled) <timestamp>` instead of `Sent <timestamp>`. `email.send_admin_failure_alerts: true` keeps `Notify_failure` enabled for operational visibility. P2's outbound-mail controls remain separate.
 
 ---
 

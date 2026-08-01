@@ -23,6 +23,9 @@ P2_Input/
 P2_Output/
 P2_Final_Results/
 Candidate_Resumes/
+# Snapshots taken before deleting a row/resume (spam & vendor cleanup) - these are
+# real candidate resumes and row data, so they must never leave the local machine.
+P2_Backups/
 *.xlsx
 !**/P1_Templates/*.xlsx
 

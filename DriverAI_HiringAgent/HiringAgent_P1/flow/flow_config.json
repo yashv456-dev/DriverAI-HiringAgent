@@ -1,20 +1,20 @@
 {
   "_comment": "DriverAI Hiring Auto-Reply - the SINGLE SOURCE OF TRUTH for the PA flow. Edit values here, run 'python build_zip.py', then re-import the .zip in Power Automate. Do NOT hand-edit definition.json - build_zip.py regenerates it from this file. Keys starting with '_' are comments and are ignored by the builder.",
-  "_comment_interval": "trigger.interval_min sets how often the inbox is polled. It only takes effect after re-importing the rebuilt zip - Power Automate cannot change a trigger interval at runtime.",
+  "_comment_interval": "P1 is a scheduled unread-Inbox poller so it handles both existing unread backlog and future unread mail. trigger.interval_min sets the schedule; unread_per_run is deliberately 1 so Excel/SharePoint writes stay sequential and every completed email is marked/moved before the next poll. It only takes effect after re-importing the rebuilt zip.",
   "_comment_loopguard": "Self-loop protection is SENDER-based: apply@driverai.io (plus mailer-daemon/postmaster/bounce) is in bad_senders, so the flow never answers itself or a bounce. Outbound subjects are NOT added to bad_subjects - that would drop applicants' 'Re: <our subject>' replies before the reference gate. Per-applicant caps stop any runaway loop. List only the junk subjects you want blocked in bad_subjects.",
   "_comment_flowname": "flow_name sets the package display name (shown when importing) AND the flow display name. build_zip.py writes it into the package manifest + definition. For a brand-new import it names the flow; for an Update import PA keeps the existing flow's name but the package name is fixed.",
   "flow_name": "DriverAI_HiringAgent_P1_AutoReply",
   "email": {
     "trigger_mailbox": "apply@driverai.io",
-    "admin_email": "yashv@driverai.io"
+    "admin_email": "yashv@driverai.io",
+    "send_applicant_emails": false,
+    "send_admin_failure_alerts": true
   },
   "trigger": {
-    "interval_min": 1
+    "interval_min": 1,
+    "unread_per_run": 1
   },
-  "_comment_testmode": "test_mode.suppress_emails=true replaces every applicant-facing Send_* action AND Notify_failure with a no-op Compose (same runAfter wiring, so tidy/patch sequencing is untouched) - used for a historical-replay test so reprocessing old mail never actually emails anyone. Mail Sent/Decline Sent stamps also switch to a 'TEST-MODE (suppressed) <timestamp>' marker instead of 'Sent <timestamp>' so replayed rows are visibly distinguishable later. MUST be set back to false, rebuilt, and re-imported to restore live behavior when the test is done.",
-  "test_mode": {
-    "suppress_emails": true
-  },
+  "_comment_outbound_mail": "email.send_applicant_emails=false keeps all six applicant-facing Send_* actions as no-op Compose steps while the trigger, filtering, SharePoint/Excel writes, and inbox tidy continue normally. Suppressed contacts are stamped 'Suppressed (applicant email disabled) <timestamp>' instead of falsely claiming Sent. email.send_admin_failure_alerts=true keeps Notify_failure live so production failures still alert the admin.",
   "_comment_rules": "Caps share ONE 'Application Updates' column on the candidate's row. A no-CV application is replied to (Email 3) but NOT written to SharePoint, so it has no row and no cap. duplicate_check_days = the resubmit window; the *_max values are the OVERALL cap (Application Updates keeps counting up to this, then the row goes fully silent forever within the 90-day window). reply_cap is a SEPARATE, smaller threshold: contacts up to reply_cap still get an actual reply email (the last one, at reply_cap, is the final-notice); contacts between reply_cap and *_max still update the row/resume (re-queued for P2) but get NO email at all - 'no other reminders'.",
   "business_rules": {
     "duplicate_check_days": 90,
@@ -39,17 +39,18 @@
     "file": "/Master_Files/Sharepoint_Master_File.xlsx",
     "table": "HiringAgent_P1_Candidates"
   },
-  "_comment_tidy": "inbox_tidy: after the flow finishes handling an email it is moved out of the Inbox (MoveV2). TWO destinations by category: (1) LEGITIMATE application mail (new CV, non-CV request, duplicate, wrong-format, update, follow-up, ignored) is marked READ (MarkAsRead_V3) and moved to `destination` (Archive) - so Archive holds only real application traffic. (2) SPAM/JUNK caught by the 3 gates (bad sender, bad subject, scam/malware/phishing/offensive/foreign) is moved to `spam_destination` (Junk Email) and left UNREAD (just moved, not marked read) so it stands out as junk. For built-in well-known folders use the connector's CAPITALIZED friendly name ('Archive', 'Junk Email', 'Deleted Items') - casing matters. For a custom folder use its mail-folder ID from Graph Explorer. Set enabled=false to leave everything unread in the Inbox (safe - the trigger watermark prevents reprocessing).",
+  "_comment_tidy": "inbox_tidy: after the flow finishes handling an email it is moved out of the Inbox (MoveV2). LEGITIMATE application mail is marked READ and moved to Archive; SPAM/JUNK is moved to Junk Email and left UNREAD; a core-processing failure is moved UNREAD to Archive only after an actual Notify_failure attempt. The failure move must never run when Notify_failure is Skipped, because that is the normal success path and would race the normal move against the same mutable Outlook message ID. MoveV2 automatic retries are disabled and terminal cleanup outcomes are explicitly finalized. Archive is deliberately reused for failures because the Outlook connector rejected the nested shared-mailbox Recruiting Review folder ID after import. Failed mail is distinguishable by remaining unread and by the admin alert. Keep enabled=true in unread-poll production mode.",
   "inbox_tidy": {
     "enabled": true,
     "destination": "Archive",
-    "spam_destination": "Junk Email"
+    "spam_destination": "Junk Email",
+    "failure_destination": "Archive"
   },
-  "_comment_year_separator": "When enabled, the FIRST new-applicant row of each calendar year gets one blank row inserted into CandidateList immediately before it (only on the brand-new-applicant path - never on duplicate/update/follow-up, which only PATCH an existing row). Detected via a cheap server-side Excel $filter for 'any row with Received Date >= <thisYear>-01-01' - bounded to just this year's volume, never a full-table scan, so it stays cheap as the table grows across years. Purely visual/organizational (lets a human scrolling the sheet see where one year's entries end and the next begin) - does not affect duplicate detection, scoring, or any other logic, since P1/P2 both already skip fully-blank rows when reading. Best-effort: if P1 is ever down across the exact New Year's boundary, whichever new-applicant row happens to trigger the check first still inserts the separator right before itself, just not necessarily before the very first 2027 row if others already landed. Set enabled=false to turn this off entirely.",
+  "_comment_year_separator": "When enabled, the FIRST new-applicant row of each calendar year gets one blank row inserted into CandidateList immediately before it. Excel Filter Query supports only alphanumeric column names, so the visible 'Received Date' header cannot be used in OData; P1 performs one paginated row scan (up to 5000) and filters the returned ISO dates with a built-in Query action. Purely visual/organizational and only on the new-applicant path; duplicate/update/follow-up paths only PATCH existing rows. Set enabled=false to turn this off entirely.",
   "year_separator": {
     "enabled": true
   },
-  "_comment_month_separator": "Same idea as year_separator but per calendar MONTH: the FIRST new-applicant row of each month gets one blank row inserted before it. Detected with a bounded server-side $filter over that month only (Received Date ge <first of month> and lt <first of next month>), so it never scans the whole table. IMPORTANT: at a January boundary the year separator already fires, and two blank rows in a row would look like a mistake - so the month check deliberately requires 'no rows this month AND at least one row already this year', which makes the year separator win and keeps exactly ONE blank row at any boundary. Same best-effort caveat as year_separator if P1 is down across a month boundary. Purely visual: P1 and P2 both skip fully-blank rows when reading. Set enabled=false to turn off.",
+  "_comment_month_separator": "Same paginated-scan/in-memory-Query mechanism as year_separator, but per calendar MONTH. The FIRST new-applicant row of each month gets one blank row inserted before it. At a January boundary the year separator wins, keeping exactly ONE blank row. Purely visual: P1 and P2 skip fully blank rows. Set enabled=false to turn off.",
   "month_separator": {
     "enabled": true
   },
@@ -152,6 +153,12 @@
       "you have a pending delivery",
       "we could not deliver",
       "track your shipment"
+    ],
+    "_comment_vendor": "Added 2026-08-01, live case: 'Futurism Technologies' (a dev/marketing/security outsourcing vendor) emailed apply@driverai.io three times pitching THEIR services to sell to us, never applying for a job. None of these phrases are malicious, so the scam/offensive/malware lists never touched them - P1 created a full candidate record and sent real candidate-lifecycle auto-replies ('Please Resend Your Resume', 'we noticed we don't have your location on file') to a sales rep for weeks. These phrases are B2B sales-deck language that essentially never appears in a genuine job application; kept short and specific to minimize the risk of ever matching a real candidate's resume or cover email.",
+    "vendor_solicitation_phrases": [
+      "company profile and corporate deck",
+      "capability deck",
+      "engagement models"
     ],
     "offensive_phrases": [
       "send nudes",

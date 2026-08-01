@@ -1,13 +1,4 @@
-"""
-folder_check.py -- Cross-check every P1 + P2 folder/file reference against the live SharePoint structure
-shown in screenshots:
-  Documents/
-    Downloaded_Resumes/
-    P1P2_SharePoint_Master_Files/
-      Sharepoint_Master_File.xlsx
-      Candidate_List_Results.xlsx
-    SharePoint_Master_Template/
-"""
+"""Cross-check the current P1/P2 folder and file contracts."""
 import json, sys, re
 from pathlib import Path
 
@@ -31,13 +22,13 @@ def ok(c, label, note=''):
 
 # ─────────────────────────────────────────────────────────────────
 print("=" * 62)
-print("  LIVE SHAREPOINT STRUCTURE (from screenshots)")
+print("  EXPECTED SHAREPOINT STRUCTURE (from current runtime config)")
 print("=" * 62)
 print("  Documents/")
-print("    Downloaded_Resumes/              <- resumes go here")
-print("    P1P2_SharePoint_Master_Files/    <- master workbook + results")
+print("    Candidate_Resumes/               <- resumes go here")
+print("    Master_Files/                    <- live master workbook")
 print("      Sharepoint_Master_File.xlsx")
-print("      Candidate_List_Results.xlsx")
+print("    Candidate_List_Results.xlsx      <- client export at library root")
 print("    SharePoint_Master_Template/      <- one-time setup template")
 print()
 
@@ -111,10 +102,10 @@ print()
 print("=== P2: RESULTS EXPORT FILE ===")
 ok("Candidate_List_Results.xlsx" in scoring_src,
    "P2 generates Candidate_List_Results.xlsx",
-   "matches file in Master_Files")
-ok("Master_Files" in scoring_src,
-   "P2 uploads results to Master_Files",
-   "matches folder in live SharePoint")
+   "matches client export filename")
+ok("def _client_export_sharepoint_folder" in scoring_src and 'return ""' in scoring_src,
+   "P2 uploads results to the Shared Documents library root",
+   "matches /Candidate_List_Results.xlsx")
 
 print()
 print("=== P1 TEMPLATE FOLDER (SharePoint_Master_Template) ===")
@@ -132,8 +123,10 @@ print("=== CROSS-CHECK: P1 and P2 agree on workbook location ===")
 p1_wb_folder = p1_cfg['excel']['file'].rsplit('/', 1)[0].lstrip('/')
 ok(p1_wb_folder == 'Master_Files',
    f"P1 writes to: {p1_wb_folder}/Sharepoint_Master_File.xlsx")
-ok("Master_Files" in scoring_src,
-   "P2 reads/writes same folder: Master_Files")
+default_wb = _re.search(r'_DEFAULT_WORKBOOK_FOLDER\s*=\s*[\"\']([^\"\']+)', client_src)
+p2_wb_folder = default_wb.group(1).strip('/') if default_wb else ''
+ok(p2_wb_folder == p1_wb_folder,
+   f"P2 default workbook folder matches P1: {p2_wb_folder or '(not found)'}")
 
 print()
 print("=" * 62)

@@ -116,6 +116,263 @@ ok(_extract_education("EDUCATION AND TRAINING\n05/10/2018 - 05/10/2022\nBS-INFOR
    "BS-INFORMATION TECHNOLOGY The Islamia University of Bahawalpur",
    "Education and Training header skips date line and captures degree line")
 
+# Live regression (2026-07-31, Syyed Nazir Ali / APP-20260727-1431-6F75): a letter-spaced
+# 'E D U C A T I O N' header (a common resume-template style - PDF extraction preserves the
+# stylized spacing as literal single-char tokens) was invisible to the header regex, so
+# extraction fell through to a full-text degree-keyword scan that matched bare "Master" in
+# a "Scrum Master" job-title line near the top - completely preempting the real "Bachelor
+# of Science" degree near the bottom. Two independent fixes, both covered here.
+_letterspaced_resume = (
+    "SYYED NAZIR ALI\n"
+    "Business Analyst  |  Scrum Master  |  Program & Project Manager\n"
+    "Certified Scrum Master (CSM / PSM) with 8+ years of experience\n"
+    "E D U C A T I O N\n"
+    "Bachelor of Science (B.Sc.)\n"
+    "IGNOU Delhi & NCHMCT Noida - India\n"
+)
+ok(_extract_education(_letterspaced_resume) == "Bachelor of Science (B.Sc.)",
+   f"letter-spaced 'E D U C A T I O N' header is still recognized, and no longer loses to "
+   f"a bare 'Scrum Master' match higher up the resume (got {_extract_education(_letterspaced_resume)!r})")
+from hiring_agent.extraction import _collapse_letter_spacing as _cls
+ok(_cls("E D U C A T I O N") == "EDUCATION", "letter-spaced header collapses correctly")
+ok(_cls("Education: BS Computer Science") == "Education: BS Computer Science",
+   "a normal (non letter-spaced) line is never touched by the collapse heuristic")
+ok(_cls("A B") == "A B",
+   "a short 2-token line (e.g. a real state abbreviation like 'A B' would never occur, but "
+   "guards the <4-token threshold) is left alone, not misread as letter-spacing")
+
+# Live regression (2026-07-31, Divy Parmar / APP-20260720-1013-09AC): an ENTIRE resume was
+# letter-spaced this way, not just a header - name, phone, email, every line - which made
+# Name/Phone/Skills all come back "Not extracted" (garbled single-character tokens can't
+# match any word-boundary pattern) and Location only surface via a mail-body fallback, not
+# the resume itself. The double-space-as-word-boundary rule must survive multi-word lines.
+ok(_cls("M a s t e r  o f  C o m p u t e r  A p p l i c a t i o n s  ( M C A )") ==
+   "Master of Computer Applications (MCA)",
+   "multi-word letter-spaced line collapses with word boundaries intact, not glued together")
+ok(_cls("d i v y p a r m a r 1 9 @ e x a m p l e . c o m") == "divyparmar19@example.com",
+   "a letter-spaced email address collapses correctly (no word-boundary spaces needed)")
+ok(_cls("7 4 0 5 4 6 5 2 0 4") == "7405465204",
+   "a letter-spaced phone number (digits are single-char tokens too) collapses correctly")
+from hiring_agent.extraction import extract_candidate_details as _ecd
+_fully_letterspaced_resume = (
+    "7 4 0 5 4 6 5 2 0 4\n"
+    "K h o k h r a ,  A h m e d a b a d\n"
+    "d i v y p a r m a r 1 9 @ g m a i l . c o m\n"
+    "D I V Y  P A R M A R\n"
+    "S U M M A R Y\n"
+    "S e n i o r  A n d r o i d  D e v e l o p e r  w i t h  4 +  y e a r s  o f  e x p e r i e n c e .\n"
+    "S K I L L S\n"
+    "L a n g u a g e s :  K o t l i n ,  J a v a\n"
+    "E D U C A T I O N\n"
+    "M a s t e r  o f  C o m p u t e r  A p p l i c a t i o n s  ( M C A )\n"
+    "M o n a r k  U n i v e r s i t y\n"
+)
+_ls_result = _ecd(_fully_letterspaced_resume)
+ok(_ls_result.get("full_name") not in (None, "Not extracted"),
+   f"a fully letter-spaced resume no longer fails Name extraction entirely (got {_ls_result.get('full_name')!r})")
+ok(_ls_result.get("phone") == "7405465204",
+   f"a fully letter-spaced resume's phone is recovered (got {_ls_result.get('phone')!r})")
+ok("kotlin" in str(_ls_result.get("skills", "")).lower(),
+   f"a fully letter-spaced resume's skills are recovered (got {_ls_result.get('skills')!r})")
+ok(_ls_result.get("education") == "Master of Computer Applications (MCA)",
+   f"a fully letter-spaced resume's education is recovered with word boundaries intact "
+   f"(got {_ls_result.get('education')!r})")
+
+# Live regression (2026-07-31, Prerna Saluja / APP-20260716-2052-6112): "position" (and
+# "role") are common English words far beyond "job position" - an Experience bullet
+# reading "...identifying an investment position that appreciated approximately 3x over 5
+# months" matched bare "position" and returned "that appreciated approximately" as her
+# desired role. The role-preference regex is now scoped to the header/summary (first 15
+# lines) only, so an Experience-section false match past that point can't reach it.
+# Padded with extra Experience lines so the false-positive text genuinely falls past line
+# 15, matching the real resume's shape (a short synthetic resume with too few lines would
+# never actually exercise the scoping boundary).
+_position_false_positive_resume = (
+    "Prerna Saluja\n"
+    "(623)-242-3627 | LinkedIn | Gmail\n"
+    "\n"
+    "EXPERIENCE\n"
+    "Pareto Inc. Financial AI Analyst (Data Labeler) 2025 - Present\n"
+    "Leveraged AI-assisted analytics tools to support rolling forecasts, variance analysis.\n"
+    "Improved data quality and analytical consistency by validating AI-generated outputs.\n"
+    "Reduced manual review effort by approximately 20 percent across quarterly cycles.\n"
+    "Arizona State University Research Assistant (Volunteer) 2025 - 2026\n"
+    "Supported faculty research on financial modeling and forecasting accuracy.\n"
+    "Built dashboards to track key performance indicators for ongoing studies.\n"
+    "Presented findings to a panel of faculty advisors each semester.\n"
+    "Coordinated with three other research assistants on data collection.\n"
+    "Documented methodology for reproducibility across research cycles.\n"
+    "Designed and executed input/output analysis in Excel, evaluating the impact of\n"
+    "variable changes on outcomes to determine relevant indicators and performance\n"
+    "factors, identifying an investment position that appreciated approximately 3x\n"
+    "over 5 months.\n"
+    "KPMG Audit Assistant 2020 - 2021\n"
+)
+_role = _ecd(_position_false_positive_resume).get("looking_for_role")
+ok(_role != "that appreciated approximately",
+   f"an unrelated 'investment position' mention deep in Experience is no longer mistaken "
+   f"for a stated role preference (got {_role!r})")
+
+# A genuine header-area role statement must still be caught - the fix narrows scope, it
+# must not blind the extractor entirely. Caught here by _extract_header_role (checked
+# before the scoped regex fixed above), which returns the whole matched line as-is -
+# pre-existing behavior, unrelated to and unaffected by this fix.
+_header_role_resume = "Jane Doe\nSeeking a Position: Senior Data Analyst\nEXPERIENCE\n...\n"
+ok(_ecd(_header_role_resume).get("looking_for_role") == "Seeking a Position: Senior Data Analyst",
+   "a genuine role statement in the header/summary area is still correctly extracted")
+
+# Live regression (2026-08-01, Mindy Anderson / APP-20260723-2034-12DF): her actual title
+# line, "Fractional/Interim Chief Marketing Officer & Marketing Advisor" (7 words), was
+# rejected by _extract_header_role's old 6-word cap, so nothing caught her real title and
+# the scoped regex below then matched "position" as a bare substring inside "brand
+# positioning" (a business term two lines later), returning "ing" as her desired role.
+from hiring_agent.extraction import _extract_header_role as _ehr
+ok(_ehr("Mindy Anderson\nFractional/Interim Chief Marketing Officer & Marketing Advisor\n"
+        "(917) 583-3070") == "Fractional/Interim Chief Marketing Officer & Marketing Advisor",
+   "a genuine 7-word compound executive title is caught, not rejected for length")
+_positioning_resume = (
+    "Mindy Anderson\nFractional/Interim Chief Marketing Officer & Marketing Advisor\n"
+    "(917) 583-3070 | candidate.cmo@example.com\n\nPROFESSIONAL SUMMARY\n"
+    "Architect and scale marketing functions aligned to long-term enterprise growth and "
+    "premium brand positioning.\n"
+)
+_role = _ecd(_positioning_resume).get("looking_for_role")
+ok(_role == "Fractional/Interim Chief Marketing Officer & Marketing Advisor",
+   f"'positioning' two lines later is not mistaken for a role statement now that the real "
+   f"header title is caught first (got {_role!r})")
+
+# Live regression (2026-08-01, same Prerna Saluja row, a second bug on the same field):
+# with the header-scoping fix above no longer matching, extraction fell through to a
+# keyword-fallback chain that checked 'rpa' as a bare substring of the whole document -
+# which matched inside 'counterparties' ('cou-nte-RPA-rties'), tagging a Financial/Audit
+# Analyst as wanting an "Automation / RPA Engineer" role she never mentioned anywhere.
+_counterparties_resume = (
+    "Prerna Saluja\n(623)-242-3627 | LinkedIn | Gmail\n\nEXPERIENCE\n"
+    "KPMG Audit Assistant 2020 - 2021\n"
+    "Reconciled 100+ counterparties' transactions to identify gaps in financial records.\n"
+    "Analyzed trends using SAP & AI Tools and financial reporting analytics.\n"
+)
+ok(_ecd(_counterparties_resume).get("looking_for_role") != "Automation / RPA Engineer",
+   f"'rpa' inside 'counterparties' is not mistaken for an Automation/RPA role preference "
+   f"(got {_ecd(_counterparties_resume).get('looking_for_role')!r})")
+
+# Live regression (2026-07-31, Brett Worker / APP-20260721-0122-E743): a compound header
+# "EDUCATION & EXECUTIVE DEVELOPMENT" had its "& EXECUTIVE DEVELOPMENT" remainder returned
+# as the Education value outright, skipping the real degree lines just below it.
+_compound_header_resume = (
+    "Brett Worker\n"
+    "Progressed into dedicated cybersecurity responsibilities.\n"
+    "EDUCATION & EXECUTIVE DEVELOPMENT\n"
+    "Robert Morris University\n"
+    "Master of Information Systems, Business Analytics | Bachelor of Science, Computer Science\n"
+    "Harvard Business School\n"
+    "CERTIFICATIONS\n"
+    "CISSP\n"
+)
+ok(_extract_education(_compound_header_resume) ==
+   "Master of Information Systems, Business Analytics | Bachelor of Science, Computer Science",
+   f"a compound header with trailing non-degree words falls through to the real degree line "
+   f"below it, instead of returning the header's own trailing words "
+   f"(got {_extract_education(_compound_header_resume)!r})")
+
+from hiring_agent.extraction import _DEGREE_RE as _degree_re
+ok(not _degree_re.search("Scrum Master"), "bare 'Scrum Master' no longer false-positives as a degree")
+ok(not _degree_re.search("Associate Director of Sales"), "bare 'Associate <title>' no longer false-positives as a degree")
+ok(_degree_re.search("Master's in Computer Science"), "\"Master's\" (possessive) still matches as a degree")
+ok(_degree_re.search("Masters in Computer Science"), "\"Masters\" (no apostrophe) still matches as a degree")
+ok(_degree_re.search("Master of Science in Data Science"), "\"Master of X\" still matches as a degree")
+ok(_degree_re.search("Bachelor of Arts"), "\"Bachelor of X\" still matches as a degree")
+
+# Live regression (2026-07-31, same Syyed Nazir Ali case): 'SWIFT' the banking payment
+# standard (always written all-caps: "UPI, NEFT, RTGS, IMPS, SWIFT, ISO 20022") matched the
+# "Swift" (Apple's language) skill keyword once both sides of the scan were lowercased to
+# "swift" - which then triggered a mobile-developer Category override for a Business
+# Analyst candidate who has never written a line of Swift in his life.
+from hiring_agent.extraction import _scan_skill_keywords
+ok("swift" not in _scan_skill_keywords("Payment rails: UPI, NEFT, RTGS, IMPS, SWIFT, ISO 20022"),
+   "all-caps 'SWIFT' (the payment standard) no longer false-positives as the Swift skill")
+ok("swift" in _scan_skill_keywords("Skills: Python, Swift, SwiftUI, Kotlin, Objective-C"),
+   "genuine mixed-case 'Swift' (the language) is still detected as a skill")
+ok("swift" not in _scan_skill_keywords("swift and efficient delivery of results"),
+   "lowercase 'swift' (the adjective, meaning fast) does not false-positive either")
+
+# Live regression (2026-07-31, Mindy Anderson / APP-20260723-2034-12DF): 'Go' (the
+# language) matched "Go To Market"/"go-to-market" (ubiquitous marketing jargon, title-
+# cased in headings just like the language name) in a marketing-executive resume with
+# zero mention of the Go language. Case-sensitivity alone can't fix this one (both
+# usages appear capitalized), so this uses phrase exclusion instead.
+ok("go" not in _scan_skill_keywords("Expertise in AI-powered ABM, Go To Market orchestration, MarTech"),
+   "'Go' inside 'Go To Market' no longer false-positives as the Go language")
+ok("go" not in _scan_skill_keywords("translating vision into sophisticated go-to-market strategy"),
+   "hyphenated 'go-to-market' also does not false-positive")
+ok("go" in _scan_skill_keywords("Backend languages: Go, Python, Rust"),
+   "genuine standalone 'Go' (the language) is still detected as a skill")
+
+# Live regression (2026-07-31, Syyed Nazir Ali / APP-20260727-1431-6F75): "go-live" is
+# standard IT/project-management deployment terminology ("business sign-off and go-live
+# approval", "Release & Go-Live Governance"), same false-positive class as "Go To Market".
+ok("go" not in _scan_skill_keywords("business sign-off and go-live approval"),
+   "'go-live' (lowercase, hyphenated) no longer false-positives as the Go language")
+ok("go" not in _scan_skill_keywords("Strategy, Release & Go-Live Governance"),
+   "'Go-Live' (title-cased) no longer false-positives as the Go language")
+
+# Live regression (2026-08-01, Sai Krishna Yallapu / APP-20260717-1100-7BDA): "SQL"/"MQL"
+# in a B2B marketing resume almost always means Sales-/Marketing-Qualified-Lead counts, not
+# the database language - "reported MQLs, SQLs, pipeline...", "MQL-to-SQL handoff", "SQL
+# acceptance rates" all matched the bare 'sql' skill keyword despite zero database mention
+# anywhere in the resume.
+for _sql_text, _why in [
+    ("reported MQLs, SQLs, pipeline, MRO/MSO to CMO", "plural 'MQLs, SQLs' lead counts"),
+    ("improving the MQL-to-SQL handoff process", "'MQL-to-SQL' handoff terminology"),
+    ("significantly improved SQL acceptance rates", "'SQL acceptance rate' marketing metric"),
+]:
+    ok("sql" not in _scan_skill_keywords(_sql_text),
+       f"{_why} does not false-positive as the SQL skill")
+ok("sql" in _scan_skill_keywords("Backend: Python, SQL Server, Node.js"),
+   "genuine standalone 'SQL' (e.g. 'SQL Server') is still detected as a skill")
+
+# Ollama's own free-text skill reading isn't bound by _scan_skill_keywords' disambiguation -
+# it independently returned "Swift" for the Syyed Nazir Ali case despite the deterministic
+# baseline being clean, primed by 'Swift' appearing as this file's own few-shot prompt
+# example. _strip_unconfirmed_ambiguous_skills is the deterministic backstop applied to
+# Ollama's raw output before it ever reaches the union merge (extract_candidate_details_smart),
+# reusing _scan_skill_keywords as the single source of truth for both the case-sensitivity
+# and phrase-exclusion fixes above.
+from hiring_agent.extraction import _strip_unconfirmed_ambiguous_skills as _strip_css
+_swift_resume_text = "Payment rails: UPI, NEFT, RTGS, IMPS, SWIFT, ISO 20022"
+ok(_strip_css("Python, Swift, Kubernetes", _swift_resume_text) == "Python, Kubernetes",
+   "Ollama's hallucinated 'Swift' is stripped when only all-caps 'SWIFT' appears in the resume")
+ok(_strip_css("Python, Swift, Kubernetes", "Skills: Python, Swift, SwiftUI, Kubernetes") == "Python, Swift, Kubernetes",
+   "a genuine mixed-case 'Swift' mention in the resume keeps Ollama's 'Swift' skill")
+ok(_strip_css("Marketing, Go, SEO", "Go To Market orchestration, SEO, demand gen") == "Marketing, SEO",
+   "Ollama's hallucinated 'Go' is stripped when the resume only says 'Go To Market'")
+ok(_strip_css("", _swift_resume_text) == "", "an empty skills string passes through unchanged")
+ok(_strip_css("Python, Kubernetes", _swift_resume_text) == "Python, Kubernetes",
+   "a skills string with no ambiguous terms is untouched")
+
+# Live regression (2026-08-01, same Sai Krishna Yallapu case): "AWS re:Invent" names a
+# conference he led sponsorship/marketing for, not a personal cloud-computing skill - his
+# resume never claims hands-on AWS use anywhere.
+ok(_strip_css("Java, AWS, Claude", "Led Oracle AI World, AWS re:Invent, Cloud World, Ascend") == "Java, Claude",
+   "Ollama's hallucinated 'AWS' is stripped when the resume only names the 'AWS re:Invent' conference")
+ok(_strip_css("Java, AWS, Claude", "Cloud: AWS, Azure, GCP") == "Java, AWS, Claude",
+   "a genuine standalone 'AWS' mention in the resume keeps Ollama's 'AWS' skill")
+
+# Live regression (2026-08-01, Sai Krishna Yallapu / APP-20260717-1100-7BDA): the AI
+# extraction prompt's own few-shot example ("e.g. Python, AWS, Docker, React, Swift") was
+# getting echoed back as hallucinated skills across UNRELATED candidates - a B2B Marketing
+# Leader's resume (zero mention of Python, Docker, or React anywhere) came back with all
+# three in 'skills'. 'Swift' alone was patched via case-sensitivity earlier; the real root
+# cause is the concrete example itself, which primes an LLM to regurgitate it regardless of
+# the actual resume content. The prompt must not contain that swappable example list.
+from hiring_agent.extraction import _AI_PROMPT
+for _bait in ("Python, AWS, Docker, React, Swift", "Python, AWS, Docker, React"):
+    ok(_bait not in _AI_PROMPT,
+       f"the AI prompt no longer bakes in a concrete skill example an LLM could echo back "
+       f"verbatim regardless of the resume ({_bait!r})")
+ok("ACTUALLY NAMED" in _AI_PROMPT or "actually named" in _AI_PROMPT.lower(),
+   "the prompt explicitly instructs the model to only report skills present in the text")
+
 # Ã¢â€â‚¬Ã¢â€â‚¬ C. SHAREPOINT WORKBOOK SHAPE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 print("\n=== C. SHAREPOINT WORKBOOK SHAPE ===")
 from sharepoint_client import _build_candidate_workbook_bytes
@@ -158,6 +415,63 @@ except _SPErr:
 ok(_raised, "ensure_workbook() raises on a missing workbook instead of swallowing it")
 ok(_ensure_calls["table_columns"] == 1, "ensure_workbook() checks the table")
 ok(_ensure_calls["upload_file"] == 0, "ensure_workbook() NEVER calls upload_file - no auto-create, ever")
+
+# ── C1b. Resume Link formula self-heals after every row add (fixed 2026-08-01) ──────
+print("\n=== C1b. add_main_row/add_rejected_row refresh Resume Link after every add ===")
+# Live finding: a genuine Excel calculated-column formula does not reliably auto-extend
+# onto a row added via Graph's rows/add the way it does for a row typed into the workbook
+# UI - 3 live rows (Sai Krishna Yallapu on Rejected, plus 2 rows moved back to Main) came
+# back with a blank 'Resume Link' despite a valid 'Resume URL' right next to it.
+
+
+def _make_fake_client(cols, raise_on_refresh=False):
+    calls = {"post": 0, "set_calc": []}
+
+    def _req(method, url, **kw):
+        calls["post"] += 1
+        return _types.SimpleNamespace(json=lambda: {})
+
+    def _set_calc(table_name, col, formula):
+        if raise_on_refresh:
+            raise _SPErr("boom")
+        calls["set_calc"].append((table_name, col))
+
+    fake = _types.SimpleNamespace(
+        table="HiringAgent_P1_Candidates",
+        table_columns=lambda: cols,
+        _table_columns_of=lambda t: cols,
+        _wb_base=lambda: "https://fake",
+        _ensure_rejected_table=lambda: "RejectedCandidates",
+        _req=_req,
+        set_calculated_column=_set_calc,
+    )
+    fake._refresh_resume_link_formula = _types.MethodType(_SPClient._refresh_resume_link_formula, fake)
+    return fake, calls
+
+
+_fake1, _calls1 = _make_fake_client(["Application ID", "Resume Link", "Resume URL"])
+_SPClient.add_main_row(_fake1, {"Application ID": "APP-TEST"})
+ok(_calls1["set_calc"] == [("HiringAgent_P1_Candidates", "Resume Link")],
+   f"add_main_row refreshes the Resume Link formula right after adding (got {_calls1['set_calc']})")
+
+_fake2, _calls2 = _make_fake_client(["Application ID", "Resume Link"])
+_SPClient.add_rejected_row(_fake2, {"Application ID": "APP-TEST"})
+ok(_calls2["set_calc"] == [("RejectedCandidates", "Resume Link")],
+   f"add_rejected_row refreshes the Resume Link formula on the Rejected table too (got {_calls2['set_calc']})")
+
+_fake3, _calls3 = _make_fake_client(["Application ID"])  # no Resume Link column at all
+_SPClient.add_main_row(_fake3, {"Application ID": "APP-TEST"})
+ok(_calls3["set_calc"] == [],
+   "no refresh call is made when the table has no Resume Link column")
+
+_fake4, _calls4 = _make_fake_client(["Resume Link"], raise_on_refresh=True)
+_raised3 = False
+try:
+    _SPClient.add_main_row(_fake4, {"Application ID": "APP-TEST"})
+except Exception:
+    _raised3 = True
+ok(not _raised3,
+   "a failed Resume Link refresh never fails the row add itself (best-effort, add already succeeded)")
 
 # score_from_sharepoint() must abort cleanly (not limp forward into a doomed row loop)
 # and alert an admin when the workbook can't be confirmed.
@@ -274,6 +588,85 @@ for gap_resp in _GAP_RESPONSES:
        f"gap-literal skills did NOT overwrite Skills")
 
 
+# â”€â”€ C1. LOCATION/COUNTRY CONSISTENCY GUARD (bug fix) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+print("\n=== C1. LOCATION/COUNTRY SELF-CONTRADICTION GUARD ===")
+# Live regression (2026-08-01, Syyed Nazir Ali / APP-20260727-1431-6F75): a stray "MS"
+# inside a tools list ("Bloomberg Terminal, MS Project") made the offline baseline
+# mis-hint location as a bogus US address and country as "United States". Ollama then
+# correctly read the resume's own header ("Location: India") and fixed location, but left
+# country as the stale "United States" hint - producing a self-contradictory India /
+# United-States row that a country-only geo check would have wrongly passed as USA-based.
+_india_resume = (
+    "Syyed Nazir Ali\nLocation: India\n\n"
+    "TOOLS\nBloomberg Terminal, MS Project, MS Office Suite\n"
+)
+with _mock.patch("requests.post") as mp:
+    mp.return_value.json.return_value = {"message": {"content": __import__("json").dumps({
+        "full_name": "Syyed Nazir Ali", "phone": "", "location": "India",
+        "country": "United States", "skills": "Excel", "looking_for_role": "Business Analyst",
+        "education": "",
+    })}}
+    mp.return_value.raise_for_status = lambda: None
+    os.environ["HIRING_OLLAMA_ENABLED"] = "true"
+    importlib.reload(_cfg_mod)
+    importlib.reload(_ext_mod)
+    from hiring_agent.extraction import extract_candidate_details_smart as _ecds
+    _guard_result = _ecds(_india_resume)
+    os.environ["HIRING_OLLAMA_ENABLED"] = "false"
+    importlib.reload(_cfg_mod)
+    importlib.reload(_ext_mod)
+ok(_guard_result.get("country") == "India",
+   f"a location that names a foreign country overrides a stale contradicting 'country' "
+   f"hint (got country={_guard_result.get('country')!r})")
+
+# Live regression (2026-08-01, same Syyed Nazir Ali row, a second bug): Location must hold
+# city/state only - Country is the dedicated field for the country name itself. His
+# resume's only location statement is "Location: India (Open to Remote / Global)" - no
+# city anywhere - so 'India' ended up duplicated into both Location AND Country. Since his
+# header also says "Open to Remote / Global", Location should read "Remote", not "India".
+_india_remote_resume = (
+    "Syyed Nazir Ali\nLocation: India (Open to Remote / Global)\n\n"
+    "TOOLS\nBloomberg Terminal, MS Project, MS Office Suite\n"
+)
+with _mock.patch("requests.post") as mp:
+    mp.return_value.json.return_value = {"message": {"content": __import__("json").dumps({
+        "full_name": "Syyed Nazir Ali", "phone": "", "location": "India",
+        "country": "India", "skills": "Excel", "looking_for_role": "Business Analyst",
+        "education": "",
+    })}}
+    mp.return_value.raise_for_status = lambda: None
+    os.environ["HIRING_OLLAMA_ENABLED"] = "true"
+    importlib.reload(_cfg_mod)
+    importlib.reload(_ext_mod)
+    _remote_result = _ecds(_india_remote_resume)
+    os.environ["HIRING_OLLAMA_ENABLED"] = "false"
+    importlib.reload(_cfg_mod)
+    importlib.reload(_ext_mod)
+ok(_remote_result.get("location") == "Remote" and _remote_result.get("country") == "India",
+   f"a bare country name in Location falls back to 'Remote' when the text says so, and is "
+   f"never duplicated into the Location column (got location={_remote_result.get('location')!r}, "
+   f"country={_remote_result.get('country')!r})")
+
+# Without any 'remote' mention, the bare-country fallback is 'N/A', not a guess.
+with _mock.patch("requests.post") as mp:
+    mp.return_value.json.return_value = {"message": {"content": __import__("json").dumps({
+        "full_name": "Jane Doe", "phone": "", "location": "France",
+        "country": "France", "skills": "Excel", "looking_for_role": "Analyst",
+        "education": "",
+    })}}
+    mp.return_value.raise_for_status = lambda: None
+    os.environ["HIRING_OLLAMA_ENABLED"] = "true"
+    importlib.reload(_cfg_mod)
+    importlib.reload(_ext_mod)
+    _na_result = _ecds("Jane Doe\nLocation: France\n\nEXPERIENCE\nSoftware Engineer\n")
+    os.environ["HIRING_OLLAMA_ENABLED"] = "false"
+    importlib.reload(_cfg_mod)
+    importlib.reload(_ext_mod)
+ok(_na_result.get("location") == "N/A" and _na_result.get("country") == "France",
+   f"a bare country name in Location with no 'remote' signal falls back to 'N/A' "
+   f"(got location={_na_result.get('location')!r}, country={_na_result.get('country')!r})")
+
+
 # â”€â”€ D. OFFLINE EXTRACTION â€” FULL NAME â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 print("\n=== D. OFFLINE EXTRACTION â€” Full Name ===")
 os.environ["HIRING_OLLAMA_ENABLED"] = "false"
@@ -299,6 +692,37 @@ ok(resolve_full_name("Not extracted", "", "Carlos Ruiz\nSoftware Engineer\n") ==
    "resolve_full_name: falls back to resume first lines")
 ok(resolve_full_name("Not extracted", "noreply@x.com", "") == "Not extracted",
    "resolve_full_name: email address not treated as name")
+
+# Live regression (2026-08-01, found by dry_run_p1_p2_scenarios.py): the old
+# `len(core) < 2` token rule rejected every name carrying a middle initial, so the
+# OFFLINE parser returned "Not extracted" for 'Christopher L. Feld' / 'Jane Q Public'.
+# Live rows looked correct only because Ollama (Tier 2) resolves the name independently -
+# the bug was invisible until Ollama was disabled, which is the documented fallback path.
+from hiring_agent.extraction import _looks_like_name as _lln2
+for _n in ("Jane Q Public", "Christopher L. Feld", "John F Kennedy"):
+    ok(_lln2(_n), f"a name with a middle initial is recognized offline: {_n!r}")
+ok(extr("Christopher L. Feld\nMarana, AZ | c.feld@example.com\n")["full_name"]
+   == "Christopher L. Feld",
+   "the offline parser extracts a middle-initial name instead of 'Not extracted'")
+# An initial must never carry the name on its own.
+for _n in ("A B", "I am", "A B Testing"):
+    ok(not _lln2(_n), f"initials alone are still rejected as a name: {_n!r}")
+
+# Live regression (2026-08-01, Futurism Technologies / APP-20260717-0559-CCE1): "Transforming
+# Business Models" (a marketing tagline from a vendor's company-brochure PDF, not a resume)
+# is 3 alphabetic tokens with no digits or section-word overlap, so it passed the old
+# structural shape check outright and was stored as the candidate's Full Name.
+from hiring_agent.extraction import _plausible_name_shape as _pns, _looks_like_name as _lln
+ok(_pns("Transforming Business Models") is False,
+   "a company/marketing-tagline phrase is not treated as a plausible parsed name")
+ok(_lln("Futurism Technologies") is False,
+   "a company name is not treated as a plausible name even with exactly 2 tokens")
+ok(resolve_full_name("Transforming Business Models", "parths", "Parth S\nFuturism Technologies\n")
+   != "Transforming Business Models",
+   "resolve_full_name never settles on a company-name-shaped parsed value")
+# Genuine names sharing no vocabulary with the company-word list still pass.
+for _name in ("Sai Krishna Yallapu", "Mindy Anderson", "Christopher L. Feld", "Bob Chen"):
+    ok(_pns(_name) is True, f"genuine name still passes the shape check: {_name!r}")
 
 
 # â”€â”€ E. OFFLINE EXTRACTION â€” PHONE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -442,6 +866,28 @@ ok(r3["phone"] == "512-555-0001",
 r4 = merge_mail_body_fallback(dict(base), "")
 ok(r4 == base, "Empty mail body returns dict unchanged")
 
+# Live regression (2026-08-01, Brett Worker / APP-20260721-0122-E743): "...for the CISO
+# position. The role caught my attention because it combines enterprise security
+# governance..." - the role name ('CISO') sits BEFORE the word 'position', so the old
+# keyword-then-role pattern found no letter immediately after 'position' (a period
+# followed it) and fell through to matching 'role' in the next sentence instead,
+# capturing "caught my attention because it combines" as the desired role.
+from hiring_agent.extraction import _extract_role_from_body as _erfb
+_brett_body = (
+    "Hello, I came across Tracy Simon's LinkedIn post for the CISO position. The role "
+    "caught my attention because it combines enterprise security governance with the "
+    "practical challenge of building a scalable security program in a growing AI company."
+)
+ok(_erfb(_brett_body) == "CISO",
+   f"'for the X position' captures the role name BEFORE the keyword, not an unrelated "
+   f"later sentence (got {_erfb(_brett_body)!r})")
+ok(_erfb("I am interested in the Senior Backend Engineer role at your company.")
+   == "Senior Backend Engineer",
+   "'interested in the X role' phrasing is also caught")
+# Pre-existing "keyword: role" phrasing must still work unchanged.
+ok(_erfb("Applying for: Data Scientist role. Passionate about ML.") == "Data Scientist role",
+   "the original 'Applying for: X' phrasing is unaffected by the new before-keyword check")
+
 
 # â”€â”€ K. PORTFOLIO EXTRACTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 print("\n=== K. PORTFOLIO EXTRACTION (extract_portfolios) ===")
@@ -482,6 +928,33 @@ both_p1, both_p2, both_p3 = extract_portfolios(
 ok("linkedin.com/in/janedoe" in both_p1 and "janesmith.io/portfolio" in both_p3,
    "LinkedIn in P1 does not discard a separate personal portfolio (stored in P3)")
 ok("janesmith.io" in p1, "Personal .io site â†’ Portfolio 1")
+
+# Live regression (2026-08-01, Muhammad Ahsan Hussain / APP-20260721-2030-3AA7): "Socket.io"
+# (a real-time messaging library he uses, mentioned repeatedly as plain text - never written
+# as a link anywhere in his resume) matched the bare 'word.io' shape and the '.io'
+# personal-site heuristic, and was stored as his Portfolio 1.
+p1, p2, p3 = extract_portfolios(
+    "Backend built on Node.js and Express.js with RESTful and GraphQL APIs, MongoDB and "
+    "Firebase for data and real-time features, and Socket.io for live communication layers")
+ok((p1, p2, p3) == ("N/A", "N/A", "N/A"),
+   f"'Socket.io' (a library mention, not a link) is not stored as a portfolio "
+   f"(got p1={p1!r}, p2={p2!r}, p3={p3!r})")
+ok("janesmith.io" in extract_portfolios("janesmith.io/portfolio")[0],
+   "a genuine personal .io site is still detected after the Socket.io exclusion")
+
+# Live regression (2026-08-01, Mindy Anderson / APP-20260723-2034-12DF): a SECOND
+# independent false positive found the same afternoon as Socket.io - "Loquatinc.io" is a
+# client company name in her contracts list ("Contracts include: Loquatinc.io, BNY Mellon,
+# EY..."), never a link, but matched the same bare 'word.io' personal-site heuristic. Two
+# unrelated real resumes hitting this in one session means the bare-TLD-only acceptance
+# rule itself was too broad - removed entirely; a bare domain now needs an explicit scheme
+# or the word "portfolio" nearby to be trusted, not just a trendy TLD.
+ok(extract_portfolios(
+    "Contracts include: Loquatinc.io, BNY Mellon, EY, OneSource Labs, and organizations "
+    "across financial services") == ("N/A", "N/A", "N/A"),
+   "a client/company name using a '.io' domain is not stored as a personal portfolio")
+ok(extract_portfolios("Built tools deployed at randomstartup.dev and cloudthing.me") == ("N/A", "N/A", "N/A"),
+   "bare .dev/.me company mentions with no scheme and no 'portfolio' context are not captured")
 
 # Skip social/email platforms
 p1, p2, p3 = extract_portfolios("gmail.com/user instagram.com/janedoe facebook.com/jane")
@@ -885,6 +1358,19 @@ ok(not _usph("519-859-0693") and not _usph("+1 519-859-0693") and not _usph("(41
    "Canadian area codes (519 Ontario, 416 Toronto) are NOT US phones")
 ok(_usph("865-356-1921") and _usph("213-376-7163"),
    "genuine US area codes (865 Tennessee, 213 LA) are still detected as US phones")
+
+# Live regression (2026-08-01, Divy Parmar / APP-20260720-1013-09AC): a bare, unformatted
+# 10-digit Indian mobile number ("7405465204", no separators, no +91) coincidentally
+# matched the NANP area-code shape and was trusted as "looks like a US phone" strongly
+# enough to override his resume's own explicit "Khokhra, Ahmedabad" location, leaving a
+# clearly non-US candidate sitting in Needs Review instead of Rejected.
+ok(not _usph("7405465204"),
+   "a bare unformatted 10-digit number (no separators, no country code) is NOT trusted "
+   "as a US phone - indistinguishable from a foreign number missing its country code")
+_keep, _r = _clu("Ahmedabad", country="India", resume_text="",
+                 education="Master of Computer Applications (MCA)", phone="7405465204")
+ok(not _keep, f"Divy Parmar case: explicit foreign city + bare unformatted phone -> REJECT, "
+              f"not Needs Review (got keep={_keep}, reason={_r!r})")
 _keep, _r = _clu("Ahmedabad, Gujarat", country="India", resume_text="", phone="+91 9409021350")
 ok(not _keep, "Krips case: foreign hometown+country + Indian (non-contradicting) phone -> still REJECT")
 _keep, _r = _clu("Mumbai, Maharashtra", country="India", resume_text="", phone="+91 98765 43210")
@@ -2314,6 +2800,107 @@ finally:
     _cfg_mod.ERROR_EMAIL_ENABLED, _cfg_mod.ADMIN_EMAIL = _orig_enabled, _orig_admin
 
 
+# â”€â”€ G1b. P2 SECONDARY CONTENT-SAFETY NET (bug fix) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+print("\n=== G1b. P2 SECONDARY CONTENT-SAFETY NET ===")
+# Live regression (2026-08-01, Futurism Technologies / APP-20260717-0559-CCE1): a services
+# vendor's "Company Profile and Corporate Deck" email/attachment was scored as if it were a
+# candidate's resume. P1 already screens incoming mail for this (flow_config.json
+# spam_filters); this is P2's secondary net for the rare row that still slips through.
+from hiring_agent.sharepoint_scoring import (
+    _detect_suspicious_content, _send_suspicious_content_alert,
+)
+
+_futurism_mail_body = (
+    "Thank you for your response on LinkedIn. As discussed, I'm sharing our Company "
+    "Profile and Corporate Deck for your review. ... Relevant profiles, case studies, "
+    "and engagement models"
+)
+_hits = _detect_suspicious_content("", _futurism_mail_body)
+ok(set(_hits) == {"company profile and corporate deck", "engagement models"},
+   f"the real Futurism vendor-pitch email is caught by P2's content-safety net (got {_hits!r})")
+ok(_detect_suspicious_content("Senior React Native Developer, 5 years experience", "") == [],
+   "a genuine resume snippet does not trigger the content-safety net")
+ok(_detect_suspicious_content("", "") == [],
+   "empty resume text and mail body never trigger the content-safety net")
+ok(_detect_suspicious_content("URGENT ACTION REQUIRED: verify your account now", "") != [],
+   "phishing-style boilerplate is also caught (case-insensitive)")
+
+# Alert gating mirrors _send_error_alert: on when enabled + admin configured, off otherwise.
+try:
+    _cfg_mod.ERROR_EMAIL_ENABLED, _cfg_mod.ADMIN_EMAIL = True, "admin@x.com"
+    _rc8 = _StubRetryClient()
+    _send_suspicious_content_alert(_rc8, "APP-SPAM-1", "vendor@x.com", ["capability deck"])
+    ok(len(_rc8.mails_sent) == 1 and _rc8.mails_sent[0][0] == "admin@x.com",
+       "suspicious-content alert sent when enabled + admin email configured")
+
+    _cfg_mod.ERROR_EMAIL_ENABLED = False
+    _rc9 = _StubRetryClient()
+    _send_suspicious_content_alert(_rc9, "APP-SPAM-2", "vendor@x.com", ["capability deck"])
+    ok(_rc9.mails_sent == [], "suspicious-content alert suppressed when ERROR_EMAIL_ENABLED=false")
+finally:
+    _cfg_mod.ERROR_EMAIL_ENABLED, _cfg_mod.ADMIN_EMAIL = _orig_enabled, _orig_admin
+
+
+# â”€â”€ G1c. NO HALF-FILLED ROW REACHES THE REJECTED SHEET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+print("\n=== G1c. PRE-REJECT COMPLETENESS GATE ===")
+# Live regression (2026-08-01): Syyed Nazir Ali (APP-20260727-1431-6F75) and Divy Parmar
+# (APP-20260720-1013-09AC) both landed on the Rejected sheet with a blank Category AND
+# blank Suggested Roles. Root cause was two-fold: (a) _validate_all_columns marked
+# 'Category'/'Suggested Role 1/2/3'/'Status' as 'ok' unconditionally WITHOUT looking at
+# their values, so the run logged a clean column check over real gaps; (b) nothing
+# re-checked completeness at the point of no return. The Rejected sheet is terminal -
+# nothing re-scores a row once it is there - so a gap that slips through is permanent.
+from hiring_agent.sharepoint_scoring import _complete_row_before_reject as _crbr
+
+_gap_row = {
+    "Application ID": "APP-GAP-1", "Full Name": "Jane Doe",
+    "Location": "Mumbai", "Country": "India", "Status": "Rejected - Non-USA Location",
+    "Current Skills": "Kotlin, Java", "Suggested Role 1": "Backend Engineer (40%)",
+    "Category": "",          # the exact gap seen live
+    "Portfolio 1": "", "Portfolio 2": "", "Portfolio 3": "",
+    "Application Updates": "", "Retry Count": "",
+}
+_fixed = _crbr(dict(_gap_row), "APP-GAP-1")
+ok(not _is_gap(_fixed.get("Category")),
+   f"a blank Category is repaired before the row reaches Rejected (got {_fixed.get('Category')!r})")
+ok(_fixed.get("Portfolio 1") == "N/A" and _fixed.get("Portfolio 2") == "N/A"
+   and _fixed.get("Portfolio 3") == "N/A",
+   "blank Portfolio slots are normalized to N/A before the row reaches Rejected")
+ok(_fixed.get("Application Updates") == 0 and _fixed.get("Retry Count") == 0,
+   "blank numeric counters are normalized to 0 before the row reaches Rejected")
+
+# Already-good values must never be churned by the gate.
+_good_row = {
+    "Application ID": "APP-GOOD-1", "Full Name": "John Smith",
+    "Location": "Hyderabad", "Country": "India", "Status": "Rejected - Non-USA Location",
+    "Current Skills": "Marketing, SEO", "Suggested Role 1": "Marketing Lead (90%)",
+    "Category": "Business Analytics", "Portfolio 1": "https://linkedin.com/in/x",
+    "Portfolio 2": "N/A", "Portfolio 3": "N/A",
+    "Application Updates": 2, "Retry Count": 1,
+}
+_untouched = _crbr(dict(_good_row), "APP-GOOD-1")
+ok(_untouched == _good_row,
+   "a fully populated row passes through the gate completely unchanged")
+
+# The gate is deterministic and offline - it must never raise on a sparse/degenerate row.
+_sparse = _crbr({}, "")
+ok(isinstance(_sparse, dict) and not _is_gap(_sparse.get("Category")),
+   "the gate never raises on an empty row and still guarantees a non-blank Category")
+
+# _validate_all_columns must no longer rubber-stamp a blank Category.
+_vac_fields = {
+    "Full Name": "Jane Doe", "Phone": "N/A", "Location": "Mumbai", "Country": "India",
+    "Current Skills": "Kotlin, Java", "Looking For Role": "Backend Engineer",
+    "Education": "N/A", "Portfolio 1": "N/A", "Portfolio 2": "N/A", "Portfolio 3": "N/A",
+    "Suggested Role 1": "Backend Engineer (40%)", "Suggested Role 2": "", "Suggested Role 3": "",
+    "Category": "", "Status": "Rejected - Non-USA Location",
+}
+_vac_out = _validate_all_columns(dict(_vac_fields), {"Email": "j@x.com"}, "")
+ok(not _is_gap(_vac_out.get("Category")),
+   f"_validate_all_columns now heals a blank Category instead of marking it OK "
+   f"(got {_vac_out.get('Category')!r})")
+
+
 # â”€â”€ G2. HAS RESUME FILTERING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 print("\n=== G2. HAS RESUME FILTERING ===")
 # If a row has 'Has Resume' not equal to 'Yes', it must be skipped and flagged for review.
@@ -2737,8 +3324,16 @@ class _ExportFilterClient:
     def list_rows(self):
         return [
             {"values": {
+                "Application ID": "APP-SCORED-OLD", "Status": "Scored",
+                "Full Name": "Older Candidate", "Received Date": "2026-05-01T09:00:00",
+            }},
+            {"values": {
                 "Application ID": "APP-SCORED", "Status": "Scored",
-                "Full Name": "Ready Candidate",
+                "Full Name": "Ready Candidate", "Received Date": "2026-06-15T09:00:00",
+            }},
+            {"values": {
+                "Application ID": "APP-SCORED-NEW", "Status": "Scored",
+                "Full Name": "Newer Candidate", "Received Date": "2026-07-20T09:00:00",
             }},
             {"values": {
                 "Application ID": "APP-LOCATION-REVIEW",
@@ -2766,13 +3361,29 @@ with _tempfile.TemporaryDirectory() as _export_tmp:
         export_client_results(_export_client, upload_to_sharepoint=True)
     _export_wb = load_workbook(_latest, data_only=False)
     _export_ws = _export_wb["Candidates"]
+    from hiring_agent.sharepoint_scoring import _CLIENT_EXPORT_COLUMNS as _EXPORT_COLS
+    ok(_export_wb.sheetnames == ["Candidates"],
+       "Candidate_List_Results is minimal: exactly one Candidates sheet")
+    ok(_export_ws.max_column == len(_EXPORT_COLS)
+       and [c.value for c in _export_ws[1]] == _EXPORT_COLS,
+       "Candidate_List_Results contains only the selected client-facing columns")
+    ok(all(_export_ws.cell(2, col).value in (None, "")
+           for col in range(1, _export_ws.max_column + 1)),
+       "Candidate_List_Results has one fully blank row directly after the header")
+    ok(len(_export_ws.tables) == 0 and len(_export_ws._charts) == 0,
+       "Candidate_List_Results stays minimal with no extra tables or charts")
+    ok(_export_ws.freeze_panes == "A2",
+       "Candidate_List_Results keeps only the header frozen")
     _export_ids = [
         _export_ws.cell(row, 1).value
         for row in range(2, _export_ws.max_row + 1)
         if _export_ws.cell(row, 1).value
     ]
-    ok(_export_ids == ["APP-SCORED"],
+    ok(set(_export_ids) == {"APP-SCORED-OLD", "APP-SCORED", "APP-SCORED-NEW"},
        "Candidate_List_Results exports only final Scored rows")
+    ok(_export_ids == ["APP-SCORED-NEW", "APP-SCORED", "APP-SCORED-OLD"],
+       f"export is sorted newest-first (current month first), matching the CandidateList "
+       f"sheet's own resort_candidate_sheets.py convention (got {_export_ids})")
     ok(len(_export_client.uploads) == 1
        and _export_client.uploads[0][1] == "Candidate_List_Results.xlsx",
        "completed live run uploads the refreshed client workbook to SharePoint")
@@ -2921,6 +3532,50 @@ for _text, _want, _why in [
     _got = str(_loc(_text) or "")
     ok(_got == _want, f"no false positive from {_why}: {_got!r} == {_want!r}")
 
+# Live regression (2026-08-01, Syyed Nazir Ali / APP-20260727-1431-6F75): a tools list
+# "Bloomberg Terminal, MS Project, MS Office Suite" matched the comma-separated "City, ST"
+# pattern as "Bloomberg Terminal, MS" (Mississippi) - unlike the no-comma path above, this
+# full-text scan had no guard against a list item that keeps going ('MS' here is Microsoft,
+# not a state, and the match is immediately followed by another bare capitalized word
+# rather than ending the field).
+ok(_loc("Jane Doe\nTools: Bloomberg Terminal, MS Project, MS Office Suite") is None,
+   f"'MS' inside a tools list ('MS Project') is not mistaken for Mississippi "
+   f"(got {_loc('Jane Doe' + chr(10) + 'Tools: Bloomberg Terminal, MS Project, MS Office Suite')!r})")
+ok(str(_loc("Jane Doe\nWork history: Jackson, MS | 2019 - 2021") or "") == "Jackson, MS",
+   "a genuine 'City, MS' work-history address is still detected")
+
+print("\n=== W1c. LOCATION NEVER DERIVED FROM A SCHOOL'S OWN NAME ===")
+# Fixed 2026-08-01, live case (Prerna Saluja / APP-20260716-2052-6112): her header has no
+# location at all, and her ONLY 'Delhi' mention is her undergrad alma mater ('Daulat Ram
+# College, University of Delhi') - her current, most recent affiliation is Arizona State
+# University. A bare substring scan for a known city/state anywhere in the document can't
+# tell a school's own city from where the candidate actually lives, so it returned "Delhi"
+# (then "India") despite her resume never stating a current location.
+_prerna_text = (
+    "Prerna Saluja\n(623)-242-3627 | LinkedIn | Gmail\n\nEDUCATION\n"
+    "W. P. Carey School of Business, Arizona State University\n"
+    "Master of Science in Finance (GPA: 3.78)\n\n"
+    "Daulat Ram College, University of Delhi\n"
+    "Bachelor of Commerce (Major: Accounting, Minor: Economics)\n"
+)
+ok(_loc(_prerna_text) is None,
+   f"a city/state embedded only in a school's own name is not returned as location "
+   f"(got {_loc(_prerna_text)!r})")
+
+# The same guard must not swallow a genuine current-location statement that happens to
+# sit near an unrelated institution mention elsewhere in the resume.
+_phoenix_text = (
+    "Jane Doe\nSoftware Engineer\nPhoenix, AZ 85004\n\n"
+    "EDUCATION\nUniversity of Phoenix, B.S. Computer Science\n"
+)
+ok(str(_loc(_phoenix_text) or "") == "Phoenix, AZ",
+   f"a real header location survives even when an unrelated 'University of Phoenix' "
+   f"appears later (got {_loc(_phoenix_text)!r})")
+
+_mumbai_text = "Ravi Kumar\nMumbai, Maharashtra | ravi@example.com\n\nEDUCATION\nB.Tech, IIT Bombay\n"
+ok(str(_loc(_mumbai_text) or "") == "Mumbai",
+   f"a genuinely stated foreign city is still detected (got {_loc(_mumbai_text)!r})")
+
 print("\n=== W2. CLIENT EXPORT PERIOD SEPARATORS ===")
 from hiring_agent.sharepoint_scoring import _with_period_separators as _sep
 
@@ -2935,15 +3590,24 @@ _sep_out = _sep([
     _xrow("E", "2027-01-03T10:00:00"),
 ])
 _ids = [str(r.get("Application ID") or "") for r in _sep_out]
+_fnames = [str(r.get("Full Name") or "") for r in _sep_out]
 ok(_ids[0] == "", "a blank spacer row sits directly under the header")
 ok(_ids == ["", "A", "B", "", "C", "D", "", "E"],
-   f"one blank row between each calendar month (got {_ids})")
+   f"one separator row between each calendar month (got {_ids})")
 ok(_ids.count("") == 3,
-   "a year change inserts ONE blank row, not two stacked (Jun-2026 -> Jan-2027)")
+   "a year change inserts ONE separator row, not two stacked (Jun-2026 -> Jan-2027)")
+ok(_fnames[6] == "-- 2027 --",
+   f"the Jun-2026 -> Jan-2027 boundary is a LABELED separator, not a plain blank (got {_fnames[6]!r})")
+_year_sep_row = _sep_out[6]
+ok(all((str(v or "") != "") == (col == "Full Name") for col, v in _year_sep_row.items()),
+   "the year-boundary separator has ONLY Full Name set; every other column stays blank")
 ok(all(all(str(v or "") == "" for v in _sep_out[i].values())
-       for i, x in enumerate(_ids) if x == ""),
-   "separator rows are fully blank in every column, so all readers skip them")
-ok(_sep([]) == [], "no spacer is emitted for an empty export")
+       for i, x in enumerate(_ids) if x == "" and i != 6),
+   "non-year separator rows (header spacer + same-year month gaps) are still fully blank")
+_empty_sep = _sep([])
+ok(len(_empty_sep) == 1
+   and all(str(v or "") == "" for v in _empty_sep[0].values()),
+   "an empty export still receives one permanent blank row after the header")
 _same = _sep([_xrow("A", "2026-05-07T10:00:00"), _xrow("B", "2026-05-08T10:00:00")])
 ok([str(r.get("Application ID") or "") for r in _same] == ["", "A", "B"],
    "rows inside one month get no separator between them")
@@ -2984,6 +3648,10 @@ ok(_r is True and _a == [{}], "new month -> exactly one fully blank separator ro
 _r, _a = _did_sep(["2026-12-07T10:00:00"], "2027-01-02T10:00:00")
 ok(_r is True and len(_a) == 1,
    "new year is also a new month -> still exactly ONE blank row, not two")
+_r, _a = _did_sep(["2026-05-07T10:00:00", "2026-06-02T10:00:00"],
+                  "2026-05-21T10:00:00")
+ok(_r is True and len(_a) == 1,
+   "an out-of-order repair reopening an older month still gets a boundary separator")
 _r, _a = _did_sep(["", "2026-05-07T10:00:00"], "2026-05-21T10:00:00")
 ok(_r is False, "the blank header-spacer row is ignored when reading existing periods")
 _r, _a = _did_sep(["2026-05-07T10:00:00"], None)

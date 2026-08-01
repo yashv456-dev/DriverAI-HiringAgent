@@ -72,6 +72,18 @@ STATUS_LOCATION_UNCONFIRMED = _yaml.get("status_values", {}).get(
     "location_unconfirmed", "Rejected - Location Not Confirmed")
 STATUS_PROCESSING_FAILED = _yaml.get("status_values", {}).get(
     "processing_failed", "Rejected - Processing Error")
+STATUS_NEEDS_REVIEW_SPAM = _yaml.get("status_values", {}).get(
+    "needs_review_spam", "Needs Review - Possible Spam")
+
+# P2's secondary content-safety net (see config.yaml content_safety) - checked against a
+# row's resume text and mail body before normal extraction runs. P1 already screens
+# incoming mail for this (HiringAgent_P1/flow/flow_config.json spam_filters); this only
+# catches the rare row that still slips through.
+SUSPICIOUS_CONTENT_PHRASES = [
+    str(p).strip().lower()
+    for p in (_yaml.get("content_safety", {}) or {}).get("suspicious_phrases", [])
+    if str(p).strip()
+]
 
 # How many times a row may fail (unreadable resume OR any exception during scoring)
 # before it's given up on and moved to Rejected - never retried forever.
