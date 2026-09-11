@@ -341,6 +341,15 @@ def _rename_to_canonical(remote, documents, app_id, full_name, category, dry_run
                 cfg.logger.info('        Renamed   : %s -> %s', name, target)
                 continue
         except Exception as error:
+            try:
+                web_url = remote.file_web_url(doc['folder'], target)
+                if web_url:
+                    doc = dict(doc, url=web_url)
+                    renamed[target] = doc
+                    cfg.logger.info('        Rename    : %s already exists as %s; using it', name, target)
+                    continue
+            except Exception:
+                pass
             cfg.logger.warning('        Rename    : %s kept its P1 name (%s)', name, error)
         renamed[name] = doc
     return renamed
@@ -440,6 +449,8 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
                     # cell to track the rename. Only fill it when P1 left it blank.
                     if not str(result_values.get('Original Filename', '') or '').strip():
                         result_values['Original Filename'] = ', '.join(documents)
+                    if not str(result_values.get('Last Updated Date', '') or '').strip():
+                        result_values['Last Updated Date'] = result_values.get('Received Date') or ''
                     first_document = next(iter(documents.values()))
                     result_values['Resume URL'] = first_document['url']
                     result_values['Resume Folder Path'] = first_document['folder']
@@ -499,8 +510,8 @@ def _sync_row_to_sharepoint(remote, app_id, sheet, result_values):
         if hasattr(remote, 'set_row_fill') and hasattr(remote, 'table'):
             try:
                 row_idx = sp_store._resolve(app_id, sheet='main')
-                has_doubt = is_doubt_candidate(result_values)
-                remote.set_row_fill(remote.table, row_idx, "#FFF2CC" if has_doubt else None)
+                is_doubt, _ = is_doubt_candidate(result_values)
+                remote.set_row_fill(remote.table, row_idx, "#FFF2CC" if is_doubt else None)
             except Exception as fill_err:
                 cfg.logger.warning('Could not set row fill for %s: %s', app_id, fill_err)
     elif sheet == 'rejected':

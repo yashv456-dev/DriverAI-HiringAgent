@@ -80,7 +80,8 @@ def build_master(store, path, generation):
                 cell.number_format = '@'
             if sheet == 'main':
                 from .sharepoint_scoring import is_doubt_candidate
-                if is_doubt_candidate(row.values):
+                is_doubt, _ = is_doubt_candidate(row.values)
+                if is_doubt:
                     amber_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
                     for cell in ws[ws.max_row]:
                         cell.fill = amber_fill
