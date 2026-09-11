@@ -24,7 +24,7 @@ resume library. Python 3.14 currently works in the validated development environ
 ## 1. What To Bring
 
 - Latest P2 code zip from:
-  `archive\backups\HiringAgent_App_P2_current_backup_*.zip`
+  `archive\backups\HiringAgent_P2_current_backup_*.zip`
 - The real `.env` file, copied separately and handled as a secret.
 - Client laptop with Windows, internet access, and permission to install Python/Ollama if needed.
 - Microsoft Graph app registration already created and admin-consented.
@@ -36,7 +36,7 @@ Do not put `.env` in email, chat, Git, or a shared public folder.
 
 Share with the client/CEO:
 
-- `HiringAgent_App_P2_current_backup_*.zip`
+- `HiringAgent_P2_current_backup_*.zip`
 - `docs\README.md`
 - `docs\P2_CLIENT_DEPLOYMENT_RUNBOOK.md`
 - `docs\p2_detailed_summary.md`
@@ -76,7 +76,7 @@ The sender mailbox in `.env` must match the mailbox allowed to send P2 emails.
 On the client laptop, create:
 
 ```powershell
-C:\HiringAgent\HiringAgent_App_P2
+C:\HiringAgent\HiringAgent_P2
 ```
 
 Extract the P2 zip into that folder.
@@ -96,7 +96,7 @@ Expected files after extraction:
 Copy the real `.env` into:
 
 ```powershell
-C:\HiringAgent\HiringAgent_App_P2\.env
+C:\HiringAgent\HiringAgent_P2\.env
 ```
 
 ## 3A. P2 App vs P2 Bot
@@ -138,7 +138,7 @@ Pick whichever the client is already comfortable with. `Launch.bat` and `RunDail
 Open PowerShell in the P2 folder:
 
 ```powershell
-cd C:\HiringAgent\HiringAgent_App_P2
+cd C:\HiringAgent\HiringAgent_P2
 ```
 
 Run:
@@ -186,7 +186,7 @@ Expected result: HTTP status `200`.
 Run from:
 
 ```powershell
-cd C:\HiringAgent\HiringAgent_App_P2
+cd C:\HiringAgent\HiringAgent_P2
 ```
 
 Check local setup:
@@ -383,9 +383,9 @@ For a client laptop, Windows Task Scheduler is usually better than leaving a ter
 Create a task:
 
 - Program/script:
-  `C:\HiringAgent\HiringAgent_App_P2\RunDaily.bat`
+  `C:\HiringAgent\HiringAgent_P2\RunDaily.bat`
 - Start in:
-  `C:\HiringAgent\HiringAgent_App_P2`
+  `C:\HiringAgent\HiringAgent_P2`
 - Run whether user is logged on or not.
 - Run with highest privileges if the client environment requires it.
 - Configure power settings so the laptop does not sleep while the task should run.
@@ -404,9 +404,9 @@ To change the schedule later:
 3. Open **Properties > Triggers**.
 4. Edit the trigger time/frequency.
 5. Confirm **Actions** still points to:
-   `C:\HiringAgent\HiringAgent_App_P2\RunDaily.bat`
+   `C:\HiringAgent\HiringAgent_P2\RunDaily.bat`
 6. Confirm **Start in** is:
-   `C:\HiringAgent\HiringAgent_App_P2`
+   `C:\HiringAgent\HiringAgent_P2`
 
 Do not edit `RunDaily.bat` just to change time. Use the task trigger for schedule changes.
 
@@ -619,7 +619,7 @@ If the new install has issues:
 2. Keep `.env` safe.
 3. Rename the current folder:
    ```powershell
-   Rename-Item C:\HiringAgent\HiringAgent_App_P2 C:\HiringAgent\HiringAgent_App_P2_broken
+   Rename-Item C:\HiringAgent\HiringAgent_P2 C:\HiringAgent\HiringAgent_P2_broken
    ```
 4. Extract the previous known-good backup zip.
 5. Copy `.env` back into the restored folder.

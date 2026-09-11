@@ -4,7 +4,7 @@
 **Single source of truth:** `flow/flow_config.json` — edit this, run `python flow/build_zip.py`, re-import.  
 **Generated artifacts (never hand-edit):** `flow/definition.json` · `flow/DriverAI-Hiring-AutoReply-apply.zip`
 
-Power Automate watches `apply@driverai.io`, filters spam and non-applications, and saves each resume + candidate row to SharePoint. Applicant replies are controlled by `email.send_applicant_emails`; the current silent-live setting is `false`, so intake runs without contacting applicants. Phase 2 (`../HiringAgent_App_P2/`) scores the queued rows.
+Power Automate watches `apply@driverai.io`, filters spam and non-applications, and saves each resume + candidate row to SharePoint. Applicant replies are controlled by `email.send_applicant_emails`; the current silent-live setting is `false`, so intake runs without contacting applicants. Phase 2 (`../HiringAgent_P2/`) scores the queued rows.
 
 ---
 
@@ -32,7 +32,7 @@ Live P1 does **not** need an Entra client secret to run the imported flow. The p
 The included Python helper/audit tools (`audit_p1_live_state.py`, `trigger_reset.py`, `bulk_move_tool.py`) are separate from the live Power Automate flow. They use the sibling P2 `.env` and the same Entra app registration used by P2:
 
 1. Entra admin creates/uses an **App registration**.
-2. Copy these values into `../HiringAgent_App_P2/.env`: `TENANT_ID`, `CLIENT_ID`, `CLIENT_SECRET`, plus the SharePoint settings used by P2.
+2. Copy these values into `../HiringAgent_P2/.env`: `TENANT_ID`, `CLIENT_ID`, `CLIENT_SECRET`, plus the SharePoint settings used by P2.
 3. In **Certificates & secrets**, create a **Client secret** and store only its value in `.env`; never place the secret in P1 docs, config, or the Power Automate zip.
 4. In **API permissions**, use Microsoft Graph **Application permissions** and grant admin consent:
    - `Sites.ReadWrite.All` / `Files.ReadWrite.All` for SharePoint workbook/resume access used by P2 and the audits.
@@ -897,7 +897,7 @@ python HiringAgent_P1/trigger_reset.py --all
 python HiringAgent_P1/trigger_reset.py --all --dry-run
 ```
 
-Credentials are loaded from `HiringAgent_App_P2/.env` (the same Entra app as the P2 worker).  
+Credentials are loaded from `HiringAgent_P2/.env` (the same Entra app as the P2 worker).  
 **Requires `Mail.ReadWrite` (Application) permission admin-consented** on that app registration —
 in addition to the `Sites.ReadWrite.All` / `Files.ReadWrite.All` the P2 worker already uses.
 
@@ -926,7 +926,7 @@ in addition to the `Sites.ReadWrite.All` / `Files.ReadWrite.All` the P2 worker a
 
 ## Hand-off to Phase 2
 
-Phase 1 writes rows with `Status = "New Email Received"`. Phase 2 (`../HiringAgent_App_P2/`) polls for those rows, reads each resume, fills the P2-owned scoring fields, applies USA-only geo-filter, and flips `Status` to `Scored` or moves the row to Rejected as `Rejected - Non-USA Location` / `Rejected - Location Not Confirmed`. The two phases never call each other - the SharePoint workbook is the only contract.
+Phase 1 writes rows with `Status = "New Email Received"`. Phase 2 (`../HiringAgent_P2/`) polls for those rows, reads each resume, fills the P2-owned scoring fields, applies USA-only geo-filter, and flips `Status` to `Scored` or moves the row to Rejected as `Rejected - Non-USA Location` / `Rejected - Location Not Confirmed`. The two phases never call each other - the SharePoint workbook is the only contract.
 
 **The table has 30 columns; `Add_row` writes only the 11 P1-owned ones.** The other 19 are simply not listed in the write, so they land as blank cells — identical outcome to writing them as empty strings, but it matches the genuine tenant export format and avoids the import-time schema-binding fragility that was dropping fields in the designer.
 

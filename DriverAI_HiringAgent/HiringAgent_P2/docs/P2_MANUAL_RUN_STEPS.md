@@ -41,7 +41,7 @@ This is the recommended method for clients.
 If the desktop shortcut is unavailable, open File Explorer and double-click:
 
 ```text
-C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_App_P2\Start.bat
+C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_P2\Start.bat
 ```
 
 ### Run candidates now
@@ -120,13 +120,13 @@ need a direct command.
 4. Enter this command exactly:
 
 ```bat
-cd /d C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_App_P2
+cd /d C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_P2
 ```
 
 The command line should now begin with:
 
 ```text
-C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_App_P2>
+C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_P2>
 ```
 
 Do not run the P2 command from `C:\Users\tracy>` because Windows will not find
@@ -246,7 +246,7 @@ processing-error rows are not included.
 Run the folder command first:
 
 ```bat
-cd /d C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_App_P2
+cd /d C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_P2
 ```
 
 Then run the P2 command again.
@@ -259,7 +259,7 @@ Then run the P2 command again.
 4. If it still does not appear, double-click:
 
 ```text
-C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_App_P2\Start.bat
+C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_P2\Start.bat
 ```
 
 ### The summary shows an error

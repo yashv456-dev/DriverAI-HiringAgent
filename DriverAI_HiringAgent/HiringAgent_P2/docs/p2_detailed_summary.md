@@ -1,6 +1,6 @@
 ﻿# Phase 2 (Scoring Client) Detailed Architectural Summary
 
-**Phase 2** (`HiringAgent_App_P2`) acts as the scoring client and pipeline executor of the hiring pipeline. It can run serverlessly in the cloud (Azure Functions, GitHub Actions), as a background daemon CLI, or as a local Desktop GUI. It reads pending rows from the SharePoint workbook, extracts and scores their resumes against active job descriptions, applies the USA-only location filter, and updates the SharePoint rows.
+**Phase 2** (`HiringAgent_P2`) acts as the scoring client and pipeline executor of the hiring pipeline. It can run serverlessly in the cloud (Azure Functions, GitHub Actions), as a background daemon CLI, or as a local Desktop GUI. It reads pending rows from the SharePoint workbook, extracts and scores their resumes against active job descriptions, applies the USA-only location filter, and updates the SharePoint rows.
 
 ---
 

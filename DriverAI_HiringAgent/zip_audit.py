@@ -9,7 +9,7 @@ FLOW = Path("HiringAgent_P1/flow")
 ZIP_PATH = FLOW / "DriverAI-Hiring-AutoReply-apply.zip"
 CFG_PATH = FLOW / "flow_config.json"
 
-P2 = Path("HiringAgent_App_P2")
+P2 = Path("HiringAgent_P2")
 sys.path.insert(0, str(P2))
 
 # ── Load files ────────────────────────────────────────────────────────────────

@@ -33,7 +33,7 @@ from pathlib import Path
 
 try:
     from dotenv import load_dotenv
-    _env = Path(__file__).resolve().parent.parent / "HiringAgent_App_P2" / ".env"
+    _env = Path(__file__).resolve().parent.parent / "HiringAgent_P2" / ".env"
     if _env.exists():
         load_dotenv(_env)
         print(f"[env] Loaded credentials from {_env}")
@@ -179,7 +179,7 @@ def main():
 
     if not tenant or not client_id or not client_secret:
         print("[ERROR] Missing AAD environment credentials (TENANT_ID, CLIENT_ID, CLIENT_SECRET).", file=sys.stderr)
-        print("Please ensure they are defined in HiringAgent_App_P2/.env", file=sys.stderr)
+        print("Please ensure they are defined in HiringAgent_P2/.env", file=sys.stderr)
         sys.exit(1)
 
     print(f"Connecting to Graph API for mailbox: {args.mailbox}...")

@@ -19,7 +19,7 @@ DriverAI_HiringAgent/
       flow/flow_config.json
       docs/P1_RUNBOOK.md
       test_p1.py
-  HiringAgent_App_P2/
+  HiringAgent_P2/
     CLIENT_COMPUTER_START_HERE.md
     Launch.bat
     Start.bat
@@ -59,7 +59,7 @@ Example PowerShell paths used below; change only the first path if installed els
 
 ```powershell
 $handoffRoot = 'C:\HiringAgent\DriverAI_HiringAgent'
-$p2Path = Join-Path $handoffRoot 'HiringAgent_App_P2'
+$p2Path = Join-Path $handoffRoot 'HiringAgent_P2'
 $p1Path = Join-Path $handoffRoot 'HiringAgent_P1\HiringAgent_P1'
 Set-Location -LiteralPath $p2Path
 ```

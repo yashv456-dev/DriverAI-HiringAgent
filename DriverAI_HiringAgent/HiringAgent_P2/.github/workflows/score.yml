@@ -1,7 +1,7 @@
 name: Score SharePoint queue
 
 # Serverless, card-free host: GitHub's runners execute the same worker on a schedule.
-# Assumes this folder (HiringAgent_App_P2) is the repository root.
+# Assumes this folder (HiringAgent_P2) is the repository root.
 #
 # The scheduled trigger is intentionally disabled. Use workflow_dispatch only after
 # removing HIRING_P2_DISABLED and deliberately re-enabling P2.

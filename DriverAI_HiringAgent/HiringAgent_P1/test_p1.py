@@ -12,7 +12,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 # Resolved relative to this file (fixed 2026-08-11). These used to be absolute paths under
 # a specific developer's home directory, so the suite only ran on that one machine - on any
 # other checkout it died at import before a single assertion. FLOW is always the sibling
-# 'flow' directory; P2 is found by walking up until a directory holding HiringAgent_App_P2
+# 'flow' directory; P2 is found by walking up until a directory holding HiringAgent_P2
 # turns up, which keeps this working whether the tree is nested one level or two (the client
 # zip extracts as HiringAgent_P1/HiringAgent_P1/...).
 _HERE = Path(__file__).resolve().parent
@@ -20,11 +20,11 @@ FLOW = str(_HERE / "flow")
 
 def _find_p2(start: Path) -> str:
     for base in (start, *start.parents):
-        cand = base / "HiringAgent_App_P2"
+        cand = base / "HiringAgent_P2"
         if cand.is_dir():
             return str(cand)
     raise SystemExit(
-        "Could not locate HiringAgent_App_P2 near %s - test_p1.py cross-checks P1's column "
+        "Could not locate HiringAgent_P2 near %s - test_p1.py cross-checks P1's column "
         "contract against P2's canonical column lists, so the P2 folder must be present." % start)
 
 P2 = _find_p2(_HERE)
@@ -1921,7 +1921,7 @@ _SEP_ON = _ysep_cfg.get("enabled", True) or _msep_cfg.get("enabled", True)
 # new month" only holds if emails arrive in date order - which the Inbox does not guarantee
 # and a backlog replay actively breaks. The live master ended up with four blanks, none at a
 # real month boundary. Grouping needs the sheet REORDERED, so layout is owned by
-# HiringAgent_App_P2/resort_candidate_sheets.py instead. Assert the flow is genuinely clean of
+# HiringAgent_P2/resort_candidate_sheets.py instead. Assert the flow is genuinely clean of
 # separator machinery when it is off - a leftover action would put stray blanks back.
 if not _SEP_ON:
     for _dead in ("Get_rows_any_applicant", "Get_rows_for_separators",

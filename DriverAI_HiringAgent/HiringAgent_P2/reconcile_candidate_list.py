@@ -2,13 +2,13 @@ import sys, os, json, time
 from collections import defaultdict, Counter
 from pathlib import Path
 
-env_path = Path('HiringAgent_App_P2/.env')
+env_path = Path('HiringAgent_P2/.env')
 for line in env_path.read_text(encoding='utf-8').splitlines():
     if '=' in line and not line.startswith('#'):
         k, v = line.split('=', 1)
         os.environ[k.strip()] = v.strip()
 
-sys.path.insert(0, 'HiringAgent_App_P2')
+sys.path.insert(0, 'HiringAgent_P2')
 
 from sharepoint_client import SharePointClient
 import hiring_agent.config as _cfg

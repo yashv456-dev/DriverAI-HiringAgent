@@ -17,10 +17,10 @@ from pathlib import Path
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent
-P2 = next((base / "HiringAgent_App_P2" for base in ROOT.parents
-           if (base / "HiringAgent_App_P2").is_dir()), None)
+P2 = next((base / "HiringAgent_P2" for base in ROOT.parents
+           if (base / "HiringAgent_P2").is_dir()), None)
 if P2 is None:
-    raise SystemExit("Could not locate HiringAgent_App_P2 next to the P1 project")
+    raise SystemExit("Could not locate HiringAgent_P2 next to the P1 project")
 sys.path.insert(0, str(P2))
 
 from hiring_agent.config import COLUMNS, REJECTED_COLUMNS

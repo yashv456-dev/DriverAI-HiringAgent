@@ -1266,7 +1266,7 @@ def _multi_suffix(loop_name: str) -> str:
 # a canonical-shape one for the same Application ID (a legacy-shape file existing on an
 # already-scored row can ONLY mean "P1 just wrote a fresh update"), scores off that alone
 # instead of blending it with the stale content, and deletes the stale sibling once the
-# rename lands. See HiringAgent_App_P2/hiring_agent/sharepoint_scoring.py
+# rename lands. See HiringAgent_P2/hiring_agent/sharepoint_scoring.py
 # (_resume_name_slots / _download_resume_text) for the actual reconciliation logic.
 _deep_find(gate["actions"], "Create_update_file")[
     "inputs"]["parameters"]["name"] = (

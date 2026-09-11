@@ -1,7 +1,7 @@
 """P2 deep end-to-end test â€” no live SharePoint, no live Ollama required.
 
 Tests every extraction/scoring/validation layer across all 14 P2-owned columns.
-Run from HiringAgent_App_P2/:
+Run from HiringAgent_P2/:
     .venv/Scripts/python test_p2.py
 """
 import io, os, sys

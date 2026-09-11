@@ -41,7 +41,7 @@ P2 is self-contained and the easier of the two to run.
 ### 1. Install
 
 ```bash
-cd DriverAI_HiringAgent/HiringAgent_App_P2
+cd DriverAI_HiringAgent/HiringAgent_P2
 python -m venv .venv
 .venv/Scripts/activate          # Windows
 # source .venv/bin/activate     # macOS / Linux
@@ -188,9 +188,9 @@ loop in the update or follow-up branches requires flattening something first.
 | [`VERSION_STACK.md`](DriverAI_HiringAgent/VERSION_STACK.md) | Verified runtime, OCR, LLM, SQL and regex versions |
 | [P1 Technical Design](DriverAI_HiringAgent/HiringAgent_P1/P1_Technical_Design_Document_Consolidated.md) | Full P1 specification |
 | [P1 Runbook](DriverAI_HiringAgent/HiringAgent_P1/docs/P1_RUNBOOK.md) | Day-to-day P1 operations |
-| [P2 Manual Run Steps](DriverAI_HiringAgent/HiringAgent_App_P2/docs/P2_MANUAL_RUN_STEPS.md) | P2 operator guide |
-| [P2 Deployment Runbook](DriverAI_HiringAgent/HiringAgent_App_P2/docs/P2_CLIENT_DEPLOYMENT_RUNBOOK.md) | Installing P2 on a new machine |
-| [Architecture Review](DriverAI_HiringAgent/HiringAgent_App_P2/docs/ARCHITECTURE_REVIEW_20260908.md) | Known gaps and priorities |
+| [P2 Manual Run Steps](DriverAI_HiringAgent/HiringAgent_P2/docs/P2_MANUAL_RUN_STEPS.md) | P2 operator guide |
+| [P2 Deployment Runbook](DriverAI_HiringAgent/HiringAgent_P2/docs/P2_CLIENT_DEPLOYMENT_RUNBOOK.md) | Installing P2 on a new machine |
+| [Architecture Review](DriverAI_HiringAgent/HiringAgent_P2/docs/ARCHITECTURE_REVIEW_20260908.md) | Known gaps and priorities |
 
 ---
 

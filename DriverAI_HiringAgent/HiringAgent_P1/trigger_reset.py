@@ -59,7 +59,7 @@ USAGE
   # Different mailbox:
   python trigger_reset.py --mailbox hiring@example.com
 
-Credentials are loaded from  ../HiringAgent_App_P2/.env  (same as the P2 worker).
+Credentials are loaded from  ../HiringAgent_P2/.env  (same as the P2 worker).
 """
 import argparse
 import datetime
@@ -70,7 +70,7 @@ from pathlib import Path
 # ── load .env from the P2 sibling directory (same Entra app credentials) ─────
 try:
     from dotenv import load_dotenv
-    _env = Path(__file__).resolve().parent.parent / "HiringAgent_App_P2" / ".env"
+    _env = Path(__file__).resolve().parent.parent / "HiringAgent_P2" / ".env"
     if _env.exists():
         load_dotenv(_env)
         print(f"[env] loaded credentials from {_env}")
@@ -282,7 +282,7 @@ def main():
     }.items() if not v]
     if missing:
         print(f"\n[ERROR] Missing environment variables: {', '.join(missing)}")
-        print("Set them in HiringAgent_App_P2/.env or export them before running.")
+        print("Set them in HiringAgent_P2/.env or export them before running.")
         sys.exit(1)
 
     until = None

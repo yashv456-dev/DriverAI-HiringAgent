@@ -15,7 +15,7 @@ from pathlib import Path
 
 import yaml
 
-# ── Paths anchored to the app root (HiringAgent_App_P2/) ──────────────────────
+# ── Paths anchored to the app root (HiringAgent_P2/) ──────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── Optional .env (only the SharePoint/online mode needs it) ──────────────────

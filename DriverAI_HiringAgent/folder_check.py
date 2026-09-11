@@ -11,11 +11,11 @@ shown in screenshots:
 import json, sys, re
 from pathlib import Path
 
-sys.path.insert(0, 'HiringAgent_App_P2')
+sys.path.insert(0, 'HiringAgent_P2')
 
 # ── Load configs ──────────────────────────────────────────────────
 p1_cfg  = json.load(open('HiringAgent_P1/flow/flow_config.json', encoding='utf-8'))
-p2_cfg  = json.load(open('HiringAgent_App_P2/config.yaml', encoding='utf-8')) \
+p2_cfg  = json.load(open('HiringAgent_P2/config.yaml', encoding='utf-8')) \
           if False else None  # use config.py import instead
 
 from hiring_agent import config as p2
@@ -89,7 +89,7 @@ ok(p2.EXCEL_BASENAME == 'HiringAgent_P1_CandidateList.xlsx',
 
 # Check what P2's sharepoint_scoring expects as the workbook
 import re as _re
-scoring_src = open('HiringAgent_App_P2/hiring_agent/sharepoint_scoring.py', encoding='utf-8').read()
+scoring_src = open('HiringAgent_P2/hiring_agent/sharepoint_scoring.py', encoding='utf-8').read()
 ok("Sharepoint_Master_File" in scoring_src or "wb_path" in scoring_src,
    "sharepoint_scoring.py references the workbook path (via _wb_path from client)")
 
@@ -101,7 +101,7 @@ ok("resumes_folder" in scoring_src,
    "sharepoint_scoring.py uses client.resumes_folder attribute")
 
 # Check the client connects resumes_folder properly
-client_src = open('HiringAgent_App_P2/sharepoint_client.py', encoding='utf-8').read()
+client_src = open('HiringAgent_P2/sharepoint_client.py', encoding='utf-8').read()
 ok("resumes_folder" in client_src,
    "sharepoint_client.py exposes resumes_folder to scoring")
 ok("Candidate_Resumes" in client_src or "resumes_folder" in client_src,

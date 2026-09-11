@@ -545,7 +545,7 @@ The Inbox is the to-do list, and mail sitting there is pending work. Archive mea
 | python HiringAgent_P1/trigger_reset.py --days N | Replay a custom window |
 | python HiringAgent_P1/trigger_reset.py --all | Replay every message in Archive |
 
-Credentials come from `HiringAgent_App_P2/.env`, the same Entra application the P2 worker uses. It needs `Mail.ReadWrite` application permission with admin consent, in addition to the SharePoint permissions P2 already holds. A 403 on every mail-folder call is the signature of an Exchange Online application access policy that does not scope this application to the mailbox, not a missing Graph permission; that condition was present on 4 July 2026 and resolved by 15 July 2026. It never affected the flow itself, which authenticates through its own Power Automate connection. `bulk_move_tool.py` restores larger Archive batches the same way.
+Credentials come from `HiringAgent_P2/.env`, the same Entra application the P2 worker uses. It needs `Mail.ReadWrite` application permission with admin consent, in addition to the SharePoint permissions P2 already holds. A 403 on every mail-folder call is the signature of an Exchange Online application access policy that does not scope this application to the mailbox, not a missing Graph permission; that condition was present on 4 July 2026 and resolved by 15 July 2026. It never affected the flow itself, which authenticates through its own Power Automate connection. `bulk_move_tool.py` restores larger Archive batches the same way.
 
 **Open.** Replay is not idempotent. A replayed message can create another file and consume another contact count, because P1 stores no stable source-message key. Neither tool can reach mail already stuck in the Inbox.
 
@@ -609,7 +609,7 @@ Covered in full in section 11.2. `_set_email` writes the policy under `runtimeCo
 
 ### 15.5 High: P2's SQLite path has no delivery dispatcher
 
-The isolated adapter refuses delivery and the parent pipeline never dispatches. Live P2 applicant mail needs a durable outbox after a successful result commit, retaining suppression and test-recipient routing, with idempotency and ambiguous-delivery reconciliation. This is separate from P1's templates. Evidence: `HiringAgent_App_P2/hiring_agent/local_pipeline.py` lines 76-79 and `run_local_pipeline` at lines 322-446; `sharepoint_scoring.py` branches there when the backend is sqlite.
+The isolated adapter refuses delivery and the parent pipeline never dispatches. Live P2 applicant mail needs a durable outbox after a successful result commit, retaining suppression and test-recipient routing, with idempotency and ambiguous-delivery reconciliation. This is separate from P1's templates. Evidence: `HiringAgent_P2/hiring_agent/local_pipeline.py` lines 76-79 and `run_local_pipeline` at lines 322-446; `sharepoint_scoring.py` branches there when the backend is sqlite.
 
 ### 15.6 Medium: text-only replies disappear from the candidate record
 

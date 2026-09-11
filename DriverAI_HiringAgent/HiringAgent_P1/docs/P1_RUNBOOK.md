@@ -296,7 +296,7 @@ Phase 1 holds **no secret** inside the package. It authenticates entirely throug
 
 ```
 C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_P1\      <- Phase 1 (this runbook)
-C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_App_P2\  <- Phase 2 (separate guide)
+C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_P2\  <- Phase 2 (separate guide)
 ```
 
 > **Watch for a doubled folder.** The delivered ZIP often extracts into a folder called `HiringAgent_P1` containing *another* `HiringAgent_P1`. If you see that, move the inner folder up one level.
@@ -481,7 +481,7 @@ Documents
 | `Mail.Send` | Send Phase 2's emails |
 | `Mail.ReadWrite` | Move mail back to the Inbox to re-run Phase 1 |
 
-The values go into Phase 2's settings file, `HiringAgent_App_P2\.env`:
+The values go into Phase 2's settings file, `HiringAgent_P2\.env`:
 
 ```
 TENANT_ID=<from Step 8>
@@ -982,7 +982,7 @@ python audit_p1_live_state.py
 Phase 2 side, for the sheet layout:
 
 ```bat
-cd /d C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_App_P2
+cd /d C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_P2
 python resort_candidate_sheets.py
 ```
 

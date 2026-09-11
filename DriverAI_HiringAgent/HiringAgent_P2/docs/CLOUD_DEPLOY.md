@@ -12,9 +12,9 @@ on GitHub's runners.
 
 **Setup:**
 
-1. Make `HiringAgent_App_P2/` the repo root:
+1. Make `HiringAgent_P2/` the repo root:
    ```bash
-   cd HiringAgent_App_P2
+   cd HiringAgent_P2
    git init && git add . && git commit -m "Hiring agent worker"
    gh repo create hiring-agent --private --source=. --push
    ```
@@ -85,7 +85,7 @@ func azure functionapp publish hiring-agent-fn --python
 
 ```bash
 # Build and test locally.
-cd HiringAgent_App_P2
+cd HiringAgent_P2
 docker build -t hiring-agent .
 docker run --rm \
   -e TENANT_ID=<guid> -e CLIENT_ID=<guid> -e CLIENT_SECRET=<secret> \
