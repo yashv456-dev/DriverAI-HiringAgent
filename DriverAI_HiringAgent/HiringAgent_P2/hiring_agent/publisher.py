@@ -98,7 +98,13 @@ def build_master(store, path, generation):
             for row in range(2, ws.max_row + 1):
                 url = str(ws.cell(row, url_col).value or '')
                 if url.startswith(('https://', 'http://')):
-                    cell = ws.cell(row, link_col, 'Open resume')
+                    from urllib.parse import unquote, urlparse, parse_qs
+                    qs = parse_qs(urlparse(url).query)
+                    if "file" in qs and qs["file"]:
+                        display = qs["file"][0]
+                    else:
+                        display = unquote(url.rstrip("/").rsplit("/", 1)[-1].split("?")[0])
+                    cell = ws.cell(row, link_col, display or 'Resume')
                     cell.hyperlink = url
                     # The loop above stamps every cell as Text ('@') so a stored value can
                     # never be evaluated as a formula. Correct for data, wrong here: it left
@@ -128,7 +134,7 @@ def build_master(store, path, generation):
     temp.replace(path)
 
 
-def publish_results(store, remote, *, upload=True, output_dir=None):
+def publish_results(store, remote, *, upload=True, output_dir=None, force=False):
     from .exporter import ExcelReportExporter
     from sharepoint_client import SharePointError
     output = Path(output_dir or os.getenv('HIRING_PUBLISH_DIR') or BASE / 'P2_Final_Results')
@@ -145,7 +151,7 @@ def publish_results(store, remote, *, upload=True, output_dir=None):
     generation.mkdir(exist_ok=True)
     master = generation / 'P2-MasterFile.xlsx'
     client = generation / 'Candidate_List_Results.xlsx'
-    if upload and record['published_revision'] == revision and master.exists() and client.exists():
+    if not force and upload and record['published_revision'] == revision and master.exists() and client.exists():
         return client
     # Always rebuild master and client fresh from store so published files are never stale.
     build_master(store, master, revision)

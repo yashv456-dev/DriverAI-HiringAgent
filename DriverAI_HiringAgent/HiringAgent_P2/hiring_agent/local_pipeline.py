@@ -334,23 +334,40 @@ def _rename_to_canonical(remote, documents, app_id, full_name, category, dry_run
             continue
         folder = str(doc.get('folder', '') or '').strip('/')
         subfolder = folder[len(root):].strip('/') if root and folder.startswith(root) else folder
-        try:
-            if remote.rename_resume(name, target, subfolder):
-                doc = dict(doc, url=remote.file_web_url(doc['folder'], target))
-                renamed[target] = doc
-                cfg.logger.info('        Renamed   : %s -> %s', name, target)
-                continue
-        except Exception as error:
+        renamed_ok = False
+        rename_fn = getattr(remote, 'rename_resume', None)
+        if callable(rename_fn):
             try:
-                web_url = remote.file_web_url(doc['folder'], target)
+                renamed_ok = rename_fn(name, target, subfolder)
+            except Exception as error:
+                cfg.logger.warning('        Rename error: %s -> %s (%s)', name, target, error)
+        if renamed_ok:
+            doc = dict(doc, url=remote.file_web_url(doc['folder'], target))
+            renamed[target] = doc
+            cfg.logger.info('        Renamed   : %s -> %s', name, target)
+            continue
+
+        # If rename didn't succeed (e.g. target already exists in SharePoint):
+        file_web_url_fn = getattr(remote, 'file_web_url', None)
+        if callable(file_web_url_fn):
+            try:
+                web_url = file_web_url_fn(doc['folder'], target)
                 if web_url:
                     doc = dict(doc, url=web_url)
                     renamed[target] = doc
                     cfg.logger.info('        Rename    : %s already exists as %s; using it', name, target)
+                    delete_fn = getattr(remote, 'delete_file', None)
+                    if callable(delete_fn):
+                        try:
+                            delete_fn(doc['folder'], name)
+                            cfg.logger.info('        Cleaned up intake duplicate: %s', name)
+                        except Exception:
+                            pass
                     continue
             except Exception:
                 pass
-            cfg.logger.warning('        Rename    : %s kept its P1 name (%s)', name, error)
+
+        cfg.logger.warning('        Rename    : %s kept its P1 name', name)
         renamed[name] = doc
     return renamed
 
@@ -454,6 +471,7 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
                     first_document = next(iter(documents.values()))
                     result_values['Resume URL'] = first_document['url']
                     result_values['Resume Folder Path'] = first_document['folder']
+                    result_values['Resume Link'] = next(iter(documents.keys()))
                     if result_values.get('Status') == 'New Email Received':
                         raise RuntimeError('Worker did not produce an outcome')
                     # Save traceable input/model context before accepting the result.

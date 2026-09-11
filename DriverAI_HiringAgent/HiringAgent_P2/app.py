@@ -1610,7 +1610,7 @@ class HiringApp:
             target = val if val.lower().startswith("http") else (
                 resume_url if col == "Resume Link" and resume_url else "")
             if target:
-                link_text = val or "Open resume"
+                link_text = val or (resume_url.rstrip("/").rsplit("/", 1)[-1].split("?")[0] if resume_url else "Resume")
                 link = ctk.CTkLabel(inner, text=link_text, fg_color="transparent", text_color=ACCENT,
                                     cursor="hand2", wraplength=460, justify="left")
                 link.grid(row=i, column=1, sticky=tk.W, pady=2)

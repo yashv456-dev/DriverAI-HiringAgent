@@ -730,7 +730,14 @@ def write_client_export(rows: list, out_path) -> None:
             # the raw formula, so flatten it to plain text here instead of preserving it.
             if display.startswith("="):
                 display = ""
-            display = display or url.rstrip("/").rsplit("/", 1)[-1] or "Open Resume"
+            if not display:
+                from urllib.parse import unquote, urlparse, parse_qs
+                qs = parse_qs(urlparse(url).query)
+                if "file" in qs and qs["file"]:
+                    display = qs["file"][0]
+                else:
+                    display = unquote(url.rstrip("/").rsplit("/", 1)[-1].split("?")[0])
+            display = display or "Resume"
             link_cell.value = display
             link_cell.hyperlink = url
             link_cell.style = "Hyperlink"

@@ -90,7 +90,22 @@ class ExcelReportExporter:
             for col in columns:
                 if col == "Resume Link":
                     url = str(vals.get("Resume URL", "") or "").strip()
-                    fn = str(vals.get("Original Filename", "") or "").strip() or "Resume"
+                    fn = ""
+                    if url:
+                        from urllib.parse import unquote, urlparse, parse_qs
+                        qs = parse_qs(urlparse(url).query)
+                        if "file" in qs and qs["file"]:
+                            fn = qs["file"][0]
+                        else:
+                            fn = unquote(url.rstrip("/").rsplit("/", 1)[-1].split("?")[0])
+                    if not fn or fn.lower() == "resume":
+                        from .sharepoint_scoring import _canonical_resume_name
+                        full_name = str(vals.get("Full Name", "") or "").strip()
+                        app_id = str(vals.get("Application ID", "") or "").strip()
+                        orig_fn = str(vals.get("Original Filename", "") or "").strip()
+                        ext = Path(orig_fn).suffix if orig_fn else ".pdf"
+                        fn = _canonical_resume_name(full_name, app_id, ext, str(vals.get("Category", "") or ""))
+                    fn = fn or "Resume"
                     if url and url.startswith("http"):
                         formula = f'=HYPERLINK("{url}", "{fn}")'
                     else:
