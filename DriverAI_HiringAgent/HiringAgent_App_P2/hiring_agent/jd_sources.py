@@ -17,9 +17,29 @@ from html import unescape
 
 from hiring_agent.config import JD_SOURCES_FILE, JD_CACHE_FILE, logger
 from hiring_agent.extraction import _scan_skill_keywords, html_to_text
+from hiring_agent.jd_identity import stamp_role_identity, stamp_roles
 from hiring_agent.scoring import get_open_roles
 
 _GRAPH = "https://graph.microsoft.com/v1.0"
+
+
+class JDFolderScanError(RuntimeError):
+    """A SharePoint JD folder IS configured but yielded nothing.
+
+    Raised (2026-08-21) so a broken folder scan can never again be mistaken for a
+    successful one. Every failure inside fetch_jd_folder_catalog - bad token, unresolvable
+    site, unresolvable folder path - logs a warning and returns [], which is
+    indistinguishable from 'the folder is genuinely empty'. When other JD sources still
+    produced roles, the caller saw a non-empty list, wrote a cache built entirely from
+    stale/pasted text, and reported success.
+
+    Real incident: `sharepoint_jd_folder` was set to 'Documents/Staffing/PDs' when the true
+    path is 'Staffing/PDs' (Staffing sits at the drive root; the 'Documents' folder beside
+    it is unrelated). Graph 404'd on every refresh, the scan returned [], and 85 stale
+    pasted descriptions carried the cache - so the live folder had not been read at all,
+    the 24h auto-refresh was a no-op, and folder_fingerprint stayed null, which silently
+    disabled file-change detection too. Nothing surfaced above WARNING in an unattended run.
+    """
 
 
 def load_jd_sources() -> dict:
@@ -275,20 +295,72 @@ def fetch_jd_role(url: str) -> dict | None:
     if not skills:
         logger.warning(f"   JD had no recognizable skills: {url}")
         return None
-    role = {"title": _title_from_jd(resp.text, url), "skills": skills, "url": url}
+    role = stamp_role_identity(
+        {"title": _title_from_jd(resp.text, url), "skills": skills, "url": url})
     logger.info(f"   JD loaded: {role['title']} <- {', '.join(skills[:10])}")
     return role
+
+
+# Section headings that begin the ABOUT-THE-COMPANY blurb, and the ones that end it by
+# starting the actual role content. Used by _strip_company_boilerplate below.
+_COMPANY_SECTION_START = re.compile(
+    r"^\s*(?:about\s+(?:driverai|us|the\s+company)|company\s+(?:overview|profile|background))\s*:?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_ROLE_SECTION_START = re.compile(
+    r"^\s*(?:about\s+the\s+(?:role|position|job|opportunity)|(?:position|role|job)\s+(?:summary|overview|description)"
+    r"|what\s+you\s+(?:will|'ll)\s+do|responsibilities|key\s+responsibilities|duties"
+    r"|qualifications|requirements|who\s+you\s+are|what\s+we\s+(?:are\s+)?look)",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _strip_company_boilerplate(text: str) -> str:
+    """Drop the 'About DriverAI' blurb from a JD before its skills are scanned.
+
+    Added 2026-08-21. That paragraph describes the COMPANY, not the role - DriverAI's runs
+    "...combine artificial intelligence, computer vision, precision navigation, cloud
+    platforms..." - so every JD carrying it inherited AI/CV skills no matter what the job
+    actually was. It put 'computer vision' on 11 postings across Marketing, Executive,
+    Finance and Business Analytics, which both advertised skills those roles never wanted
+    and let unrelated candidates score against them.
+
+    The proof it was boilerplate and not the role: for one opening, the Job Announcement
+    (which carries the blurb) yielded 'computer vision' while the Position Description for
+    that same opening (which does not) did not.
+
+    Only the span between an about-the-COMPANY heading and the next role heading is removed;
+    if either marker is missing the text is returned untouched, so a JD written without
+    those headings is never truncated.
+    """
+    if not text:
+        return text
+    out, cursor = [], 0
+    for start in _COMPANY_SECTION_START.finditer(text):
+        if start.start() < cursor:
+            continue
+        end_match = _ROLE_SECTION_START.search(text, start.end())
+        if not end_match:
+            continue                      # no role heading after it - leave the text alone
+        out.append(text[cursor:start.start()])
+        cursor = end_match.start()
+    out.append(text[cursor:])
+    return "".join(out)
 
 
 def parse_jd_text(title: str, text: str) -> dict | None:
     """Turn a pasted (or extracted) JD description into a role dict {title, skills}."""
     title = _normalized_file_jd_title(title, text)
-    skills = _scan_skill_keywords(text)
+    # Title resolution above still sees the FULL text (the offer-letter/normalisation rules
+    # read the opening paragraphs); only the skill scan works on the de-boilerplated copy.
+    skills = _scan_skill_keywords(_strip_company_boilerplate(text))
     if not skills:
         logger.warning(f"   JD text '{title}' had no recognizable skills.")
         return None
-    role = {"title": title or "Untitled JD", "skills": skills}
-    logger.info(f"   JD parsed: {role['title']} <- {', '.join(skills[:10])}")
+    role = stamp_role_identity({"title": title or "Untitled JD", "skills": skills})
+    logger.info(f"   JD parsed: {role['title']} <- {', '.join(skills[:10])} "
+                f"[opening: {role['opening_id']}"
+                f"{', ' + role['doc_type'] if role['doc_type'] else ''}]")
     return role
 
 
@@ -310,7 +382,18 @@ def _fetch_active_roles_live(cfg: dict) -> list:
         from hiring_agent.config import SHAREPOINT_HOSTNAME, SHAREPOINT_SITE_PATH
         hostname  = cfg["sharepoint_jd_hostname"] or SHAREPOINT_HOSTNAME
         site_path = cfg["sharepoint_jd_site"]     or SHAREPOINT_SITE_PATH
-        roles.extend(fetch_jd_folder_from_sharepoint(hostname, site_path, sp_folder))
+        folder_roles = fetch_jd_folder_from_sharepoint(hostname, site_path, sp_folder)
+        # A configured folder that yields nothing is a FAILURE, not an empty folder (see
+        # JDFolderScanError). Raise instead of quietly continuing on whatever the pasted
+        # descriptions happen to hold - the caller decides whether to keep the last known
+        # good cache, but it must never overwrite it with a folder-less rebuild.
+        if not folder_roles:
+            raise JDFolderScanError(
+                f"JD folder '{sp_folder}' is configured but returned no JDs "
+                f"(host={hostname!r}, site={site_path!r}). Check the path, the app's "
+                f"Files.Read.All consent, and network access - see the warning logged above."
+            )
+        roles.extend(folder_roles)
 
     # 2. Public URL JDs
     for url in cfg["urls"]:
@@ -412,11 +495,21 @@ def _write_role_cache(roles: list, cfg: dict) -> None:
     Also stores a fingerprint of the JD folder's current contents (see
     _jd_folder_fingerprint) so a file added to the folder is detected on the next run."""
     import datetime
+    fingerprint = _jd_folder_fingerprint(cfg)
+    # A null fingerprint alongside a configured folder means file-change detection is OFF:
+    # get_active_roles skips the comparison when either side is None, so an edited/added JD
+    # would sit unnoticed until the 24h TTL. That combination went unnoticed for days in the
+    # 2026-08-21 incident (see JDFolderScanError), so name it explicitly instead.
+    if cfg.get("sharepoint_jd_folder") and fingerprint is None:
+        logger.warning(
+            "JD folder fingerprint could not be computed - per-file change detection is "
+            "DISABLED for this cache; JD edits will only be picked up by the 24h refresh."
+        )
     try:
         JD_CACHE_FILE.write_text(json.dumps({
             "built_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "signature": _source_signature(cfg),
-            "folder_fingerprint": _jd_folder_fingerprint(cfg),
+            "folder_fingerprint": fingerprint,
             "roles": roles,
         }, indent=2), encoding="utf-8")
     except OSError as e:
@@ -427,10 +520,15 @@ def _read_role_cache() -> dict | None:
     if not JD_CACHE_FILE.exists():
         return None
     try:
-        return json.loads(JD_CACHE_FILE.read_text(encoding="utf-8"))
+        cached = json.loads(JD_CACHE_FILE.read_text(encoding="utf-8"))
     except Exception as e:
         logger.warning(f"Could not read JD cache {JD_CACHE_FILE.name}: {e}")
         return None
+    # A cache written before 2026-08-03 has no opening identity on its roles. Backfill it on
+    # read (rather than forcing a full rescan, which needs Graph credentials and ~45s) so the
+    # scorer can rely on the field being present no matter how old the cache on disk is.
+    stamp_roles(cached.get("roles") if isinstance(cached, dict) else None)
+    return cached
 
 
 def build_jd_cache(catalog: list | None = None) -> list:
@@ -461,7 +559,21 @@ def build_jd_cache(catalog: list | None = None) -> list:
             if r:
                 roles.append(r)
     else:
-        roles = _fetch_active_roles_live(cfg)
+        try:
+            roles = _fetch_active_roles_live(cfg)
+        except JDFolderScanError as e:
+            # Keep the last known good cache rather than replacing it with a rebuild that
+            # never saw the JD folder. Logged at ERROR (not WARNING) because this runs
+            # unattended - a warning here is what let the broken path hide for days.
+            logger.error(f"JD REFRESH ABORTED: {e}")
+            cached = _read_role_cache()
+            if cached and cached.get("roles"):
+                logger.error(f"   Keeping the existing cache of {len(cached['roles'])} role(s) "
+                             f"(built {cached.get('built_at', '?')}) - it was NOT overwritten. "
+                             f"Scoring continues on it, but it is now STALE until this is fixed.")
+                return cached["roles"]
+            logger.error("   No usable cache on disk either - falling back to built-in roles.")
+            return get_open_roles()
 
     if not roles:
         logger.warning("JD refresh found no roles — leaving the built-in roles in effect.")
@@ -518,7 +630,21 @@ def get_active_roles(refresh: bool = False) -> list:
                             f"`bot.py --refresh-jd` to rescan).")
                 return cached["roles"]
 
-    roles = _fetch_active_roles_live(cfg)
+    try:
+        roles = _fetch_active_roles_live(cfg)
+    except JDFolderScanError as e:
+        # Same rule as build_jd_cache: a scoring run must never silently downgrade the
+        # cache. Serve the existing roles if there are any, and say loudly that they are
+        # stale, rather than scoring this candidate against a folder-less rebuild.
+        logger.error(f"JD FOLDER SCAN FAILED: {e}")
+        cached = _read_role_cache()
+        if cached and cached.get("roles"):
+            logger.error(f"   Scoring on the existing STALE cache of {len(cached['roles'])} "
+                         f"role(s) (built {cached.get('built_at', '?')}); cache NOT overwritten.")
+            return cached["roles"]
+        logger.error("   No usable cache on disk either - falling back to built-in roles.")
+        return get_open_roles()
+
     if not roles:
         logger.warning("JD sources enabled but none loaded — falling back to built-in roles.")
         return get_open_roles()

@@ -5,7 +5,21 @@ REM app environment and its dependencies. After that it just starts the app.
 cd /d "%~dp0"
 title DriverAI Hiring Agent
 
-if exist ".venv\Scripts\python.exe" goto :deps
+REM ---- A .venv is only usable if it actually RUNS. Existence is not enough: a venv
+REM ---- copied from another machine still has python.exe on disk, but pyvenv.cfg points
+REM ---- at the ORIGINAL interpreter path (e.g. C:\Users\<someone-else>\...\Python312),
+REM ---- so every call dies with "No Python at ...". This folder shipped exactly that way,
+REM ---- which made the app unrunnable on any machine but the one that built it. Same
+REM ---- lesson already applied to system-Python detection below - apply it here too, and
+REM ---- rebuild the environment instead of failing.
+if not exist ".venv\Scripts\python.exe" goto :findpython
+".venv\Scripts\python.exe" -c "import sys" >nul 2>&1
+if not errorlevel 1 goto :deps
+echo [setup] The bundled environment was built on another machine and cannot run here.
+echo [setup] Rebuilding it - one-time step...
+rmdir /s /q ".venv" >nul 2>&1
+
+:findpython
 
 REM ---- find a working Python by actually running it, so the fake
 REM ---- Microsoft Store alias can never be picked by mistake
@@ -38,19 +52,19 @@ echo [setup] Installing dependencies - about 1 minute, one time only...
 if errorlevel 1 goto :fail_deps
 
 :ocrlibs
-REM OCR python libs (pymupdf/pytesseract/pillow). Best-effort: never block the app if a
-REM wheel is unavailable for this Python - OCR just stays off until it can be installed.
-"%VPY%" -c "import fitz, pytesseract, PIL" >nul 2>&1
+REM OCR & layout libs (pymupdf4llm / rapidocr-onnxruntime / pymupdf / pytesseract / pillow).
+REM Best-effort: never block the app if a wheel is unavailable for this Python.
+"%VPY%" -c "import pymupdf, pymupdf4llm, rapidocr_onnxruntime, PIL" >nul 2>&1
 if not errorlevel 1 goto :tesseract
-echo [setup] Adding OCR libraries for scanned PDFs...
-"%VPY%" -m pip install pymupdf pytesseract pillow -q
+echo [setup] Adding OCR & layout libraries (rapidocr, pymupdf4llm)...
+"%VPY%" -m pip install rapidocr-onnxruntime pymupdf4llm pymupdf pytesseract pillow -q
 
 :tesseract
-REM Tesseract BINARY - needed to actually read scanned / image-only PDFs. Idempotent:
-REM skip if already on PATH or in the standard install folder.
+REM Tesseract BINARY - optional legacy fallback for scanned PDFs.
+REM RapidOCR runs self-contained inside Python via ONNX runtime and does not require this binary.
 where tesseract >nul 2>&1 && goto :ollama
 if exist "%ProgramFiles%\Tesseract-OCR\tesseract.exe" goto :ollama
-echo [setup] Installing Tesseract OCR engine (scanned-PDF support) - one time...
+echo [setup] Optional: installing Tesseract OCR engine fallback...
 winget install -e --id UB-Mannheim.TesseractOCR --accept-source-agreements --accept-package-agreements
 
 :ollama
@@ -81,6 +95,13 @@ if errorlevel 1 (echo [info] Model download failed/skipped - app scores fully wi
 echo [ok] Ollama ready with '%OLLAMA_MODEL_NAME%' - local AI extraction/scoring enabled, works offline from here on.
 
 :run
+REM --setup-only: build/repair the environment and stop, WITHOUT opening the GUI.
+REM Used by RunDaily.bat, which runs unattended under Task Scheduler - launching a
+REM window there would either block the scheduled run or pop a UI on a headless box.
+if /i "%~1"=="--setup-only" (
+    echo [ok] Environment ready - setup-only requested, not starting the app.
+    exit /b 0
+)
 echo [ok] Starting DriverAI Hiring Agent...
 "%VPY%" app.py %*
 if errorlevel 1 goto :fail_app

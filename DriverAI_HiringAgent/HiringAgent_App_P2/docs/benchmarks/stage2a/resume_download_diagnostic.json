@@ -1,0 +1,337 @@
+{
+  "resumes_folder": "/Candidate_Resumes",
+  "rows": [
+    {
+      "index": 161,
+      "values": {
+        "Application ID": "APP-20260819-0140-WPOA",
+        "Full Name": "mona c9109",
+        "Received Date": "2026-08-19T01:40:01",
+        "Original Filename": "Mona_Rawat_CV.pdf",
+        "Resume URL": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent/Shared%20Documents/Candidate_Resumes/2026/August/monac9109_APP-20260819-0140-WPOA.pdf",
+        "Resume Path": null,
+        "Has Resume": "Yes",
+        "Status": "Needs Review - Unreadable Resume",
+        "Category": ""
+      },
+      "resolved_subpath": "2026/August",
+      "attempts": [
+        {
+          "name": "monac9109_APP-20260819-0140-WPOA.pdf",
+          "status": 404,
+          "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/monac9109_APP-20260819-0140-WPOA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+        },
+        {
+          "name": "mona_c9109_WPOA.pdf",
+          "status": 404,
+          "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/mona_c9109_WPOA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+        },
+        {
+          "name": "APP-20260819-0140-WPOA_Mona_Rawat_CV.pdf",
+          "status": 404,
+          "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/APP-20260819-0140-WPOA_Mona_Rawat_CV.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+        }
+      ]
+    },
+    {
+      "index": 167,
+      "values": {
+        "Application ID": "APP-20260815-0302-WPDA",
+        "Full Name": "shahyash29031997",
+        "Received Date": "2026-08-15T03:02:20",
+        "Original Filename": "Yash_Shah_Resume.pdf",
+        "Resume URL": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent/Shared%20Documents/Candidate_Resumes/2026/August/shahyash29031997_APP-20260815-0302-WPDA.pdf",
+        "Resume Path": null,
+        "Has Resume": "Yes",
+        "Status": "Needs Review - Unreadable Resume",
+        "Category": ""
+      },
+      "resolved_subpath": "2026/August",
+      "attempts": [
+        {
+          "name": "shahyash29031997_APP-20260815-0302-WPDA.pdf",
+          "status": 404,
+          "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/shahyash29031997_APP-20260815-0302-WPDA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+        },
+        {
+          "name": "shahyash29031997_WPDA.pdf",
+          "status": 404,
+          "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/shahyash29031997_WPDA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+        },
+        {
+          "name": "APP-20260815-0302-WPDA_Yash_Shah_Resume.pdf",
+          "status": 404,
+          "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/APP-20260815-0302-WPDA_Yash_Shah_Resume.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+        }
+      ]
+    }
+  ],
+  "folders": {
+    "/Candidate_Resumes": [
+      {
+        "name": "2026",
+        "is_folder": true
+      }
+    ],
+    "/Candidate_Resumes/2026/August": [
+      {
+        "name": "Adil_Anwer_WQAA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Bharat_Gupta_WP0A.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Bharath_Hanumanthappa_WPBA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Candidate_WPWA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Jeffrey_Kennedy_WPPA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Kshitij_Sahu_WPZA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Manay_Lodha_WPGA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Mithilesh_Kothandaraman_WPIA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Muhammad_Hussain_WPTA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Nimish_Goel_WPVA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Pragya_Mittal_WPZA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Prerna_Saluja_WPYA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Saad_Ullah_WQWA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Samarth_Subramanya_WQRA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Shalin_Edward_WPHA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Shashank_Singh_WPQA.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Shruti_Kamath_WP1A.pdf",
+        "is_folder": false
+      },
+      {
+        "name": "Vibha_Swaminathan_WPMA.pdf",
+        "is_folder": false
+      }
+    ]
+  },
+  "requests": [
+    {
+      "path": "https://graph.microsoft.com/v1.0/sites/led1234567.sharepoint.com:/sites/CandidateList_HiringAgent",
+      "status": 200
+    },
+    {
+      "path": "/Master_Files/Sharepoint_Master_File.xlsx",
+      "status": 200
+    },
+    {
+      "path": "https://graph.microsoft.com/v1.0/sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/items/01DSC53R4SQXBSAU3UM5CZI47WRSSVGASJ/workbook/tables/HiringAgent_P1_Candidates/columns?$select=name",
+      "status": 200
+    },
+    {
+      "path": "https://graph.microsoft.com/v1.0/sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/items/01DSC53R4SQXBSAU3UM5CZI47WRSSVGASJ/workbook/tables/HiringAgent_P1_Candidates/rows",
+      "status": 200
+    },
+    {
+      "path": "/Candidate_Resumes/2026/August/monac9109_APP-20260819-0140-WPOA.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/2026/August/monac9109_APP-20260819-0140-WPOA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/monac9109_APP-20260819-0140-WPOA.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/monac9109_APP-20260819-0140-WPOA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/2026/August/mona_c9109_WPOA.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/2026/August/mona_c9109_WPOA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/mona_c9109_WPOA.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/mona_c9109_WPOA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/2026/August/APP-20260819-0140-WPOA_Mona_Rawat_CV.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/2026/August/APP-20260819-0140-WPOA_Mona_Rawat_CV.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/APP-20260819-0140-WPOA_Mona_Rawat_CV.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/APP-20260819-0140-WPOA_Mona_Rawat_CV.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/2026/August/shahyash29031997_APP-20260815-0302-WPDA.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/2026/August/shahyash29031997_APP-20260815-0302-WPDA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/shahyash29031997_APP-20260815-0302-WPDA.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/shahyash29031997_APP-20260815-0302-WPDA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/2026/August/shahyash29031997_WPDA.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/2026/August/shahyash29031997_WPDA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/shahyash29031997_WPDA.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/shahyash29031997_WPDA.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/2026/August/APP-20260815-0302-WPDA_Yash_Shah_Resume.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/2026/August/APP-20260815-0302-WPDA_Yash_Shah_Resume.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes/APP-20260815-0302-WPDA_Yash_Shah_Resume.pdf:/content",
+      "status": 404,
+      "error": "GET /sites/led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e/drive/root:/Candidate_Resumes/APP-20260815-0302-WPDA_Yash_Shah_Resume.pdf:/content -> 404: {\"error\":{\"code\":\"itemNotFound\",\"message\":\"The resource could not be found.\"}}"
+    },
+    {
+      "path": "/Candidate_Resumes:/children?$select=name,folder&$top=200",
+      "status": 200
+    },
+    {
+      "path": "/Candidate_Resumes/2026/August:/children?$select=name,folder&$top=200",
+      "status": 200
+    }
+  ],
+  "resume_tree_search": {
+    "folders": [
+      "/Candidate_Resumes",
+      "/Candidate_Resumes/2026",
+      "/Candidate_Resumes/2026/April",
+      "/Candidate_Resumes/2026/August",
+      "/Candidate_Resumes/2026/July",
+      "/Candidate_Resumes/2026/June",
+      "/Candidate_Resumes/2026/May",
+      "/Candidate_Resumes/2026/Rejected",
+      "/Candidate_Resumes/2026/September"
+    ],
+    "files_checked": 286,
+    "matches": [
+      "/Candidate_Resumes/2026/July/Chris_Cunningham_WPOA.pdf",
+      "/Candidate_Resumes/2026/July/Yashvi_Vaghela_WP6A.pdf",
+      "/Candidate_Resumes/2026/July/Yashvi_Vaghela_WQVA.pdf",
+      "/Candidate_Resumes/2026/Rejected/Mona_Rawat_8C97.pdf",
+      "/Candidate_Resumes/2026/Rejected/Yash_Shah_F711.pdf",
+      "/Candidate_Resumes/2026/Rejected/Yashvi_Vaghela_4383.pdf",
+      "/Candidate_Resumes/2026/September/Yash_Verma_WPNA.pdf"
+    ],
+    "errors": []
+  },
+  "matching_rows": [
+    {
+      "sheet": "main",
+      "index": 161,
+      "values": {
+        "Application ID": "APP-20260819-0140-WPOA",
+        "Full Name": "mona c9109",
+        "Email": "mona.c9109@gmail.com",
+        "Received Date": "2026-08-19T01:40:01",
+        "Original Filename": "Mona_Rawat_CV.pdf",
+        "Resume URL": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent/Shared%20Documents/Candidate_Resumes/2026/August/monac9109_APP-20260819-0140-WPOA.pdf",
+        "Has Resume": "Yes",
+        "Status": "Needs Review - Unreadable Resume"
+      }
+    },
+    {
+      "sheet": "main",
+      "index": 167,
+      "values": {
+        "Application ID": "APP-20260815-0302-WPDA",
+        "Full Name": "shahyash29031997",
+        "Email": "shahyash29031997@gmail.com",
+        "Received Date": "2026-08-15T03:02:20",
+        "Original Filename": "Yash_Shah_Resume.pdf",
+        "Resume URL": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent/Shared%20Documents/Candidate_Resumes/2026/August/shahyash29031997_APP-20260815-0302-WPDA.pdf",
+        "Has Resume": "Yes",
+        "Status": "Needs Review - Unreadable Resume"
+      }
+    },
+    {
+      "sheet": "rejected",
+      "index": 62,
+      "values": {
+        "Application ID": "APP-20260819-0140-WPOA",
+        "Full Name": "Mona Rawat",
+        "Email": "mona.c9109@gmail.com",
+        "Received Date": "2026-08-19T01:40:01",
+        "Original Filename": "Mona_Rawat_CV.pdf",
+        "Resume URL": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent/Shared%20Documents/Candidate_Resumes/2026/Rejected/Mona_Rawat_WPOA.pdf",
+        "Has Resume": "Yes",
+        "Status": "Rejected - Non-USA Location"
+      }
+    },
+    {
+      "sheet": "rejected",
+      "index": 63,
+      "values": {
+        "Application ID": "APP-20260815-0302-WPDA",
+        "Full Name": "Yash Shah",
+        "Email": "shahyash29031997@gmail.com",
+        "Received Date": "2026-08-15T03:02:20",
+        "Original Filename": "Yash_Shah_Resume.pdf",
+        "Resume URL": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent/Shared%20Documents/Candidate_Resumes/2026/Rejected/Yash_Shah_WPDA.pdf",
+        "Has Resume": "Yes",
+        "Status": "Rejected - Non-USA Location"
+      }
+    }
+  ],
+  "rejected_file_checks": [
+    {
+      "file": "Mona_Rawat_8C97.pdf",
+      "bytes": 118216,
+      "text_chars": 6628,
+      "matching_candidate_emails": [
+        "mona.c9109@gmail.com"
+      ]
+    },
+    {
+      "file": "Yash_Shah_F711.pdf",
+      "bytes": 145943,
+      "text_chars": 5761,
+      "matching_candidate_emails": [
+        "shahyash29031997@gmail.com"
+      ]
+    }
+  ]
+}

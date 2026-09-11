@@ -1,0 +1,156 @@
+--- before/hiring_agent/sharepoint_scoring.py
++++ after/hiring_agent/sharepoint_scoring.py
+@@ -2242,6 +2242,10 @@
+     return bool(union) and (len(a & b) / union) >= threshold
+ 
+ 
++class ResumeUnavailableError(RuntimeError):
++    """The resume could not be obtained; this is not an unreadable applicant file."""
++
++
+ def _download_resume_text(client, app_id: str, resume_filename_cell: str, subpath: str,
+                           full_name: str = None, category: str = None,
+                           resume_url: str = None
+@@ -2254,8 +2258,13 @@
+     won each slot (for the caller to rename/keep, and raw_by_name lets a caller that wants a
+     local copy avoid re-downloading). Any other guess left over for a slot (typically a stale
+     pre-update canonical-shape file once a legacy-shape update file wins) is NOT included
+-    here and should be cleaned up by the caller once the new content is safely scored."""
++    here and should be cleaned up by the caller once the new content is safely scored.
++
++    Raises ResumeUnavailableError if any attachment slot cannot be downloaded.
++    An empty text result with downloaded bytes still means a parsing/OCR failure.
++    """
+     from sharepoint_client import SharePointError
++    from requests import RequestException
+     used, raw_by_name, texts = [], {}, []
+     slots = _resume_name_slots(app_id, resume_filename_cell, full_name, category)
+     linked_name = _resume_name_from_url(resume_url)
+@@ -2271,11 +2280,17 @@
+     # still has to rename, move or clean it up - only its TEXT is left out of the blend.
+     _seen: list[frozenset] = []
+     for slot in slots:
++        last_error = None
+         for name in slot:
+             try:
+                 raw = client.download_resume(name, subfolder=subpath)
+-            except SharePointError:
++            except SharePointError as e:
++                if e.status_code not in (None, 404):
++                    raise ResumeUnavailableError(f"{app_id}: resume download failed: {e}") from e
++                last_error = e
+                 continue
++            except RequestException as e:
++                raise ResumeUnavailableError(f"{app_id}: resume download failed: {e}") from e
+             used.append(name)
+             raw_by_name[name] = raw
+             body = extract_text_from_bytes(raw, name)
+@@ -2289,7 +2304,10 @@
+                 texts.append(body)
+             break
+         else:
+-            logger.warning(f"       WARNING  : Could not download any of {slot} for {app_id}")
++            raise ResumeUnavailableError(
++                f"{app_id}: no resume file downloaded in {subpath!r} or the legacy root; "
++                f"tried {slot}. Last download error: {last_error}"
++            ) from last_error
+     text = "\n".join(t for t in texts if t).strip()
+     return text, used, raw_by_name
+ 
+@@ -2579,6 +2597,33 @@
+     except RowVanished:
+         return None
+ 
++def _unchanged_completed_retry(retry: dict, completed: dict) -> bool:
++    """Only skip a stale retry when identity AND application version still agree.
++
++    A new submission, changed attachment, or clarification must keep its place in
++    the queue even when an older copy of the same Application ID is completed.
++    Missing version information is not proof of a duplicate.
++    """
++    if str(retry.get("Status", "")).strip() != _cfg.STATUS_NEEDS_REVIEW:
++        return False
++    if str(completed.get("Status", "")).strip() not in (
++            STATUS_SCORED, "Rejected - Non-USA Location"):
++        return False
++    app_id = _app_id_of(retry)
++    email = _bare_email(retry.get("Email", ""))
++    if not app_id or app_id != _app_id_of(completed) or not email:
++        return False
++    if email != _bare_email(completed.get("Email", "")):
++        return False
++    for key in ("Received Date", "Last Updated Date", "Original Filename"):
++        value = str(retry.get(key, "") or "").strip()
++        if not value or value != str(completed.get(key, "") or "").strip():
++            return False
++    updates = retry.get("Application Updates")
++    return (updates is not None and completed.get("Application Updates") is not None
++            and str(updates).strip() == str(completed["Application Updates"]).strip())
++
++
+ def _scoring_queue_rows(client) -> list:
+     """Return only new/unscored work plus genuinely updated location-review rows.
+ 
+@@ -2587,9 +2632,11 @@
+     location-review status unchanged. Untouched scored/rejected/review rows never enter.
+     """
+     rows = list(client.list_unscored_rows((_STATUS_NEW, _cfg.STATUS_NEEDS_REVIEW)))
++    main_rows = []
+     try:
++        main_rows = client.list_rows()
+         review_updates = [
+-            row for row in client.list_rows()
++            row for row in main_rows
+             if str(row["values"].get("Status", "")).strip() == STATUS_LOCATION_REVIEW
+             and _updated_after_location_request(row["values"])
+         ]
+@@ -2608,6 +2655,28 @@
+         if key not in seen:
+             rows.append(row)
+             seen.add(key)
++
++    # A failed Excel deletion can leave a retry beside its completed copy. Exclude
++    # that copy before applying the batch limit; this read-only check never deletes
++    # a row and never suppresses a new/updated application.
++    if any(str(r.get("values", {}).get("Status", "")).strip() == _cfg.STATUS_NEEDS_REVIEW
++           for r in rows):
++        try:
++            completed_rows = main_rows + client.list_rejected_rows()
++        except Exception as e:
++            logger.warning(f"  Queue     : could not verify completed duplicates ({e}); "
++                           "keeping retry rows eligible.")
++        else:
++            eligible = []
++            for row in rows:
++                vals = row.get("values", {})
++                if any(_unchanged_completed_retry(vals, r.get("values", {}))
++                       for r in completed_rows):
++                    logger.info(f"  Queue     : skipping unchanged retry {_app_id_of(vals)}; "
++                                "the same application already completed. Rows unchanged.")
++                else:
++                    eligible.append(row)
++            rows = eligible
+     return rows
+ 
+ 
+@@ -3196,6 +3265,11 @@
+             processed += 1
+             candidate_result = "Would score" if dry_run else "Scored"
+             logger.info("")
++        except ResumeUnavailableError as e:
++            deferred += 1
++            candidate_result = "Deferred - resume unavailable"
++            logger.warning(f"       DEFERRED : {e}. Status and Retry Count unchanged; "
++                           "repair the resume link/file before retrying.")
+         except Exception as e:
+             errors += 1
+             new_attempts = _score_attempts_of(vals) + 1
+@@ -3311,7 +3385,7 @@
+     if deferred:
+         logger.warning(
+             f"       DEFERRED  : {deferred} candidate(s) were left in the queue because the "
+-            f"model could not read or score them. Nothing was written for them and no retry "
++            f"resume or model was unavailable. Nothing was written for them and no retry "
+             f"counter moved; they will be picked up again next run."
+         )
+     if degraded_extractions:

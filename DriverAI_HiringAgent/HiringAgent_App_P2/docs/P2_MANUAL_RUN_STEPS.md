@@ -4,7 +4,29 @@ P2 scores only new or genuinely updated candidates waiting in the SharePoint
 queue. A normal live run does not rescore candidates already marked `Scored` or
 `Rejected`.
 
-The old Windows task `HiringAgent P2 Daily 9AM` is disabled.
+September 7 source review: use the [current architecture](../../CURRENT_ARCHITECTURE.md) for backend limitations. The old handoff recorded `HiringAgent P2 Daily 9AM` as disabled; verify the actual scheduler on the target computer. An empty queue can still trigger live maintenance, mail-marker handling, and exports.
+
+> ## 🔇 A live run currently contacts nobody (since 2026-09-04)
+>
+> Applicant mail is **OFF** in both phases. A live run still scores rows, moves
+> resumes, maintains the Rejected sheet and rebuilds the client export — it only
+> withholds:
+>
+> - the **decline** to a candidate confirmed outside the USA,
+> - the **clarification / missing-info request** to a scored or under-review candidate,
+> - and the real `Mail Sent` stamp (a `TEST-MODE (suppressed)` marker is written instead).
+>
+> Admin and error alerts still send. Rows touched while suppressed keep their place in
+> the mail queue: a suppressed marker does not read as "already contacted", so those
+> candidates are emailed for real on the first live run — nothing has to be cleared by hand.
+>
+> To resume applicant mail, set `test_mode.suppress_emails: false` in `config.yaml`
+> **and** `HIRING_SUPPRESS_EMAILS=false` in `.env` (both — `test_p2.py` §Y10 fails if
+> they disagree); for P1 set `email.send_applicant_emails: true`, rebuild and re-import.
+>
+> **Once mail is back on, email cannot be recalled.** To see what *would* happen, use
+> the read-only preview (`--dry-run`, below) — it reports the same `Declines` and
+> `Info reqs` counts and sends nothing.
 
 ## Option A: Run from the Desktop App
 
@@ -109,6 +131,29 @@ C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_App_P2>
 
 Do not run the P2 command from `C:\Users\tracy>` because Windows will not find
 the P2 virtual environment or `bot.py`.
+
+### Check the setup (read-only, ~10 seconds)
+
+Run this first. It touches nothing and confirms the machine itself is ready:
+
+```bat
+.\.venv\Scripts\python.exe bot.py --doctor
+```
+
+Every line should read OK. The ones that matter:
+
+```text
+  Core deps         : OK
+  OCR libs          : OK (pymupdf/pytesseract/pillow)
+  Tesseract engine  : <a path>
+  P2 .env           : OK
+  SharePoint        : configured (online mode)
+```
+
+If **`P2 .env`** or **`SharePoint`** is not OK, stop — the run would fail anyway.
+If only **Ollama** is unreachable, the run still works; it falls back to the
+offline parser, which is what the cloud always uses, just with lower extraction
+quality.
 
 ### Test the connection
 

@@ -48,6 +48,20 @@ from repair_rejected_month_records import (
 )
 from sharepoint_client import SharePointClient, SharePointError
 
+from hiring_agent.store import ExcelCandidateStore, APP_ID_COL
+
+
+def _store(client):
+    """Row identity — see hiring_agent/store.py. Rows are addressed by Application ID, never
+    by position, so a Phase 1 append between this tool's read and its write cannot make it
+    patch the wrong candidate."""
+    return ExcelCandidateStore(client)
+
+
+def _app_id_of(values) -> str:
+    return str((values or {}).get(APP_ID_COL, "") or "").strip()
+
+
 
 BATCH_SIZE = 30
 REPORT_DIR = Path(__file__).parent / "P2_Logs" / "batch_repairs"
@@ -651,9 +665,10 @@ def _process_duplicate(client: SharePointClient, row: dict, keep_id: str,
     if apply:
         phone = str(vals.get("Phone", "") or "").strip()
         if phone and phone.lower() not in {"n/a", "not extracted"}:
-            client.update_row(
-                keeper["index"], {"Phone": phone}, current_values=keeper["values"])
-        client.delete_row(row["index"])
+            _store(client).save_by_id(
+                keep_id, {"Phone": phone}, current_values=keeper["values"],
+                hint=keeper["index"])
+        _store(client).delete_by_id(_app_id_of(row["values"]), hint=row["index"])
     return result
 
 
@@ -847,13 +862,12 @@ def run(batch: int, manifest: Path, apply: bool = False,
                     "Retry Count": 0,
                 })
                 if verdict is True:
-                    client.update_row(row["index"], fields, current_values=vals)
+                    _store(client).save_by_id(app_id, fields, current_values=vals, hint=row["index"])
                 else:
                     merged = dict(vals)
                     merged.update(fields)
                     merged[cfg.DECLINE_SENT_COLUMN] = NO_MAIL_MARKER
-                    client.add_rejected_row(merged)
-                    client.delete_row(row["index"])
+                    _store(client).move_to_rejected(app_id, merged, hint=row["index"])
                 removed = _clean_old_files(
                     client, app_id, target_folder, canonical, month)
                 result.update({

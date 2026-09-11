@@ -1,0 +1,152 @@
+--- before/hiring_agent/extraction.py
++++ after/hiring_agent/extraction.py
+@@ -2754,6 +2754,47 @@
+ #: previous candidate into this one. Do not read it from a worker thread.
+ EXTRACTION_SOURCE = {"value": "offline (Ollama disabled)"}
+ 
++# Live qwen3-1.7b-p2 measurement, 2026-09-06: the largest non-thinking reply
++# across these four calls was 121 tokens (421 characters), rising to 124 with
++# schemas. 512 gives >4x headroom. Measurements: docs/benchmarks/stage2a/.
++_EXTRACTION_NUM_PREDICT = 512
++
++
++def _string_fields_schema(*fields: str) -> dict:
++    """Require the existing string fields, including empty strings for gaps."""
++    return {
++        "type": "object",
++        "properties": {field: {"type": "string"} for field in fields},
++        "required": list(fields),
++        "additionalProperties": False,
++    }
++
++
++_CANDIDATE_FORMAT = _string_fields_schema(
++    "full_name", "phone", "location", "country", "skills", "looking_for_role", "education")
++_ROLE_SUMMARY_FORMAT = _string_fields_schema("summary")
++_PORTFOLIO_FORMAT = _string_fields_schema("linkedin", "github", "other")
++
++
++def _post_ollama_extraction(url: str, **kwargs):
++    """Retry a requests timeout once, independently of the row give-up counter.
++
++    HTTP errors, bad JSON, and connection failures keep the caller's existing
++    handling. Parsing stays outside the retry loop so it cannot trigger a retry.
++    """
++    import requests
++
++    for attempt in range(2):
++        try:
++            return requests.post(url, **kwargs)
++        except requests.Timeout:
++            if attempt == 1:
++                raise
++            logger.warning(
++                "       Ollama extraction timed out after %ss; retrying once.",
++                kwargs.get("timeout"),
++            )
++
+ 
+ def extract_with_ollama(text: str, hints: dict | None = None) -> dict | None:
+     """FREE local-LLM extraction via Ollama (no API key). None to fall back.
+@@ -2783,14 +2824,14 @@
+                 "says otherwise:\n" + lines
+             )
+     try:
+-        import requests
+-        resp = requests.post(
++        resp = _post_ollama_extraction(
+             f"{OLLAMA_HOST}/api/chat",
+             json={
+                 "model": OLLAMA_MODEL,
+-                "format": "json",
++                "format": _CANDIDATE_FORMAT,
++                "think": False,
+                 "stream": False,
+-                "options": {"temperature": 0},
++                "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
+                 "messages": [
+                     {"role": "system",
+                      "content": _AI_PROMPT + hint_block + " Respond ONLY with a JSON object "
+@@ -2804,19 +2845,19 @@
+         resp.raise_for_status()
+         data = json.loads(resp.json()["message"]["content"])
+     except Exception as e:
+-        # `import requests` happens INSIDE this try, so `except requests.Timeout` would raise
+-        # NameError on the one failure where the import itself is what broke. Match on the
+-        # class name instead - it costs nothing and cannot introduce a second failure mode.
++        # requests is imported lazily inside the helper. Keep provenance classification
++        # independent of that import, so a missing dependency also falls back cleanly.
+         if type(e).__name__ in ("Timeout", "ReadTimeout", "ConnectTimeout"):
+-            # An ordinary two-page resume measured 62.1s against this 60s budget on the
+-            # client's hardware (2026-09-06), so a timeout here is NOT an edge case. Falling
++            # An ordinary two-page resume measured 62.1s against the former 60s budget on
++            # the client's hardware (2026-09-06). Both attempts have now timed out. Falling
+             # through to the regex parser silently published regex-quality fields as if the
+             # model had read the resume, and the row still went out as 'Scored' with nothing
+             # on it to say otherwise. Recorded loudly so a degraded run is visible and the
+             # affected rows can be re-scored later.
+             EXTRACTION_SOURCE["value"] = f"offline (Ollama timed out after {OLLAMA_TIMEOUT}s)"
+             logger.warning(
+-                f"       DEGRADED : Ollama extraction TIMED OUT after {OLLAMA_TIMEOUT}s - "
++                f"       DEGRADED : Ollama extraction TIMED OUT after two attempts "
++                f"({OLLAMA_TIMEOUT}s each) - "
+                 f"falling back to the offline parser. This candidate's fields are "
+                 f"regex-quality, not model-read."
+             )
+@@ -3117,14 +3158,14 @@
+     )
+ 
+     try:
+-        import requests
+-        resp = requests.post(
++        resp = _post_ollama_extraction(
+             f"{OLLAMA_HOST}/api/chat",
+             json={
+                 "model": OLLAMA_MODEL,
+-                "format": "json",
++                "format": _CANDIDATE_FORMAT,
++                "think": False,
+                 "stream": False,
+-                "options": {"temperature": 0},
++                "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
+                 "messages": [
+                     {"role": "system", "content": _RECHECK_PROMPT},
+                     {"role": "user", "content": context},
+@@ -3219,14 +3260,14 @@
+             f"=== RESUME TEXT (for context only) ===\n{(resume_text or '')[:AI_TEXT_LIMIT]}\n"
+         )
+         try:
+-            import requests
+-            resp = requests.post(
++            resp = _post_ollama_extraction(
+                 f"{OLLAMA_HOST}/api/chat",
+                 json={
+                     "model": OLLAMA_MODEL,
+-                    "format": "json",
++                    "format": _ROLE_SUMMARY_FORMAT,
++                    "think": False,
+                     "stream": False,
+-                    "options": {"temperature": 0},
++                    "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
+                     "messages": [
+                         {"role": "system", "content": _ROLE_SUMMARY_PROMPT},
+                         {"role": "user", "content": context},
+@@ -3401,14 +3442,14 @@
+     if not OLLAMA_ENABLED or (p1 != "N/A" and p2 != "N/A" and p3 != "N/A"):
+         return p1, p2, p3
+     try:
+-        import requests
+-        resp = requests.post(
++        resp = _post_ollama_extraction(
+             f"{OLLAMA_HOST}/api/chat",
+             json={
+                 "model": OLLAMA_MODEL,
+-                "format": "json",
++                "format": _PORTFOLIO_FORMAT,
++                "think": False,
+                 "stream": False,
+-                "options": {"temperature": 0},
++                "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
+                 "messages": [
+                     {"role": "system", "content": _PORTFOLIO_INFER_PROMPT},
+                     {"role": "user", "content": (resume_text or "")[:AI_TEXT_LIMIT]},

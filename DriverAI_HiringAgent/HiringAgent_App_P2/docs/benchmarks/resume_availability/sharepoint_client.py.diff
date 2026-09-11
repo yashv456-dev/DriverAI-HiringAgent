@@ -1,0 +1,15 @@
+--- before/sharepoint_client.py
++++ after/sharepoint_client.py
+@@ -684,8 +684,10 @@
+         if subfolder:
+             try:
+                 return self.download_file(f"{self.resumes_folder}/{subfolder}", name)
+-            except SharePointError:
+-                pass  # fall back to the flat folder (pre-dated resumes)
++            except SharePointError as e:
++                if e.status_code != 404:
++                    raise  # preserve auth/throttling/server errors instead of masking them
++                # A missing dated file may still exist in the old flat folder.
+         return self.download_file(self.resumes_folder, name)
+ 
+     def file_web_url(self, folder: str, name: str) -> str:

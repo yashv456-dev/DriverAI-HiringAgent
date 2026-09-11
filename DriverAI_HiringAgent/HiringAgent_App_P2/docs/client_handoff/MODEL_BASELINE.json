@@ -1,0 +1,8 @@
+{
+  "model": "qwen3-1.7b-p2:latest",
+  "model_id_prefix": "338d99fd07ec",
+  "base_model": "qwen3:1.7b",
+  "base_model_id_prefix": "8f68893c685c",
+  "weights_sha256": "sha256-3d0b790534fe4b79525fc3692950408dca41171676ed7e21db57af5c65ef6ab6",
+  "portable_modelfile_sha256": "86a8b8ada34529505a9b410ce2d6b4daedbd5db7e9c8ea0ae2bec58c1fad5c27"
+}

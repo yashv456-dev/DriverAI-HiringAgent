@@ -42,6 +42,23 @@ _TIMEOUT = 60
 _WB_NAME = "Sharepoint_Master_File.xlsx"
 _DEFAULT_WORKBOOK_FOLDER = "/Master_Files"
 
+# Must stay byte-identical to hiring_agent.sharepoint_scoring._RESUME_LINK_FORMULA - kept
+# as a separate copy here (not imported) to avoid a circular import (sharepoint_scoring
+# imports SharePointClient from this module). Needed here, not just there, because
+# add_main_row/add_rejected_row (below) must re-apply it after every add - fixed
+# 2026-08-01, live finding: a genuine Excel table calculated-column formula does NOT
+# automatically extend itself onto a row added through Graph's rows/add endpoint the way
+# it would for a row typed into the workbook's UI. Every row added this way (confirmed on
+# 3 live rows: Sai Krishna Yallapu on Rejected, plus two rows manually moved back to Main)
+# came back with a genuinely blank 'Resume Link' cell despite a valid 'Resume URL' sitting
+# right next to it - "not visible, unable to open" from the user's perspective, because
+# there was no formula there to compute a link from at all.
+_RESUME_LINK_FORMULA = ('=IF([@[Resume URL]]="","",'
+                        'HYPERLINK([@[Resume URL]],'
+                        'IF(TRIM([@[Original Filename]])="",'
+                        'TRIM(RIGHT(SUBSTITUTE([@[Resume URL]],"/",REPT(" ",300)),300)),'
+                        'TRIM([@[Original Filename]]))))')
+
 
 class SharePointError(RuntimeError):
     """Any Graph/config failure - carries a human-readable message for the logs."""
@@ -234,7 +251,14 @@ class SharePointClient:
         self._get_token()
         r = None
         for attempt in range(4):
-            r = self._session.request(method, url, timeout=_TIMEOUT, **kw)
+            try:
+                r = self._session.request(method, url, timeout=_TIMEOUT, **kw)
+            except (requests.Timeout, requests.ConnectionError) as error:
+                # Retrying an uncertain append/delete can duplicate or remove another row.
+                if method.upper() not in ("GET", "HEAD") or attempt == 3:
+                    raise SharePointError(f"{method} transport unavailable: {type(error).__name__}") from error
+                _time.sleep(min(2 ** attempt, 8))
+                continue
             if r.status_code == 401:  # token expired mid-run - refresh once and retry
                 self._token = None
                 self._get_token()
@@ -247,8 +271,18 @@ class SharePointClient:
                     pass
                 wait = min(wait or 10 * (attempt + 1), 120)
                 from hiring_agent.config import logger
-                logger.warning(f"   Graph {r.status_code} (throttled/unavailable) — "
-                               f"retrying in {wait}s ({attempt + 1}/3)...")
+                # Name the OPERATION being retried. The old message said only "Graph 504 -
+                # retrying", so a run that hit a throttled patch produced pages of identical
+                # lines with no way to tell which call was stuck, whether it was the same
+                # call looping, or how far the run had actually got - during the 2026-08-04
+                # recheck this made a healthy run look hung for five minutes. The Graph URL
+                # tail is short, stable, and identifies the operation exactly.
+                op = url.split("/v1.0", 1)[-1].split("?", 1)[0]
+                if len(op) > 90:
+                    op = "..." + op[-87:]
+                logger.warning(
+                    f"   Graph {r.status_code} (throttled/unavailable) on {method} {op} — "
+                    f"retrying in {wait}s (attempt {attempt + 1}/3)")
                 _time.sleep(wait)
                 continue
             break
@@ -371,6 +405,25 @@ class SharePointClient:
                 continue
             out.append({"index": r.get("index"), "values": mapped})
         return out
+
+    def row_values_at(self, index: int) -> dict | None:
+        """The values of ONE table row by position, or None if that position is empty/gone.
+
+        A targeted single-row GET, unlike list_rows()'s paginated whole-table read. Exists so
+        a caller holding a cached index from an earlier batch fetch can cheaply confirm the
+        row still sitting there is the one it thinks it is, before addressing a write to it
+        (see sharepoint_scoring._live_row_index). Every write is by itemAt(index), so a stale
+        index writes one candidate's data onto another candidate's row."""
+        try:
+            data = self._req(
+                "GET", f"{self._wb_base()}/tables/{self.table}/rows/itemAt(index={int(index)})"
+            ).json()
+        except SharePointError:
+            return None
+        cols = self.table_columns()
+        vals = data.get("values", [[]])
+        cells = vals[0] if vals else []
+        return {cols[i]: (cells[i] if i < len(cells) else "") for i in range(len(cols))}
 
     def list_unscored_rows(self, statuses=("New Email Received",)) -> list:
         """Rows still waiting to be scored (Status in the given set — the PA-written
@@ -638,8 +691,10 @@ class SharePointClient:
         if subfolder:
             try:
                 return self.download_file(f"{self.resumes_folder}/{subfolder}", name)
-            except SharePointError:
-                pass  # fall back to the flat folder (pre-dated resumes)
+            except SharePointError as e:
+                if e.status_code != 404:
+                    raise  # preserve auth/throttling/server errors instead of masking them
+                # A missing dated file may still exist in the old flat folder.
         return self.download_file(self.resumes_folder, name)
 
     def file_web_url(self, folder: str, name: str) -> str:
@@ -694,6 +749,30 @@ class SharePointClient:
             url = data.get("@odata.nextLink")
         return items
 
+    def list_intake_events(self):
+        """Read retained P1 input versions, including updates received while P2 was offline."""
+        import json
+        pending = [self.resumes_folder]
+        events = []
+        cache = getattr(self, '_intake_event_cache', {})
+        while pending:
+            folder = pending.pop()
+            for item in self.list_folder_children(folder):
+                name = item.get('name', '')
+                if item.get('folder') is not None:
+                    pending.append(folder.rstrip('/')+'/'+name)
+                elif name.startswith('intake_') and name.endswith('.json'):
+                    file_key = str(item.get('id') or folder+'/'+name)+':'+str(item.get('eTag', ''))
+                    values = cache.get(file_key)
+                    if values is None:
+                        values = json.loads(self.download_file(folder, name))
+                    if not isinstance(values, dict) or not values.get('Application ID'):
+                        raise SharePointError(f'Invalid intake manifest {name}; import deferred')
+                    events.append({'values': values})
+                    cache[file_key] = values
+        self._intake_event_cache = cache
+        return events
+
     def move_resume(self, name: str, from_folder: str, to_folder: str) -> bool:
         """Move one resume file between two fully-resolved folders (e.g. .../2026/July <->
         .../2026/July/Rejected). Download+upload+delete (reuses the existing primitives — Graph
@@ -705,11 +784,19 @@ class SharePointClient:
             data = self.download_file(from_folder, name)
         except SharePointError:
             return False
-        self.upload_file(to_folder, name, data)
         try:
-            self.delete_file(from_folder, name)
-        except SharePointError:
-            pass  # copy already succeeded; a leftover source copy is harmless
+            existing = self.download_file(to_folder, name)
+        except SharePointError as error:
+            if error.status_code != 404:
+                raise
+            existing = None
+        if existing is not None and existing != data:
+            raise SharePointError("Destination contains a different CV; refusing overwrite")
+        if existing is None:
+            self.upload_file(to_folder, name, data)
+        if self.download_file(to_folder, name) != data:
+            raise SharePointError("CV copy verification failed; original preserved")
+        # Preserve the source and every version. Local scoring never calls this helper.
         return True
 
     def rename_resume(self, old_name: str, new_name: str, subfolder: str = "") -> bool:
@@ -735,26 +822,56 @@ class SharePointClient:
         return False
 
     # ---- outbound mail (app-only; needs Mail.Send Application permission) ----
-    def send_mail(self, to_address: str, subject: str, html_body: str) -> bool:
+    def send_mail(self, to_address: str, subject: str, html_body: str,
+                  admin: bool = False) -> bool:
         """Send an HTML email FROM self.sender_mailbox via Graph (app-only sendMail).
 
         Returns True on success, False on any failure (never raises) - a failed notice must
         not break a scoring run. Needs Mail.Send (Application) admin-consented on the app; until
         then Graph returns 403 and this logs a warning and returns False.
 
-        This is the ONLY place P2 transmits mail, which makes it the enforcement point for
-        config.SUPPRESS_EMAILS (HIRING_SUPPRESS_EMAILS / test_mode.suppress_emails). When
-        suppressed it returns True WITHOUT contacting Graph, so the caller proceeds exactly as
-        if the send had succeeded - the row still gets its marker and the pass still advances,
-        the same way P1's suppressed build keeps every Send_* action's runAfter wiring intact.
+        This is the ONLY place P2 transmits mail, which makes it the enforcement point for the
+        outbound-mail policy. Two independent audiences, mirroring P1's two flags exactly:
+
+          applicant mail  <- config.SUPPRESS_EMAILS   (P1: email.send_applicant_emails)
+          admin alerts    <- config.ERROR_EMAIL_ENABLED (P1: email.send_admin_failure_alerts)
+
+        `admin=True` marks a message as operational (a failure alert, a suspicious-content
+        warning, a missing-workbook alarm) and routes it past SUPPRESS_EMAILS. Fixed
+        2026-08-03: SUPPRESS_EMAILS used to be a single master switch covering BOTH, so the
+        silent-live posture also silenced P2's own failure reporting - P2 ran continuously and,
+        if it broke, told nobody. P1 never had that problem (its Notify_failure stayed live),
+        and the asymmetry was the gap.
+
+        Admin alerts remain fully disableable: every caller is already gated on
+        ERROR_EMAIL_ENABLED (HIRING_ERROR_EMAIL / error_email), so a genuine
+        no-mail-whatsoever run - a bulk historical replay, say - sets suppress_emails: true
+        AND error_email: false.
+
+        When a message is withheld this returns True WITHOUT contacting Graph, so the caller
+        proceeds exactly as if the send had succeeded - the row still gets its marker and the
+        pass still advances, the same way P1's suppressed build keeps every Send_* action's
+        runAfter wiring intact.
         """
         to_address = (to_address or "").strip()
         if not to_address or "@" not in to_address:
             return False
-        from hiring_agent.config import SUPPRESS_EMAILS, logger
-        if SUPPRESS_EMAILS:
-            logger.info(f"       Email     : SUPPRESSED (test mode) - would have emailed "
-                        f"{to_address} | {subject}")
+        from hiring_agent.config import SUPPRESS_EMAILS, ERROR_EMAIL_ENABLED, logger
+        if admin:
+            # Enforced HERE, not only in the callers. Every admin sender already checks
+            # ERROR_EMAIL_ENABLED, but relying on that alone is the exact mistake that let the
+            # missing-info nudge escape GEO_REJECT_EMAIL: a future admin sender that forgets
+            # its own flag would otherwise transmit even during a deliberate blackout.
+            if not ERROR_EMAIL_ENABLED:
+                logger.info(f"       Email     : admin alert withheld (error_email is off) "
+                            f"- would have emailed {to_address} | {subject}")
+                return True
+            if SUPPRESS_EMAILS:
+                logger.info(f"       Email     : admin alert sent despite applicant-mail "
+                            f"suppression -> {to_address}")
+        elif SUPPRESS_EMAILS:
+            logger.info(f"       Email     : SUPPRESSED (applicant mail off) - would have "
+                        f"emailed {to_address} | {subject}")
             return True
         url = f"{GRAPH}/users/{self.sender_mailbox}/sendMail"
         payload = {
@@ -801,9 +918,24 @@ class SharePointClient:
 
         from hiring_agent.config import REJECTED_COLUMNS as COLUMNS
         from openpyxl.utils import get_column_letter
-        ref = f"A1:{get_column_letter(len(COLUMNS))}1"
+        last_col = get_column_letter(len(COLUMNS))
+        # Row 2 is a PERMANENT blank spacer, exactly like the CandidateList sheet and the
+        # setup template (2026-08-27). Two reasons it has to be created here rather than
+        # left to appear later:
+        #   * convention - every other surface (the template, resort_candidate_sheets.py,
+        #     and the client export's _with_period_separators) puts one blank row directly
+        #     under the header, and a Rejected sheet built header-only was the one place
+        #     that silently broke it;
+        #   * resort_candidate_sheets.py cannot repair it, because it returns early on a
+        #     sheet with no real rows - so a table created without the spacer never gets
+        #     one until a rejection lands AND someone re-runs the resort by hand.
+        # The table range therefore spans A1:<last>2, and Graph is given an explicit empty
+        # row so the cells genuinely exist (a range that merely *claims* row 2 without cells
+        # is the defect that was found in the setup template earlier the same day).
+        ref = f"A1:{last_col}2"
         range_url = f"{self._wb_base()}/worksheets/Rejected/range(address='{ref}')"
-        self._req("PATCH", range_url, json={"values": [COLUMNS]})
+        self._req("PATCH", range_url,
+                  json={"values": [COLUMNS, [""] * len(COLUMNS)]})
         add_url = f"{self._wb_base()}/worksheets/Rejected/tables/add"
         created = self._req("POST", add_url,
                             json={"address": ref, "hasHeaders": True}).json()
@@ -816,6 +948,35 @@ class SharePointClient:
             # Rename failed — the auto-name still works for every rows/add call.
             return auto_name or table_name
 
+    def ensure_rejected_spacer(self) -> bool:
+        """Give an EXISTING Rejected table its permanent row-2 spacer if it has none.
+
+        _ensure_rejected_table only seeds the spacer for a table it creates, and it returns
+        early when the table already exists - so a Rejected table built before 2026-08-27
+        (like the live one, created header-only) never gets the blank row every other surface
+        assumes. resort_candidate_sheets.py cannot fix it either: it returns early on a sheet
+        with no real rows.
+
+        Deliberately narrow: it acts ONLY when the table has ZERO physical rows, so it can
+        never insert a stray blank into a populated sheet, and it is a no-op on every
+        subsequent run. Returns True when a spacer was added.
+        """
+        tbl = self._rejected_table_name_if_exists()
+        if tbl is None:
+            return False
+        try:
+            rows = self._rows_paged(f"{self._wb_base()}/tables/{tbl}/rows")
+        except SharePointError:
+            return False
+        if rows:                     # already has a spacer, or real data - leave it alone
+            return False
+        cols = self._table_columns_of(tbl)
+        if not cols:
+            return False
+        self._req("POST", f"{self._wb_base()}/tables/{tbl}/rows/add",
+                  json={"values": [[""] * len(cols)]})
+        return True
+
     def add_rejected_row(self, fields: dict) -> None:
         """Append a row to the 'Rejected' sheet/table in the same workbook."""
         tbl = self._ensure_rejected_table()
@@ -825,7 +986,53 @@ class SharePointClient:
         cols = self._table_columns_of(tbl)
         values = [[fields.get(c, "") for c in cols]]
         url = f"{self._wb_base()}/tables/{tbl}/rows/add"
-        self._req("POST", url, json={"values": values})
+        resp = self._req("POST", url, json={"values": values}).json()
+        self._refresh_resume_link_formula(tbl, cols)
+        if "index" in resp:
+            self._reapply_row_format(tbl, "Rejected", resp["index"])
+
+    def _refresh_resume_link_formula(self, table_name: str, cols: list) -> None:
+        """Re-apply the 'Resume Link' calculated-column formula immediately after a row
+        add - fixed 2026-08-01. Excel's table calculated-column behaviour (a formula
+        entered once auto-extends to every future row) does NOT reliably extend onto a row
+        added through Graph's rows/add endpoint the way it does for a row typed into the
+        workbook's own UI - confirmed live: rows added this way came back with a genuinely
+        blank 'Resume Link' cell despite a valid 'Resume URL' right next to it. Best-effort:
+        a failure here must never fail the row add itself, which already succeeded."""
+        if "Resume Link" not in cols:
+            return
+        try:
+            self.set_calculated_column(table_name, "Resume Link", _RESUME_LINK_FORMULA)
+        except SharePointError as e:
+            from hiring_agent.config import logger
+            logger.warning(f"   WARNING   Could not refresh 'Resume Link' formula on "
+                            f"{table_name} after row add: {e}")
+
+    def _reapply_row_format(self, table_name: str, sheet_name: str, row_index: int) -> None:
+        """Force a freshly-added row back to the sheet's plain, non-wrapped, auto-height
+        look (best-effort — a failure here must never fail the row add itself).
+
+        Same class of gap as _refresh_resume_link_formula: Graph's rows/add endpoint writes
+        cell VALUES only, and does not reliably carry cell format the way typing a row into
+        the Excel UI does. A long 'Mail Body'/'Mail Subject' value can come back with wrap
+        text implicitly on and a stretched row height, which reads as a visibly 'broken' row
+        next to its plain single-line neighbours - confirmed live 2026-09-01. Unlike the
+        formula (one fixed value), the correct row height is content-dependent, so this
+        clears wrap explicitly and lets Excel autofit the height from there rather than
+        hard-coding a number."""
+        try:
+            addr = self._req("GET", f"{self._wb_base()}/tables/{table_name}"
+                                     f"/rows/itemAt(index={row_index})/range?$select=address"
+                             ).json()["address"]
+            range_ref = addr.split("!", 1)[-1]
+            range_url = (f"{self._wb_base()}/worksheets('{sheet_name}')"
+                         f"/range(address='{range_ref}')")
+            self._req("PATCH", f"{range_url}/format", json={"wrapText": False})
+            self._req("POST", f"{range_url}/format/autofitRows()")
+        except SharePointError as e:
+            from hiring_agent.config import logger
+            logger.warning(f"   WARNING   Could not reapply row format on {table_name} "
+                            f"row {row_index}: {e}")
 
     def ensure_rejected_columns(self, required: list) -> list:
         """Add any missing columns to the Rejected table (if it exists yet), inserted at
@@ -866,7 +1073,10 @@ class SharePointClient:
         cols = self.table_columns()
         values = [[fields.get(c, "") for c in cols]]
         url = f"{self._wb_base()}/tables/{self.table}/rows/add"
-        self._req("POST", url, json={"values": values})
+        resp = self._req("POST", url, json={"values": values}).json()
+        self._refresh_resume_link_formula(self.table, cols)
+        if "index" in resp:
+            self._reapply_row_format(self.table, "CandidateList", resp["index"])
 
     # ---- reconcile helpers (used by --recheck-all) -------------------------
     def _table_columns_of(self, table_name: str) -> list:

@@ -52,6 +52,25 @@ def row_empty(vals: dict) -> bool:
     return not any(str(v or "").strip() for v in vals.values())
 
 
+def _is_sent_marker(marker: str) -> bool:
+    """True when this marker records a real send attempt.
+
+    'TEST-MODE (suppressed) Sent <ts>' is stamped when HIRING_SUPPRESS_EMAILS is on: the row
+    WAS processed and must never be re-contacted, so for auditing purposes it counts exactly
+    like 'Sent <ts>'. Matching only the 'Sent ' prefix (the behaviour before 2026-08-04) made
+    every row processed in suppressed mode look unmarked.
+    """
+    return "Sent " in str(marker or "")
+
+
+def _is_settled_marker(marker: str) -> bool:
+    """True when a marker means 'this row needs no further mail' - sent, or deliberately not
+    sent ('No valid email on file', 'N/A - aged out, no reply', 'Duplicate - ...')."""
+    m = str(marker or "").strip()
+    return bool(m) and (_is_sent_marker(m) or m.startswith("No valid email")
+                        or m.startswith("N/A -") or "Duplicate" in m)
+
+
 def row_record(sheet: str, row: dict) -> dict:
     vals = row["values"]
     rec = {
@@ -78,9 +97,17 @@ def row_record(sheet: str, row: dict) -> dict:
     }
     # Keep the exact SharePoint column names too; some shared P2 helpers expect
     # those keys rather than the normalized report keys above.
+    # 'Email', the three Portfolio slots and the two date columns were MISSING from this
+    # list until 2026-08-04. _missing_fields_list reads them by their exact column name, so
+    # for every scored row it saw a blank Email and three blank Portfolio slots and reported
+    # "a portfolio or LinkedIn/GitHub link, a contact email address" as missing - on rows that
+    # plainly had both. That produced a FAIL on essentially every scored row and made the
+    # whole audit unusable as a pre-flight gate.
     for col in (
         "Phone", "Location", "Country", "Current Skills", "Education",
         "Info Request Sent", "Status", "Application ID", "Original Filename",
+        "Email", "Portfolio 1", "Portfolio 2", "Portfolio 3",
+        "Last Updated Date", "Received Date",
     ):
         rec[col] = vals.get(col, "")
     return rec
@@ -140,11 +167,11 @@ def audit_records(records: list[dict]) -> tuple[list[dict], dict]:
         status = rec["status"]
         marker = str(rec["info_request_sent"] or "").strip()
         decline = str(rec["decline_sent"] or "").strip()
-        if marker.startswith("Sent "):
+        if _is_sent_marker(marker):
             counts["info_sent"] += 1
         elif marker == "Nothing missing":
             counts["info_nothing_missing"] += 1
-        if decline.startswith("Sent "):
+        if _is_sent_marker(decline):
             counts["declines_sent"] += 1
         elif sheet == "Rejected" and decline:
             counts["declines_other"] += 1
@@ -160,7 +187,7 @@ def audit_records(records: list[dict]) -> tuple[list[dict], dict]:
                     "notes": f"scored row is {decision.value}, not confirmed US: {reason}",
                 })
             missing = _missing_fields_list(rec)
-            if missing and not (marker.startswith("Sent ") or marker == "No valid email"):
+            if missing and not _is_settled_marker(marker):
                 counts["info_blank_needs_attention"] += 1
                 issues.append({
                     "severity": "FAIL",
@@ -168,7 +195,7 @@ def audit_records(records: list[dict]) -> tuple[list[dict], dict]:
                     **rec,
                     "notes": "missing/unclear fields without Sent/No valid email marker: " + ", ".join(missing),
                 })
-            if not missing and marker not in {"", "Nothing missing"} and not marker.startswith("Sent "):
+            if not missing and marker not in {"", "Nothing missing"} and not _is_settled_marker(marker):
                 issues.append({
                     "severity": "WARN",
                     "check": "unexpected_info_marker",
@@ -211,7 +238,7 @@ def audit_records(records: list[dict]) -> tuple[list[dict], dict]:
                     **rec,
                     "notes": f"rejected row is {decision.value}, not confirmed non-US: {reason}",
                 })
-            if status in {STATUS_REJECTED, STATUS_LOCATION_UNCONFIRMED} and not (decline.startswith("Sent ") or decline.startswith("No valid email") or decline.startswith("N/A -") or "Duplicate" in decline):
+            if status in {STATUS_REJECTED, STATUS_LOCATION_UNCONFIRMED} and not _is_settled_marker(decline):
                 issues.append({
                     "severity": "FAIL",
                     "check": "decline_not_marked",

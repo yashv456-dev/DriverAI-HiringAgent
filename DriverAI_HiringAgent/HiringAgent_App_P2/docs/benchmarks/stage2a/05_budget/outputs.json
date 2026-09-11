@@ -1,0 +1,81 @@
+{
+  "extract_1": {
+    "seconds": 3.120346999989124,
+    "fields": {
+      "portfolio_1": "https://www.linkedin.com/in/alex-morgan-example",
+      "portfolio_2": "https://github.com/alex-morgan-example",
+      "portfolio_3": "N/A",
+      "education_start_date": "Aug 2016",
+      "education_end_date": "May 2020",
+      "experience": "6 years",
+      "notes": "Alex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with ",
+      "phone": "+1 (512) 555-0142",
+      "skills": "Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS, REST",
+      "full_name": "Alex Morgan",
+      "location": "Austin, Texas",
+      "country": "United States",
+      "looking_for_role": "Senior Software Engineer",
+      "education": "Bachelor of Science in Computer Science, University of Texas at Austin"
+    }
+  },
+  "extract_2": {
+    "seconds": 3.0133587999880547,
+    "fields": {
+      "portfolio_1": "https://www.linkedin.com/in/alex-morgan-example",
+      "portfolio_2": "https://github.com/alex-morgan-example",
+      "portfolio_3": "N/A",
+      "education_start_date": "Aug 2016",
+      "education_end_date": "May 2020",
+      "experience": "6 years",
+      "notes": "Alex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with ",
+      "phone": "+1 (512) 555-0142",
+      "skills": "Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS, REST",
+      "full_name": "Alex Morgan",
+      "location": "Austin, Texas",
+      "country": "United States",
+      "looking_for_role": "Senior Software Engineer",
+      "education": "Bachelor of Science in Computer Science, University of Texas at Austin"
+    }
+  },
+  "extract_3": {
+    "seconds": 3.020112500002142,
+    "fields": {
+      "portfolio_1": "https://www.linkedin.com/in/alex-morgan-example",
+      "portfolio_2": "https://github.com/alex-morgan-example",
+      "portfolio_3": "N/A",
+      "education_start_date": "Aug 2016",
+      "education_end_date": "May 2020",
+      "experience": "6 years",
+      "notes": "Alex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with ",
+      "phone": "+1 (512) 555-0142",
+      "skills": "Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS, REST",
+      "full_name": "Alex Morgan",
+      "location": "Austin, Texas",
+      "country": "United States",
+      "looking_for_role": "Senior Software Engineer",
+      "education": "Bachelor of Science in Computer Science, University of Texas at Austin"
+    }
+  },
+  "recheck": {
+    "portfolio_1": "https://www.linkedin.com/in/alex-morgan-example",
+    "portfolio_2": "https://github.com/alex-morgan-example",
+    "portfolio_3": "N/A",
+    "education_start_date": "Aug 2016",
+    "education_end_date": "May 2020",
+    "experience": "6 years",
+    "notes": "Alex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with ",
+    "phone": "+1 (512) 555-0142",
+    "skills": "Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS",
+    "full_name": "Alex Morgan",
+    "location": "Austin, Texas",
+    "country": "United States",
+    "looking_for_role": "Senior Software Engineer",
+    "education": "Bachelor of Science in Computer Science, University of Texas at Austin"
+  },
+  "role_note": "Seeking Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners.",
+  "portfolios": [
+    "https://www.linkedin.com/in/alex-morgan-example",
+    "https://github.com/alex-morgan-example",
+    "N/A"
+  ]
+}

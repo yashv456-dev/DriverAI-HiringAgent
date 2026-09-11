@@ -1,0 +1,37 @@
+Alex Morgan
+Austin, Texas, United States
+alex.morgan@example.com | +1 (512) 555-0142
+https://www.linkedin.com/in/alex-morgan-example
+https://github.com/alex-morgan-example
+
+PROFESSIONAL SUMMARY
+Software engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.
+
+PROFESSIONAL EXPERIENCE
+Software Engineer | Cedar Systems | Austin, Texas
+September 2022 - August 2026
+- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with product managers to define acceptance criteria and document API contracts for internal consumers.
+- Built React and TypeScript screens that let operations staff search orders, correct incomplete records, and review shipment history. Added accessible forms, loading indicators, and clear validation messages.
+- Used Docker and AWS to package and deploy services. Maintained GitHub Actions workflows for automated builds, unit tests, and deployment checks. Investigated failed releases and documented recovery steps.
+- Improved SQL queries used by daily operational reports. Added indexes after reviewing query plans, reduced duplicate database calls, and verified that totals matched existing financial exports.
+- Wrote pytest tests for data validation, authorization, and retry behavior. Reviewed pull requests with an emphasis on readable code and preserving existing customer workflows.
+- Participated in an on-call rotation, investigated production incidents, and added structured logs and dashboards to make recurring failures easier to diagnose. Shared incident findings with the team.
+
+Junior Software Engineer | Willow Analytics | Austin, Texas
+September 2020 - August 2022
+- Implemented Django endpoints and PostgreSQL migrations for an internal reporting application. Coordinated releases with analysts who relied on the reports during weekly planning meetings.
+- Wrote Python scripts to validate incoming CSV files, flag duplicate records, and produce error summaries. Added regression tests for missing columns and inconsistent date formats.
+- Updated JavaScript interfaces, fixed browser compatibility issues, and worked with designers to improve keyboard navigation. Maintained documentation for common support requests.
+- Used Git for version control and Linux for development and troubleshooting. Paired with senior engineers to review requirements and break larger changes into smaller releases.
+
+EDUCATION
+Bachelor of Science in Computer Science, University of Texas at Austin
+August 2016 - May 2020
+Coursework included data structures, algorithms, databases, operating systems, and software engineering. Completed a team project that exposed a REST API and a web interface for scheduling community events.
+
+TECHNICAL SKILLS
+Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS.
+
+PROJECTS
+Community Events Scheduler: Developed a Python API and React interface for event registration. Implemented input validation and PostgreSQL storage, wrote setup instructions, and collected feedback from volunteer coordinators.
+Data Quality Toolkit: Created Python utilities for checking CSV exports before loading them into reporting tables. Included automated tests, sample inputs, and documentation explaining each validation rule.

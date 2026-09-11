@@ -13,6 +13,7 @@ from hiring_agent.config import (
     ROLE_CATEGORY_RULES, ROLE_CATEGORY_DEFAULT,
     logger,
 )
+from hiring_agent.jd_identity import role_display_name, role_opening_id, stamp_role_identity
 from hiring_agent.ollama_scorer import ai_score_roles
 
 
@@ -21,8 +22,12 @@ _NON_JOB_ROLE_TITLE_RE = _re.compile(r"\b(?:offer\s+letter|offerletter|onboardin
 
 
 def get_open_roles() -> list[dict]:
-    """Default open roles from config.yaml."""
-    return list(DEFAULT_ROLES)
+    """Default open roles from config.yaml, each carrying its opening identity.
+
+    Copied per call (rather than handing out the config dicts themselves) so stamping the
+    identity fields never mutates module-level config state.
+    """
+    return [stamp_role_identity(dict(r)) for r in DEFAULT_ROLES]
 
 
 #: Tool names that are essentially never used outside native mobile app development —
@@ -42,6 +47,12 @@ _GRAPHICS_TOOL_SKILLS = {
 }
 
 
+_AI_TOOL_SKILLS = {
+    "langchain", "llamaindex", "rag", "agentic ai", "agentic", "azure openai",
+    "hugging face", "prompt engineering", "fine-tuning", "peft", "lora",
+}
+
+
 def assign_category(role_str: str, skills_str: str = "") -> str:
     """Map 'Role Title (NN%)' → business category using config-driven rules.
 
@@ -56,9 +67,9 @@ def assign_category(role_str: str, skills_str: str = "") -> str:
     (Kotlin/Swift/Flutter/...). Added 2026-07-24: the winning JD title (Suggested Role 1)
     is sometimes a differently-domain-named posting that a mobile candidate only weakly
     matched (e.g. 'Gaming Position (23%)', 'Mobile Application Lead Developer Position
-    Description v2 (80%)' — the latter landing in 'Senior & Executive' via the 'lead'
+    Description v2 (80%)' — the latter landing in 'Senior' via the 'lead'
     keyword, section 1 precedence, same as the intentional 'Logistics Manager' ->
-    'Senior & Executive' behavior tested elsewhere). That precedence is correct when the
+    'Senior' behavior tested elsewhere). That precedence is correct when the
     JD title genuinely reflects the candidate's level/domain, but a candidate's own tool
     stack is more reliable than a loosely-matched title, so a clear, uncontested mobile
     signal in Skills is trusted over the title match. Optional and defaults to empty so
@@ -69,8 +80,37 @@ def assign_category(role_str: str, skills_str: str = "") -> str:
         return "Mobile Apps (Android IOS)"
 
     title = _re.sub(r'\s*\(\d+%\)\s*$', '', (role_str or "")).strip().lower()
+
+    # Precedence 1: Senior Manager and Executive titles
     for rule in ROLE_CATEGORY_RULES:
-        if rule.get("match", "").lower() in title:
+        if rule.get("category") not in ("Senior Manager", "Executive"):
+            continue
+        needle = rule.get("match", "").lower()
+        if not needle:
+            continue
+        if rule.get("word"):
+            if _re.search(rf"(?<![a-z0-9]){_re.escape(needle)}(?![a-z0-9])", title):
+                return rule["category"]
+        elif needle in title:
+            return rule["category"]
+
+    # Precedence 2: Uncontested AI / Agentic tool stack (3+ specialized AI skills)
+    if len(skills & _AI_TOOL_SKILLS) >= 3:
+        return "AI/ML/CV (SIN2)"
+
+    for rule in ROLE_CATEGORY_RULES:
+        needle = rule.get("match", "").lower()
+        if not needle:
+            continue
+        if rule.get("word"):
+            # Opt-in whole-word match (added 2026-08-21 for the C-suite acronyms). Plain
+            # substring is unusable for short tokens: 'cto' is inside contractor/doctor/
+            # factory/sector/director, 'coo' inside coordinator, 'cio' inside suspicious.
+            # Lookarounds rather than \b because a needle may contain non-word characters
+            # (e.g. 'ai/ml'), where \b would anchor in the wrong place.
+            if _re.search(rf"(?<![a-z0-9]){_re.escape(needle)}(?![a-z0-9])", title):
+                return rule["category"]
+        elif needle in title:
             return rule["category"]
     return ROLE_CATEGORY_DEFAULT
 
@@ -89,6 +129,55 @@ def _skill_set(skills_str: str) -> set[str]:
             out.add(s)
     return out
 
+_SKILL_EXPANSIONS = {
+    "agentic ai": {"agentic", "agentic ai"},
+    "agentic": {"agentic", "agentic ai"},
+    "llm": {"llm", "transformer", "transformers", "neural networks", "genai"},
+    "gpt-4": {"llm", "transformer", "genai"},
+    "openai": {"llm", "genai"},
+    "azure openai": {"llm", "genai"},
+    "hugging face": {"llm", "transformer", "transformers", "pytorch", "neural networks"},
+    "fine-tuning": {"fine-tuning", "deep learning", "neural networks"},
+    "peft": {"fine-tuning", "deep learning", "neural networks"},
+    "lora": {"fine-tuning", "deep learning", "neural networks"},
+    "rag": {"rag", "embeddings", "prompt engineering"},
+    "langchain": {"langchain", "prompt engineering", "agentic"},
+    "llamaindex": {"llamaindex", "prompt engineering", "rag"},
+    "nlp": {"nlp", "natural language processing"},
+    "machine learning": {"machine learning", "ml"},
+    "deep learning": {"deep learning", "neural networks"},
+    "github actions": {"github actions", "ci/cd", "automation"},
+}
+
+
+def _expand_skills(skill_set: set[str]) -> set[str]:
+    expanded = set(skill_set)
+    for s in skill_set:
+        if s in _SKILL_EXPANSIONS:
+            expanded.update(_SKILL_EXPANSIONS[s])
+    return expanded
+
+
+def _skill_overlap_count(skills_str: str, role_skills) -> int:
+    """How many of the candidate's skills the JD actually asks for.
+
+    Returns a large sentinel when either side has NO parsed skills, so the zero-overlap guard
+    only ever fires on a GENUINE mismatch - never on missing data.
+
+    Both exemptions matter, and the second was learned the hard way on 2026-08-04: the
+    candidate-side skills can come back empty (an AI recheck rewrote them as prose that the
+    prose filter then stripped), and with an empty candidate set EVERY role scores 0, so the
+    guard silently discarded all 11 ranked roles for APP-20260720-1755-30E6 and dropped a
+    correct 'Cybersecurity IT Administrator PD (90%)' match down to 'CISO LinkedIn
+    Announcement (40%)'. Zero overlap only means something when both sides actually parsed.
+    """
+    if not role_skills:
+        return 999
+    candidate = _expand_skills(_skill_set(skills_str))
+    if not candidate:
+        return 999
+    return len(candidate & {str(s).lower() for s in role_skills})
+
 
 def _is_scoring_role(role: dict) -> bool:
     """True for real candidate-match JDs; false for admin docs accidentally cached as JDs."""
@@ -96,12 +185,19 @@ def _is_scoring_role(role: dict) -> bool:
     return bool(title.strip()) and not _NON_JOB_ROLE_TITLE_RE.search(title)
 
 
-def _dedupe_ranked_titles(scored: list[tuple[str, int]]) -> list[tuple[str, int]]:
-    """Keep the best score per visible title so Suggested Role 1/2/3 never repeat."""
+def _dedupe_ranked_titles(scored: list[tuple[str, int, str]]) -> list[tuple[str, int]]:
+    """Keep the best-scoring document per OPENING so Suggested Role 1/2/3 never repeat.
+
+    `scored` carries (title, score, opening_id). The opening id is stamped onto every role at
+    INGEST by hiring_agent.jd_identity - one opening is stored as several JD documents (Job
+    Announcement + Position Description + revisions), and without grouping them a single
+    opening could win all three Suggested Role slots. The surviving entry keeps its own full
+    title, so the client still sees the exact JD document that scored best.
+    """
     best: dict[str, tuple[str, int]] = {}
     order: list[str] = []
-    for title, score in scored:
-        key = _re.sub(r"\s+", " ", str(title or "").strip()).lower()
+    for title, score, key in scored:
+        key = key or _re.sub(r"\s+", " ", str(title or "").strip()).lower()
         if not key:
             continue
         if key not in best:
@@ -124,8 +220,12 @@ _PREF_FAMILIES = (
      ("data analyst", "business data analyst", "businessanalyst", "analytics")),
     (("data engineer",), ("data engineer",)),
     (("data scientist", "machine learning", "ml engineer", "ai engineer",
-      "artificial intelligence", "computer vision"),
-     ("data scientist", "ai ml", "ai/ ml", "ai/", "computer vision", " cv ")),
+      "artificial intelligence", "computer vision", "forward deployed", "fde",
+      "applied ai", "agentic", "agentic ai", "generative ai", "genai", "llm"),
+     ("data scientist", "ai ml", "ai/ ml", "ai/", "computer vision", " cv ", "agai", "swdev ai ml", "ai")),
+    (("software engineer", "sde", "swe", "software developer", "forward deployed", "fde",
+      "full stack", "backend", "developer"),
+     ("software developer", "software engineer", "swdev", "software", "developer", "backend", "full stack")),
     (("mobile", "ios", "android", "swift", "kotlin", "flutter"),
      ("mobile application", "mobile app")),
     (("cybersecurity", "cyber security", "security analyst", "ciso"),
@@ -152,7 +252,8 @@ def _preference_matches_title(role_pref: str, title: str) -> bool:
         return False
     for pref_terms, title_terms in _PREF_FAMILIES:
         if any(term in pref for term in pref_terms):
-            return any(term in role for term in title_terms)
+            if any(term in role for term in title_terms):
+                return True
     # Exact tokens only: never let a short title token such as "it" match inside
     # unrelated text such as "with your organization".
     broad = {"data", "software", "application", "position", "job", "announcement",
@@ -180,7 +281,7 @@ def _top_n_list(skills_str: str, role_pref: str = "", top_n: int = None, roles=N
                       max(len(required), SCORING_MIN_ROLE_SKILLS))
         if pref and _preference_matches_title(pref, role["title"]):
             score = min(100, score + SCORING_TITLE_BOOST)
-        scored.append((role["title"], score))
+        scored.append((role["title"], score, role_opening_id(role)))
     ranked = sorted(_dedupe_ranked_titles(scored), key=lambda x: -x[1])
     return [(t, s) for t, s in ranked if s >= SCORING_MIN_MATCH][:top_n]
 
@@ -207,10 +308,15 @@ def _ai_role_shortlist(skills_str: str, role_pref: str, roles: list,
     Asking a 4K-context local model to emit scores for 80+ roles is both too large and
     unreliable.  Deterministic overlap first narrows the live JD set; Ollama then adds
     semantic judgment only inside that evidence-based shortlist.
+
+    Every slot goes to a DIFFERENT opening, so the model always sees real alternatives - the
+    JD library holds several documents per opening, and an undeduplicated shortlist could
+    spend all 12 slots on 4 openings. A catalog that is already both short enough and free of
+    duplicate openings is handed through untouched, skipping the ranking work entirely.
     """
-    if len(roles) <= limit:
+    if len(roles) <= limit and len({role_opening_id(r) for r in roles}) == len(roles):
         return roles
-    candidate = _skill_set(skills_str)
+    candidate = _expand_skills(_skill_set(skills_str))
     pref = (role_pref or "").lower()
     ranked = []
     for position, role in enumerate(roles):
@@ -219,9 +325,26 @@ def _ai_role_shortlist(skills_str: str, role_pref: str, roles: list,
         ratio = overlap / max(len(required), SCORING_MIN_ROLE_SKILLS)
         title = str(role.get("title", ""))
         pref_hit = _preference_matches_title(pref, title)
-        ranked.append((pref_hit, ratio, overlap, -position, role))
-    ranked.sort(key=lambda item: item[:4], reverse=True)
-    return [item[4] for item in ranked[:limit]]
+        # Intern penalty: if candidate did not request an intern role, deprioritize intern JDs
+        is_intern = "intern" in title.lower() and "intern" not in pref
+        intern_penalty = 0.3 if is_intern else 0.0
+        # Score combines ratio (completeness) and overlap count (depth of match)
+        # so large JDs with high skill counts aren't crowded out by 4-skill JDs
+        score_metric = ratio * 0.5 + (min(overlap, 15) / 15.0) * 0.5 - intern_penalty
+        ranked.append((pref_hit, score_metric, overlap, ratio, -position, role))
+    ranked.sort(key=lambda item: (item[0], item[1], item[2], item[3], item[4]), reverse=True)
+    # Ranking first, then keeping the first document seen per opening, means the best-scoring
+    # document of each opening is the one that represents it.
+    shortlist, seen = [], set()
+    for item in ranked:
+        key = role_opening_id(item[5])
+        if key in seen:
+            continue
+        seen.add(key)
+        shortlist.append(item[5])
+        if len(shortlist) >= limit:
+            break
+    return shortlist
 
 
 # ── AI-aware scoring dispatcher (Ollama brain -> keyword fallback) ────────────
@@ -243,24 +366,98 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
                         "before Ollama ranking")
         ai = ai_score_roles(skills_str, role_pref, roles=ai_roles, resume_text=resume_text)
         if ai:
+            # ai_score_roles only ever returns titles it was given, so the shortlist is
+            # enough to look each one's opening up - no re-deriving identity from the title.
+            openings = {str(r.get("title", "")).strip().lower(): role_opening_id(r)
+                        for r in ai_roles}
+            # Skills per JD title, for the zero-overlap guard below.
+            role_skills_by_title = {str(r.get("title", "")).strip().lower():
+                                    {str(s).lower() for s in (r.get("skills") or [])}
+                                    for r in ai_roles}
             ranked = []
-            seen_titles = set()
+            seen_openings = set()
             for r in ai:
                 if r["score"] < SCORING_MIN_MATCH:
                     continue
-                key = _re.sub(r"\s+", " ", str(r.get("title", "")).strip()).lower()
-                if not key or key in seen_titles or _NON_JOB_ROLE_TITLE_RE.search(key):
+                title = str(r.get("title", "")).strip()
+                # Same opening-level grouping as the keyword path (_dedupe_ranked_titles), so
+                # an Ollama ranking can't fill all three slots with the JA/PD/v2 documents of
+                # one opening either.
+                key = openings.get(title.lower()) or role_opening_id(title)
+                if not key or key in seen_openings or _NON_JOB_ROLE_TITLE_RE.search(title):
                     continue
-                seen_titles.add(key)
+                # ZERO-OVERLAP GUARD (added 2026-08-04). Ollama scores from its reading of
+                # the text, so it can rate a JD highly that shares NOT ONE skill with the
+                # candidate. Live case APP-20260721-0122-E743 (Brett Worker, CISSP applying
+                # for CISO): 'SIN 2 AI ML ENg Job Announcement' was ranked #1 at 95% with a
+                # keyword overlap of exactly 0/8, pushing 'Cybersecurity IT Admin Manager'
+                # (4/4 matched, 80%) into second - and Category, which derives from Suggested
+                # Role 1, then filed a security executive under AI/ML/CV.
+                #
+                # A confident model with zero evidence is worse than no model: drop any AI
+                # pick that shares no skill at all with the candidate. Roles with a genuine
+                # overlap keep the AI's ranking, which is what it is good at.
+                if _skill_overlap_count(skills_str, role_skills_by_title.get(title.lower())) == 0:
+                    logger.info(f"   scorer: dropped AI pick {title[:48]!r} - zero skill "
+                                f"overlap with the candidate (AI said {r['score']}%)")
+                    continue
+                seen_openings.add(key)
                 ranked.append(r)
             if ranked:
+                # TOP-UP (added 2026-08-04). Ollama frequently returns a THIN ranking - one
+                # or two roles clearing the threshold - and until now anything it didn't fill
+                # was published as a blank Suggested Role 2/3, even when the deterministic
+                # scorer had strong matches sitting right there. The old code only fell back
+                # to keywords when `ranked` was COMPLETELY empty, so a partial AI answer
+                # silently suppressed the rest.
+                #
+                # Live case APP-20260716-2052-6112 (Prerna Saluja, finance/FP&A): Ollama
+                # returned exactly one role, 'Finance Intern Position Description (20%)', and
+                # slots 2 and 3 shipped blank - while the keyword scorer ranks 'Business
+                # Analytics Marketing Intern (52%)', 'Data Analyst PD (48%)' and 'Business
+                # Data Analyst PD (45%)' for the same skills, all far better aligned with her
+                # stated 'Data Scientist / Analyst' preference.
+                #
+                # Ollama keeps every slot it actually earned, in its own order; the keyword
+                # scorer only fills what is left. Opening-level de-dupe still applies, so a
+                # top-up can never repeat an opening the AI already picked.
+                if len(ranked) < 3:
+                    for _title, _score in _top_n_list(skills_str, role_pref,
+                                                      top_n=len(roles), roles=roles):
+                        if len(ranked) >= 3:
+                            break
+                        _key = openings.get(_title.strip().lower()) or role_opening_id(_title)
+                        if not _key or _key in seen_openings:
+                            continue
+                        seen_openings.add(_key)
+                        ranked.append({"title": _title, "score": _score, "reason": ""})
+                        logger.info(f"   scorer: topped up slot {len(ranked)} with "
+                                    f"{_title[:48]!r} ({_score}%) - Ollama returned only "
+                                    f"{len(ai)} usable role(s)")
+
+                # Publish the STRONGEST match first. Added 2026-08-06: Ollama returns its
+                # picks in its own order and the top-up above APPENDS keyword matches after
+                # them, so a strong keyword match could land in slot 3 behind weaker AI
+                # picks. Five live rows shipped that way - APP-20260804-1856-2182 (Bharat
+                # Gupta) read 20% / 20% / 100%, putting his best match, 'Mobile Application
+                # Lead Developer (100%)', last on the client's sheet while slot 1 showed a
+                # 20% AWS role; APP-20260602-0018-52C6 read 80/30/87, and 6112, 0C84 and
+                # 55FC were out of order too.
+                #
+                # The sort is STABLE, so equal scores keep the order they were ranked in -
+                # Ollama's own preference still wins a tie against a keyword top-up, which
+                # is the whole point of the top-up keeping "every slot it actually earned".
+                # _top_n_list (the keyword-only fallback below) already sorts descending, so
+                # this is the only path that could publish out of order.
+                ranked.sort(key=lambda r: -int(r.get("score", 0) or 0))
+
                 r1 = ranked[0]
                 r2 = ranked[1] if len(ranked) >= 2 else None
                 r3 = ranked[2] if len(ranked) >= 3 else None
                 return {
-                    "role_1": f"{r1['title']} ({r1['score']}%)",
-                    "role_2": f"{r2['title']} ({r2['score']}%)" if r2 else "",
-                    "role_3": f"{r3['title']} ({r3['score']}%)" if r3 else "",
+                    "role_1": f"{role_display_name(r1)} ({r1['score']}%)",
+                    "role_2": f"{role_display_name(r2)} ({r2['score']}%)" if r2 else "",
+                    "role_3": f"{role_display_name(r3)} ({r3['score']}%)" if r3 else "",
                     "reason": r1.get("reason", ""),
                     "source": "ollama",
                 }
@@ -271,9 +468,9 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
     if top:
         reason = _keyword_reason(skills_str, top[0][0], roles)
     return {
-        "role_1": f"{top[0][0]} ({top[0][1]}%)" if len(top) >= 1 else "",
-        "role_2": f"{top[1][0]} ({top[1][1]}%)" if len(top) >= 2 else "",
-        "role_3": f"{top[2][0]} ({top[2][1]}%)" if len(top) >= 3 else "",
+        "role_1": f"{role_display_name(top[0][0])} ({top[0][1]}%)" if len(top) >= 1 else "",
+        "role_2": f"{role_display_name(top[1][0])} ({top[1][1]}%)" if len(top) >= 2 else "",
+        "role_3": f"{role_display_name(top[2][0])} ({top[2][1]}%)" if len(top) >= 3 else "",
         "reason": reason,
         "source": "keyword",
     }

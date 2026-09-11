@@ -21,10 +21,12 @@ from hiring_agent.config import (
     dated_subpath,
 )
 from hiring_agent.sharepoint_scoring import (
+    _canonical_resume_name,
     _clean_category_for_filename,
     _get_cleaned_filename_prefix,
     _rejected_subpath,
     _resume_filename_tail,
+    _underscored_name_prefix,
 )
 from sharepoint_client import SharePointClient, SharePointError
 
@@ -99,7 +101,32 @@ def extension_for(vals: dict, original: str) -> str:
     return f".{m.group(1)}" if m else ""
 
 
+# Delegates instead of rebuilding the name, so this auditor can never again drift from the
+# code that actually names the files - it did between 2026-08-04 (when the convention became
+# '<First>_<Last>_<tail>') and this fix, reporting every correctly-named file as 'legacy'
+# against a superseded expectation. Category came back into the name on 2026-08-06 and is
+# passed through here for the same reason: the auditor must ask the namer, never guess.
 def canonical_name(vals: dict, original: str) -> str:
+    return _canonical_resume_name(
+        str(vals.get("Full Name", "") or ""),
+        str(vals.get("Application ID", "") or "").strip(),
+        extension_for(vals, original),
+        str(vals.get("Category", "") or ""),
+    )
+
+
+# The 2026-08-04..2026-08-06 shape, '<First>_<Last>_<tail>' with no Category. Every file
+# stored in that window carries it, so it stays probed until the migration has run -
+# mirrors _resume_name_slots.
+def superseded_nocategory_name(vals: dict, original: str) -> str:
+    return (f"{_underscored_name_prefix(str(vals.get('Full Name', '') or ''))}"
+            f"_{_resume_filename_tail(str(vals.get('Application ID', '') or '').strip())}"
+            f"{extension_for(vals, original)}")
+
+
+# The 2026-07-15..2026-08-04 shape. Still probed so a file saved under it and not yet
+# migrated is found rather than reported missing - mirrors _resume_name_slots.
+def superseded_category_name(vals: dict, original: str) -> str:
     app_id = str(vals.get("Application ID", "") or "").strip()
     ext = extension_for(vals, original)
     name = _get_cleaned_filename_prefix(str(vals.get("Full Name", "") or ""))
@@ -157,6 +184,8 @@ def expected_names(vals: dict) -> list[tuple[str, str]]:
         status = str(vals.get("Status", "") or "").strip()
         if status not in PENDING_STATUSES:
             names.append(("canonical", canonical_name(vals, original)))
+            names.append(("superseded_nocategory", superseded_nocategory_name(vals, original)))
+            names.append(("superseded_category", superseded_category_name(vals, original)))
         names.append(("p1_current_write", p1_legacy_name(vals, original)))
         names.append(("old_appid_original", old_appid_original_name(vals, original)))
         names.append(("original", original))

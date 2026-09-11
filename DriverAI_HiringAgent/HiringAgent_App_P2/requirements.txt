@@ -3,9 +3,21 @@ azure-functions>=1.18     # Azure Functions runtime bindings (serverless host)
 pandas>=2.0
 openpyxl>=3.1
 pypdf>=4.0
+# Second-chance PDF text extraction when pypdf's parser returns nothing readable.
+# extraction.py has always called this, and the docs have always described it, but it was
+# never declared here - so on a clean install the fallback silently ImportError'd and was
+# swallowed as a warning (found 2026-08-02: present in code + docs, absent from the venv).
+pdfplumber>=0.11
 python-docx>=1.1
 requests>=2.31            # Graph (SharePoint) + optional Nominatim geo
 pyyaml>=6.0              # config.yaml business logic
+# Reads .env, which is where every LOCAL run gets TENANT_ID/CLIENT_ID/CLIENT_SECRET and the
+# SharePoint addressing. config.py, bot.py and the standalone scripts all call load_dotenv().
+# Same omission class as pdfplumber above: used in code, documented, never declared - so a
+# clean local install silently skipped .env and died with "Missing .env settings" even though
+# a correct .env was sitting right there (found 2026-08-11 on a fresh client-machine setup).
+# Cloud hosts inject real environment variables, which is why this never showed up there.
+python-dotenv>=1.0
 #
 # Scoring brain in the cloud (Azure Functions): always the offline regex parser — no
 # cloud-LLM hook exists (removed; it was never configured with a key in this deployment).

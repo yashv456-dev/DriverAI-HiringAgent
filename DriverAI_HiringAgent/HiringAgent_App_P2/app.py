@@ -396,9 +396,26 @@ class HiringApp:
         self.root.after(600, self._refresh_queue)
         self.root.after(400, self._refresh_metrics)
         self.root.after(900, self._refresh_insights)
+        # Say out loud, at launch, whether opening this window is about to start writing to
+        # live SharePoint. auto_start silently kicks off a real scoring loop 500ms after the
+        # window appears - no click, no prompt - and nothing on screen said so, which makes
+        # "just opening the app to look at the queue" an action with side effects. Logged
+        # either way so the quiet case is explicit rather than merely absent.
+        _interval = self.settings.get("trigger_interval_min", 5)
         if self.settings.get("auto_start"):
+            self._log(self.sp_log,
+                      f"AUTO-RUN IS ON - scoring will start automatically in a moment and "
+                      f"repeat every {_interval} min, writing to live SharePoint. "
+                      f"Turn it off in Settings > Auto start.")
             self.root.after(500, self._sp_autorun)
+        else:
+            self._log(self.sp_log,
+                      "Auto-run is off - this app will not touch SharePoint until you "
+                      "press Run. (Settings > Auto start enables it.)")
         if self.settings.get("schedule_enabled") and self.settings.get("scheduled_times"):
+            self._log(self.sp_log,
+                      f"Scheduler is ON for {self.settings.get('scheduled_times')} - "
+                      f"runs will fire unattended at those times.")
             self.root.after(800, self._start_scheduler)
             if self.settings.get("backdate_enabled"):
                 self.root.after(1200, self._backdate_check)
@@ -688,10 +705,17 @@ class HiringApp:
             except Exception as e:
                 self.log_q.put((log_widget, f"\n[error] {e}\n"))
                 rc = -1
-            secs = round(time.monotonic() - started, 1)
-            counts = parse_run_summary("".join(buffered[-80:]))
-            self.log_q.put((None, {"rc": rc, "secs": secs, "mode": mode,
-                                   "dry": "--dry-run" in args, **counts}))
+            finally:
+                # The completion payload is what clears _bot_running on the UI thread, so it
+                # must be posted even if summarising the output throws - otherwise the app
+                # stays stuck on "a run is already in progress" until it is restarted.
+                secs = round(time.monotonic() - started, 1)
+                try:
+                    counts = parse_run_summary("".join(buffered[-80:]))
+                except Exception:
+                    counts = {}
+                self.log_q.put((None, {"rc": rc, "secs": secs, "mode": mode,
+                                       "dry": "--dry-run" in args, **counts}))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -956,13 +980,34 @@ class HiringApp:
                       self.sp_log, interactive=False)
         self.sp_status.configure(text=f"  Scoring every {mins} min", text_color=SUCCESS)
 
+    def _sp_export_results(self):
+        """Rebuild the client-facing result sheet without running a scoring pass.
+
+        Goes through bot.py --export-results like every other action here, so it reuses the
+        same busy-guard, log streaming and completion handling rather than doing SharePoint
+        work on the UI thread.
+        """
+        self._run_bot(["--export-results"], self.sp_log)
+
     def _sp_stop(self):
-        if self.proc and self.proc.poll() is None:
-            self.proc.terminate()
-            self._log(self.sp_log, "\n[stopped]\n")
-            self.sp_status.configure(text="  Stopped", text_color=ERROR)
-        else:
+        if not (self.proc and self.proc.poll() is None):
             self._log(self.sp_log, "Nothing running.")
+            return
+        # Rejecting or restoring a candidate is two Graph calls (add to one sheet, delete
+        # from the other). Killing the worker between them leaves that candidate on BOTH
+        # sheets, which then needs the dedup/merge pass or a manual repair to sort out - so
+        # make the cost explicit instead of stopping instantly on a single click.
+        if not messagebox.askyesno(
+                "Stop the run?",
+                "Stop scoring now?\n\n"
+                "The candidate currently being written may be left half-recorded "
+                "(on both the main and Rejected sheets), which needs a re-run or a "
+                "repair pass to clean up.\n\n"
+                "Candidates already finished are unaffected."):
+            return
+        self.proc.terminate()
+        self._log(self.sp_log, "\n[stopped]\n")
+        self.sp_status.configure(text="  Stopped", text_color=ERROR)
 
     # ── Scheduled triggers ──
     def _format_sched_label(self, hhmm: str) -> str:
@@ -1261,6 +1306,9 @@ class HiringApp:
                             "Original Filename": name,
                             "Application Updates": 0,
                         })
+                        from hiring_agent.sharepoint_scoring import (
+                            _ensure_main_period_separator)
+                        _ensure_main_period_separator(client, row["Received Date"])
                         client.add_main_row(row)
                         ok += 1
                         self.log_q.put((self.resume_log,
@@ -1576,15 +1624,19 @@ class HiringApp:
             return
         try:
             import pandas as pd
-            try:
-                from hiring_agent.config import COLUMNS
-                df = pd.DataFrame(rows).reindex(columns=COLUMNS)
-            except Exception:
-                df = pd.DataFrame(rows)
+            # Same contract as the automatic client export (the "result sheet"): the minimal
+            # client column set, current-month-first order, a blank row under the header and
+            # between calendar months, and a clickable Resume Link. Previously this button
+            # dumped all 30 internal columns — Mail Body, Status, Retry Count and the rest —
+            # with no separators and a dead Resume Link, so the file a user hand-exported
+            # looked nothing like the one the client actually receives.
+            from hiring_agent.sharepoint_scoring import (
+                prepare_client_export_rows, write_client_export, _CLIENT_EXPORT_COLUMNS)
+            prepared = prepare_client_export_rows(rows)
             if f.lower().endswith(".csv"):
-                df.to_csv(f, index=False)
+                pd.DataFrame(prepared, columns=_CLIENT_EXPORT_COLUMNS).to_csv(f, index=False)
             else:
-                df.to_excel(f, index=False)
+                write_client_export(prepared, f)
             messagebox.showinfo("Saved", f"{len(rows)} candidate(s) saved to:\n{f}")
         except Exception as e:
             messagebox.showerror("Couldn't save", str(e))
@@ -2247,6 +2299,11 @@ class HiringApp:
         )
         self.run_btn.pack(side=tk.LEFT)
         ctk.CTkButton(actions, text="Stop", width=90, command=self._sp_stop).pack(side=tk.LEFT, padx=6)
+        # Rebuilding the client sheet used to require a whole scoring run (the export only
+        # ran as its final step), so a mid-day refresh for the client meant either waiting
+        # or running a scoring pass you did not otherwise want.
+        ctk.CTkButton(actions, text="Export Results", width=130,
+                      command=self._sp_export_results).pack(side=tk.LEFT, padx=(0, 6))
         ctk.CTkLabel(actions, text="Batch", fg_color="transparent",
                      text_color=CARD_SUBTEXT).pack(side=tk.LEFT, padx=(14, 6))
         self.batch_size_combo = ctk.CTkComboBox(

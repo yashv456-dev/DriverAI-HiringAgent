@@ -24,6 +24,7 @@ from hiring_agent.config import (
 from hiring_agent.extraction import (
     extract_text_from_bytes, extract_candidate_details_smart, resolve_full_name,
     infer_looking_for_role, infer_missing_portfolios, _GAP_LITERALS,
+    sanitize_phone, format_phone,
 )
 from hiring_agent.scoring import suggested_roles, assign_category
 from hiring_agent.jd_sources import get_active_roles
@@ -35,7 +36,12 @@ _PREFIX_RE = re.compile(r"^APP-\d{8}-\d{6}_", re.IGNORECASE)
 
 
 def _new_app_id() -> str:
-    return f"APP-{datetime.datetime.now(datetime.timezone.utc):%Y%m%d-%H%M%S}-{next(_APP_SEQ):02d}"
+    # LOCAL, not UTC (2026-08-27). The row this ref is minted for stores its
+    # "Received Date" from datetime.now() - local wall-clock - and P1 now mints its own
+    # APP- refs from the local receivedDateTime too. Left on UTC, a 23:30 local upload
+    # got a ref dated the NEXT day, disagreeing with its own row and with every other
+    # reference in the system (Arizona is UTC-7).
+    return f"APP-{datetime.datetime.now():%Y%m%d-%H%M%S}-{next(_APP_SEQ):02d}"
 
 
 def _strip_prefix(name: str) -> str:
@@ -212,7 +218,14 @@ def run_intake(path: str = None, dry_run: bool = False, excel_file=None) -> dict
             email = d.get("email", "")
             location = d.get("location", "Not extracted")
             country = d.get("country", "")
-            phone = d.get("phone", "Not extracted")
+            # Matches the SharePoint scoring path (sharepoint_scoring.py), which was the
+            # only one of the two intake routes doing either of these until found live
+            # 2026-09-01: a masked resume phone ('732-4***') came back as a fabricated-
+            # looking '732-449***' instead of 'Not extracted', and a NANP-shaped number
+            # (10 digit, or 11 starting with 1) was left as-written ('+1 480 930 2876')
+            # instead of the uniform '(480) 930-2876'.
+            phone = format_phone(d.get("phone", "Not extracted"))
+            phone = sanitize_phone(phone)
 
             if GEO_FILTER_USA_ONLY:
                 geo_decision, usa_reason = classify_location_usa(
@@ -282,7 +295,15 @@ def run_intake(path: str = None, dry_run: bool = False, excel_file=None) -> dict
                 stored = f"{app_id}_{name}"
                 logger.info(f"   ADD     {name} -> {app_id} | {full} | {r1} | {r2} | {r3} "
                             f"[{res['source']}] | {time.perf_counter()-t0:.1f}s")
-                logger.info(f"   location='{location}' | country='{country}' | usa={is_usa} ({usa_reason})")
+                # 'geo=', not 'usa=': the boolean is_usa was replaced by the tri-state
+                # GeoDecision (CONFIRMED_US / CONFIRMED_NON_US / UNKNOWN). The UPDATE branch
+                # above was migrated, this ADD branch was missed, so every NEW candidate
+                # reaching intake died on NameError: name 'is_usa' is not defined - the row
+                # was scored correctly and then thrown away. Only --score-folder/--score-excel
+                # run this path; production --score-sharepoint has its own, which is why it
+                # survived unnoticed. Caught 2026-08-24 by a 3-candidate dry run.
+                logger.info(f"   location='{location}' | country='{country}' | "
+                            f"geo={geo_decision.value} ({usa_reason})")
                 row_data = {"Application ID": app_id,
                             # ISO 'T' form: Excel Online keeps it as text (the space
                             # form gets coerced to a date serial; see excel_output).

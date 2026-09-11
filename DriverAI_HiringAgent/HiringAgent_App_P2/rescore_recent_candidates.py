@@ -12,6 +12,20 @@ load_dotenv(".env")
 
 import hiring_agent.config as cfg
 from sharepoint_client import SharePointClient, SharePointError
+
+from hiring_agent.store import ExcelCandidateStore, APP_ID_COL
+
+
+def _store(client):
+    """Row identity — see hiring_agent/store.py. Rows are addressed by Application ID, never
+    by position, so a Phase 1 append between this tool's read and its write cannot make it
+    patch the wrong candidate."""
+    return ExcelCandidateStore(client)
+
+
+def _app_id_of(values) -> str:
+    return str((values or {}).get(APP_ID_COL, "") or "").strip()
+
 from hiring_agent.excel_output import _parse_received
 from hiring_agent.extraction import (
     extract_candidate_details, ai_recheck_fields, merge_mail_body_fallback, html_to_text,
@@ -132,7 +146,7 @@ def run(count: int = 30, apply: bool = False,
             if verdict is True:
                 fields["Status"] = cfg.STATUS_SCORED
                 if apply:
-                    client.update_row(index, fields, current_values=vals)
+                    _store(client).save_by_id(app_id, fields, current_values=vals, hint=index)
                 kept += 1
                 outcome = "KEEP-USA"
             else:
@@ -142,9 +156,13 @@ def run(count: int = 30, apply: bool = False,
                 merged[cfg.DECLINE_SENT_COLUMN] = (
                     "N/A - USA-only audit; applicant email suppressed")
                 if apply:
+                    # Pass the Resume URL so the ACTUAL stored filename is tried first;
+                    # name/category guesses alone miss any file saved under a since-changed
+                    # Full Name or Category. Same fix as migrate_resume_filenames.py.
                     stored = _stored_resume_names(
                         app_id, vals.get("Original Filename", ""),
-                        full_name=vals.get("Full Name"), category=vals.get("Category"))
+                        full_name=vals.get("Full Name"), category=vals.get("Category"),
+                        resume_url=vals.get("Resume URL"))
                     if stored and _move_resumes(client, stored, subpath, to_rejected=True):
                         url, path = _resume_url_and_path(client, stored, _rejected_subpath(subpath))
                         if url:
@@ -152,11 +170,11 @@ def run(count: int = 30, apply: bool = False,
                             merged["Resume Folder Path"] = path
                     if app_id in rejected_by_id:
                         existing = rejected_by_id[app_id]
-                        client.update_rejected_row(
-                            existing["index"], merged,
-                            current_values=existing["values"])
+                        _store(client).save_by_id(
+                            app_id, merged, current_values=existing["values"],
+                            sheet="rejected", hint=existing["index"])
                     else:
-                        client.add_rejected_row(merged)
+                        _store(client).add(merged, "rejected")
                         rejected_ids.add(app_id)
                     delete_main.append(index)
                 if verdict is False:
@@ -192,11 +210,11 @@ def run(count: int = 30, apply: bool = False,
                 if apply:
                     if app_id in rejected_by_id:
                         existing = rejected_by_id[app_id]
-                        client.update_rejected_row(
-                            existing["index"], merged,
-                            current_values=existing["values"])
+                        _store(client).save_by_id(
+                            app_id, merged, current_values=existing["values"],
+                            sheet="rejected", hint=existing["index"])
                     else:
-                        client.add_rejected_row(merged)
+                        _store(client).add(merged, "rejected")
                         rejected_ids.add(app_id)
                     delete_main.append(index)
                 if verdict is False:
@@ -212,7 +230,7 @@ def run(count: int = 30, apply: bool = False,
 
     if apply:
         for index in sorted(set(delete_main), reverse=True):
-            client.delete_row(index)
+            _store(client).delete_at(index)
     result = {"kept_usa": kept, "moved_non_usa": moved,
               "moved_review": unresolved, "source_missing": source_missing,
               "errors": errors}

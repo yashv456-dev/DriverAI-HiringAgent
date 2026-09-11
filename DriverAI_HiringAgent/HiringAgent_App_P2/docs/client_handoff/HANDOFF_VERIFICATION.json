@@ -1,0 +1,48 @@
+{
+  "date": "2026-09-05",
+  "existing_runtime_config_package_files_verified": 67,
+  "existing_files_changed": [],
+  "portable_model_matches_installed_except_from": true,
+  "note_copies_identical": true,
+  "new_archives_created": false,
+  "live_actions_performed": false,
+  "cleanup_20260906": {
+    "date": "2026-09-06",
+    "scope": "Removed archives and unused artifacts so the tree holds only P1 and P2. 1.8 GB -> 276 MB.",
+    "manifest_regenerated": true,
+    "manifest_entries_before": 67,
+    "manifest_entries_after": 52,
+    "removed_from_package": [
+      "HiringAgent_App_P2\\dryrun_five_candidates.py",
+      "HiringAgent_App_P2\\dryrun_one_e2e.py",
+      "HiringAgent_App_P2\\dryrun_two_candidates.py",
+      "HiringAgent_App_P2\\p2_dryrun_D4DB_results.json",
+      "HiringAgent_App_P2\\p2_dryrun_two_results.json",
+      "HiringAgent_App_P2\\p2_edge_case_review_results.json",
+      "HiringAgent_App_P2\\p2_five_candidate_results.json",
+      "HiringAgent_App_P2\\p2_five_resume_evidence.json",
+      "HiringAgent_App_P2\\p2_one_candidate_e2e_results.json",
+      "HiringAgent_App_P2\\p2_published_results_comparison.json",
+      "HiringAgent_App_P2\\review_p2_edge_cases.py",
+      "HiringAgent_App_P2\\update_D4DB_from_cv.py",
+      "HiringAgent_App_P2\\verify_five_preview_export.py",
+      "HiringAgent_App_P2\\verify_five_resume_evidence.py",
+      "HiringAgent_P1\\HiringAgent_P1\\flow\\v4.zip"
+    ],
+    "hash_drift_predating_this_cleanup": [
+      "HiringAgent_P1\\HiringAgent_P1\\test_p1.py",
+      "HiringAgent_P1\\HiringAgent_P1\\flow\\definition.json",
+      "HiringAgent_P1\\HiringAgent_P1\\flow\\DriverAI-Hiring-AutoReply-apply.zip",
+      "HiringAgent_P1\\HiringAgent_P1\\flow\\flow_config.json"
+    ],
+    "hash_drift_note": "These four were rebuilt on 2026-09-05 at 19:50, after the 17:30 manifest snapshot, and were already stale before this cleanup ran. The regenerated manifest records their CURRENT hashes, so it no longer proves they match the 2026-09-05 handoff snapshot. Re-verify the P1 flow package against Power Automate before relying on it.",
+    "files_edited_by_cleanup": [
+      "HiringAgent_App_P2\\CLIENT_COMPUTER_START_HERE.md",
+      "HiringAgent_P1\\CLIENT_COMPUTER_START_HERE.md",
+      "HiringAgent_P1\\HiringAgent_P1\\CLIENT_COMPUTER_START_HERE.md",
+      "HiringAgent_P1\\HiringAgent_P1\\docs\\P1_TDD.md"
+    ],
+    "edit_reason": "Removed pointers to deleted dry-run helpers, JSON artifacts, v4.zip and the retired parent-level review reports; logged the cleanup in the P1 TDD changelog.",
+    "live_actions_performed": false
+  }
+}

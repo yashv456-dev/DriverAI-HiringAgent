@@ -1,0 +1,21 @@
+--- before/config.yaml
++++ after/config.yaml
+@@ -4062,13 +4062,11 @@
+     enabled: true
+     model: "qwen3-1.7b-p2:latest"
+     host: "http://localhost:11434"
+-    # RAISED 60 -> 180 on 2026-09-06. Measured against this exact model on the client's
+-    # hardware: a 1.4k-char resume took 36.9s, an ORDINARY 3.6k-char two-page CV took
+-    # 62.1s, an 8.1k-char one took 45.6s. 60s was not a ceiling, it was roughly the
+-    # median - so a normal resume timed out about half the time, silently fell back to
+-    # the regex parser, and published regex-quality fields as 'Scored'. With require_ai
+-    # below there is no silent fallback any more, so this budget has to be realistic or
+-    # the queue simply defers everything.
++    # Give-up threshold per attempt, not a performance setting: about 3x the earlier
++    # worst measured extraction (62.1s). Retained at 180 after measuring thinking off,
++    # a 512-token output cap, and JSON schemas; see docs/benchmarks/stage2a/REPORT.md.
++    # Extraction retries a timeout once; a second timeout uses the existing fallback
++    # and require_ai gate. Connection failures are not retried.
+     timeout: 180
+     # Separate, longer timeout just for role-fit scoring (rates the candidate against
+     # every open role in one prompt - the heaviest Ollama call, needs real headroom).

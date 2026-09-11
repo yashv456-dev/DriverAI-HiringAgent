@@ -72,10 +72,41 @@ STATUS_LOCATION_UNCONFIRMED = _yaml.get("status_values", {}).get(
     "location_unconfirmed", "Rejected - Location Not Confirmed")
 STATUS_PROCESSING_FAILED = _yaml.get("status_values", {}).get(
     "processing_failed", "Rejected - Processing Error")
+STATUS_NEEDS_REVIEW_SPAM = _yaml.get("status_values", {}).get(
+    "needs_review_spam", "Needs Review - Possible Spam")
+
+# P2's secondary content-safety net (see config.yaml content_safety) - checked against a
+# row's resume text and mail body before normal extraction runs. P1 already screens
+# incoming mail for this (HiringAgent_P1/flow/flow_config.json spam_filters); this only
+# catches the rare row that still slips through.
+SUSPICIOUS_CONTENT_PHRASES = [
+    str(p).strip().lower()
+    for p in (_yaml.get("content_safety", {}) or {}).get("suspicious_phrases", [])
+    if str(p).strip()
+]
 
 # How many times a row may fail (unreadable resume OR any exception during scoring)
 # before it's given up on and moved to Rejected - never retried forever.
 SCORE_RETRY_MAX = int(os.getenv("HIRING_SCORE_RETRY_MAX") or _yaml.get("score_retry_max", 3))
+
+# How many days an unanswered review row may sit on the main sheet before P2 quietly closes
+# it (no email, ever). 0 disables aging. See config.yaml review_age_out_days.
+try:
+    REVIEW_AGE_OUT_DAYS = int(os.getenv("HIRING_REVIEW_AGE_OUT_DAYS")
+                              or _yaml.get("review_age_out_days", 14))
+except (TypeError, ValueError):
+    REVIEW_AGE_OUT_DAYS = 14
+REVIEW_AGE_OUT_DAYS = max(REVIEW_AGE_OUT_DAYS, 0)
+
+# Pause between candidates in the scoring loop. Every candidate costs several Graph calls
+# (read row, download resume, rename, write row), so a long unattended client run can walk
+# into throttling; a short breath between rows keeps it well inside the limits. 0 disables.
+try:
+    ROW_DELAY_SECONDS = float(os.getenv("HIRING_ROW_DELAY_SECONDS")
+                              or _yaml.get("row_delay_seconds", 2))
+except (TypeError, ValueError):
+    ROW_DELAY_SECONDS = 2.0
+ROW_DELAY_SECONDS = max(ROW_DELAY_SECONDS, 0.0)
 
 # Admin recipient for the "row given up on after N failures" alert, and the P2-side alert
 # toggle - separate from GEO_REJECT_EMAIL (applicant-facing) and P1's own Notify_failure.
@@ -189,26 +220,34 @@ FOREIGN_CITIES = [loc.lower() for loc in _filters.get("foreign_cities", [])]
 FOREIGN_REGIONS = [loc.lower() for loc in _filters.get("foreign_regions", [])]
 FOREIGN_DEMONYMS = [loc.lower() for loc in _filters.get("foreign_demonyms", [])]
 
-US_STATE_ABBREVS = {
-    "al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl", "ga",
-    "hi", "id", "il", "in", "ia", "ks", "ky", "la", "me", "md",
-    "ma", "mi", "mn", "ms", "mo", "mt", "ne", "nv", "nh", "nj",
-    "nm", "ny", "nc", "nd", "oh", "ok", "or", "pa", "ri", "sc",
-    "sd", "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "dc",
+# Single source of truth for US states: the abbreviation <-> full-name pairing. Both sets
+# below are derived from it, so they can never drift apart, and callers that need to treat
+# "AZ" and "Arizona" as the same claim (see extraction._location_grounded_in_text) have a
+# real mapping instead of two unrelated sets.
+US_STATE_ABBREV_TO_NAME = {
+    "al": "alabama", "ak": "alaska", "az": "arizona", "ar": "arkansas",
+    "ca": "california", "co": "colorado", "ct": "connecticut", "de": "delaware",
+    "fl": "florida", "ga": "georgia", "hi": "hawaii", "id": "idaho",
+    "il": "illinois", "in": "indiana", "ia": "iowa", "ks": "kansas",
+    "ky": "kentucky", "la": "louisiana", "me": "maine", "md": "maryland",
+    "ma": "massachusetts", "mi": "michigan", "mn": "minnesota",
+    "ms": "mississippi", "mo": "missouri", "mt": "montana", "ne": "nebraska",
+    "nv": "nevada", "nh": "new hampshire", "nj": "new jersey",
+    "nm": "new mexico", "ny": "new york", "nc": "north carolina",
+    "nd": "north dakota", "oh": "ohio", "ok": "oklahoma", "or": "oregon",
+    "pa": "pennsylvania", "ri": "rhode island", "sc": "south carolina",
+    "sd": "south dakota", "tn": "tennessee", "tx": "texas", "ut": "utah",
+    "vt": "vermont", "va": "virginia", "wa": "washington",
+    "wv": "west virginia", "wi": "wisconsin", "wy": "wyoming",
+    "dc": "district of columbia",
 }
 
-US_STATE_NAMES = {
-    "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
-    "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
-    "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana",
-    "maine", "maryland", "massachusetts", "michigan", "minnesota",
-    "mississippi", "missouri", "montana", "nebraska", "nevada",
-    "new hampshire", "new jersey", "new mexico", "new york", "north carolina",
-    "north dakota", "ohio", "oklahoma", "oregon", "pennsylvania",
-    "rhode island", "south carolina", "south dakota", "tennessee", "texas",
-    "utah", "vermont", "virginia", "washington", "west virginia",
-    "wisconsin", "wyoming", "district of columbia",
-}
+US_STATE_NAME_TO_ABBREV = {name: abbrev
+                           for abbrev, name in US_STATE_ABBREV_TO_NAME.items()}
+
+US_STATE_ABBREVS = set(US_STATE_ABBREV_TO_NAME)
+
+US_STATE_NAMES = set(US_STATE_ABBREV_TO_NAME.values())
 
 US_TERRITORY_NAMES = {
     "puerto rico", "guam", "u.s. virgin islands", "american samoa",
@@ -244,11 +283,19 @@ _ollama_default = bool(_ollama.get("enabled", True)) and not IS_SERVERLESS
 OLLAMA_ENABLED = _envflag("HIRING_OLLAMA_ENABLED", _ollama_default)
 OLLAMA_MODEL = os.getenv("HIRING_OLLAMA_MODEL") or _ollama.get("model", "llama3.2")
 OLLAMA_HOST = (os.getenv("HIRING_OLLAMA_HOST") or _ollama.get("host", "http://localhost:11434")).rstrip("/")
-OLLAMA_TIMEOUT = int(_ollama.get("timeout", 60))
+OLLAMA_TIMEOUT = int(_ollama.get("timeout", 180))
 # Separate, longer timeout just for role-fit scoring (rates the candidate against every
-# open role in one prompt - the heaviest Ollama call). Extraction's OLLAMA_TIMEOUT above
-# is untouched - it was never the thing that timed out.
+# open role in one prompt - the heaviest Ollama call).
+#
+# The note that used to sit here said extraction's OLLAMA_TIMEOUT "was never the thing that
+# timed out". Measured 2026-09-06 against the live model, that was wrong: an ordinary
+# 3.6k-char two-page CV took 62.1s against the then-60s extraction budget. Extraction was
+# exactly the thing that timed out, and the fallback was silent. See config.yaml.
 OLLAMA_SCORING_TIMEOUT = int(_ollama.get("scoring_timeout", 150))
+
+# Never publish a row the model did not actually read - defer it instead. See config.yaml's
+# ai_extraction.ollama.require_ai for the full reasoning.
+REQUIRE_AI = _envflag("HIRING_REQUIRE_AI", bool(_ollama.get("require_ai", False)))
 
 # Use the Ollama brain for SCORING too (role-fit + reasoning), not just extraction.
 # Falls back to the deterministic keyword scorer when off or unavailable.
@@ -267,6 +314,10 @@ SCORING_TITLE_BOOST = _scoring.get("title_boost", 10)
 SCORING_MIN_ROLE_SKILLS = int(_scoring.get("min_role_skills_denominator", 5))
 SCORING_MAX_SKILLS = _scoring.get("max_skills_display", 40)
 SCORING_BATCH_LIMIT = int(os.getenv("HIRING_SCORING_BATCH_LIMIT") or _scoring.get("batch_limit", 25))
+
+# Circuit breaker: maximum consecutive candidate failures/timeouts before halting the run.
+# Protects the queue if Ollama, network, or Graph experiences an outage. Remaining queue is untouched.
+CONSECUTIVE_FAILURE_LIMIT = int(os.getenv("HIRING_CONSECUTIVE_FAILURE_LIMIT") or _yaml.get("consecutive_failure_limit", 3))
 
 # ── Role → Category mapping (config-driven; first-match-wins substring rules) ─
 _cat_cfg = _yaml.get("role_categories", {})

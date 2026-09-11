@@ -19,6 +19,20 @@ load_dotenv(".env")
 
 import hiring_agent.config as cfg
 from sharepoint_client import GRAPH, SharePointClient, SharePointError
+
+
+from hiring_agent.store import ExcelCandidateStore, APP_ID_COL
+
+
+def _store(client):
+    """Row identity — see hiring_agent/store.py. Rows are addressed by Application ID, never
+    by position, so a Phase 1 append between this tool's read and its write cannot make it
+    patch the wrong candidate."""
+    return ExcelCandidateStore(client)
+
+
+def _app_id_of(values) -> str:
+    return str((values or {}).get(APP_ID_COL, "") or "").strip()
 from hiring_agent.excel_output import _parse_received
 from hiring_agent.extraction import (
     _GAP_LITERALS, _ocr_pdf, ai_recheck_fields, extract_candidate_details_smart,
@@ -30,7 +44,7 @@ from hiring_agent.geo import normalize_country, reconcile_us_country
 from hiring_agent.jd_sources import get_active_roles
 from hiring_agent.scoring import assign_category, suggested_roles
 from hiring_agent.sharepoint_scoring import (
-    _clean_category_for_filename, _get_cleaned_filename_prefix, _na_if_gap,
+    _canonical_resume_name, _na_if_gap,
     _rejected_subpath, _resume_display_path, _resume_filename_tail,
 )
 from rescore_recent_candidates import _strict_geo
@@ -214,10 +228,15 @@ def _deep_text(raw: bytes, filename: str) -> tuple[str, bool]:
 
 def _canonical_name(full_name: str, category: str,
                     app_id: str, source_name: str) -> str:
+    """Delegate to the one function that names resumes, never rebuild the shape here.
+
+    This rebuilt it by hand until 2026-08-06 and had drifted two conventions behind -
+    it still produced the 2026-07-15 run-together '<FirstLast>_<Category>_<tail>', so a
+    repaired row would have been written back under a filename P2 no longer uses. Same
+    drift class that left audit_all_resume_files.py checking a superseded expectation.
+    """
     ext = PurePosixPath(source_name).suffix.lower() or ".pdf"
-    return (f"{_get_cleaned_filename_prefix(full_name)}_"
-            f"{_clean_category_for_filename(category)}_"
-            f"{_resume_filename_tail(app_id)}{ext}")
+    return _canonical_resume_name(full_name, app_id, ext, category)
 
 
 def _old_url_location(vals: dict) -> tuple[str, str] | None:
@@ -284,11 +303,19 @@ def run(apply: bool = False, app_ids: list[str] | None = None) -> dict:
     client = SharePointClient()
     rejected = client.list_rejected_rows()
     requested = {str(x).strip() for x in (app_ids or []) if str(x).strip()}
+    # The month-folder condition is this script's ORIGINAL sweep filter: find rows whose
+    # resume link still pointed at '<Year>/<Month>' before the Rejected consolidation. That
+    # sweep is finished, so with no --app-id it now correctly selects nothing.
+    #
+    # An explicit --app-id must OVERRIDE it (changed 2026-08-06). Naming a row is a direct
+    # instruction to re-extract that row; silently dropping it because its link is already
+    # consolidated made the flag look broken - it reported TARGETS=0 for three rows that
+    # genuinely needed repairing (DAA7, 44A6, B88E, all with a bad Full Name).
     targets = [r for r in rejected
                if str(r["values"].get("Application ID", "")).startswith("APP-")
-               and "/Rejected" not in str(r["values"].get("Resume Folder Path", ""))
-               and (not requested or str(
-                   r["values"].get("Application ID", "")).strip() in requested)]
+               and (str(r["values"].get("Application ID", "")).strip() in requested
+                    if requested else
+                    "/Rejected" not in str(r["values"].get("Resume Folder Path", "")))]
     messages = _archive_messages(client)
     roles = get_active_roles()
     main_ids = {str(r["values"].get("Application ID", "")).strip()
@@ -359,7 +386,7 @@ def run(apply: bool = False, app_ids: list[str] | None = None) -> dict:
                 if app_id in main_ids:
                     raise RuntimeError(
                         "Application ID already exists on CandidateList; refusing duplicate restore")
-                client.add_main_row(merged)
+                _store(client).add(merged, "main")
                 main_ids.add(app_id)
                 delete_rejected.append(index)
             else:
@@ -367,15 +394,25 @@ def run(apply: bool = False, app_ids: list[str] | None = None) -> dict:
                                     else cfg.STATUS_LOCATION_UNCONFIRMED)
                 if not str(merged.get(cfg.DECLINE_SENT_COLUMN, "") or "").strip():
                     merged[cfg.DECLINE_SENT_COLUMN] = NO_MAIL_MARKER
-                client.update_rejected_row(index, merged, current_values=vals)
+                _store(client).save_by_id(app_id, merged, current_values=vals,
+                                          sheet="rejected", hint=index)
 
-            if old_location and old_location != (folder, canonical):
+            # Both "is this the file I just wrote?" guards compare CASE-INSENSITIVELY.
+            # SharePoint paths are case-insensitive, so an exact == let a rename that only
+            # changed capitalisation slip through as a "different" file and the cleanup then
+            # deleted the copy just uploaded. Live on 2026-08-06: APP-20260604-0818-44A6's
+            # name was corrected 'aashish sachaniya' -> 'Aashish Sachaniya', the canonical
+            # target differed from the stored file by case alone, and the resume was
+            # destroyed - the row survived pointing at a file that no longer existed.
+            _written = (folder.lower(), canonical.lower())
+            if old_location and (old_location[0].lower(),
+                                 old_location[1].lower()) != _written:
                 try:
                     client.delete_file(*old_location)
                 except SharePointError:
                     pass
             for old_folder, old_name in old_files:
-                if (old_folder, old_name) == (folder, canonical):
+                if (old_folder.lower(), old_name.lower()) == _written:
                     continue
                 try:
                     client.delete_file(old_folder, old_name)
@@ -387,7 +424,7 @@ def run(apply: bool = False, app_ids: list[str] | None = None) -> dict:
 
     if apply:
         for index in sorted(set(delete_rejected), reverse=True):
-            client.delete_rejected_row(index)
+            _store(client).delete_at(index, "rejected")
     print("\nSUMMARY", counts, flush=True)
     return counts
 

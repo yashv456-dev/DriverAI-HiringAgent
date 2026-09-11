@@ -1,0 +1,34 @@
+# ── Secrets ─────────────────────────────────────────────────────────────────
+# .env holds TENANT_ID / CLIENT_ID / CLIENT_SECRET for the Azure app registration
+# that has write access to the live SharePoint site. It must never be committed,
+# to a private repo either: git history is permanent and a repo's visibility can
+# be changed later. .env.example carries the same keys with the values stripped.
+.env
+local.settings.json
+
+# ── Candidate data (PII) ────────────────────────────────────────────────────
+# Real applicants: names, email addresses, phone numbers, locations, resumes.
+candidates.db
+candidates.db-shm
+candidates.db-wal
+candidates.db.bak*
+*.xlsx
+P2_Logs/
+P2_Input/
+P2_Output/
+P2_Final_Results/
+P2_Preview/
+resume_cache/
+processing_artifacts/
+benchmark_resumes/
+*.pdf
+*.docx
+
+# ── Environment and build noise ─────────────────────────────────────────────
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+*.lock
+jd_roles_cache.json

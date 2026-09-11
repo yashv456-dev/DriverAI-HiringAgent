@@ -85,8 +85,9 @@ def ai_score_roles(skills: str, role_pref: str = "", roles=None,
             json={
                 "model": OLLAMA_MODEL,
                 "format": "json",
+                "think": False,
                 "stream": False,
-                "options": {"temperature": 0},
+                "options": {"temperature": 0, "num_predict": 1536},
                 "messages": [
                     {"role": "system", "content": _SCORE_SYSTEM},
                     {"role": "user", "content": user},
@@ -95,7 +96,16 @@ def ai_score_roles(skills: str, role_pref: str = "", roles=None,
             timeout=OLLAMA_SCORING_TIMEOUT,
         )
         resp.raise_for_status()
-        data = json.loads(resp.json()["message"]["content"])
+        content = resp.json()["message"]["content"]
+        try:
+            data = json.loads(content)
+        except Exception:
+            import re
+            items = re.findall(r'\{[^{}]*?"title"\s*:\s*"([^"]+)"[^{}]*?"score"\s*:\s*(\d+)[^{}]*?\}', content)
+            if items:
+                data = {"scores": [{"title": t, "score": int(s), "reason": ""} for t, s in items]}
+            else:
+                raise
     except Exception as e:
         logger.warning(f"Ollama scoring unavailable ({e}); using keyword scorer.")
         return None

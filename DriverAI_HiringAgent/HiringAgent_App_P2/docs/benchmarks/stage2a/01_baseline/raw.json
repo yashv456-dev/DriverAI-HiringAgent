@@ -1,0 +1,266 @@
+[
+  {
+    "call": "extract_1",
+    "request": {
+      "json": {
+        "model": "qwen3-1.7b-p2:latest",
+        "format": "json",
+        "stream": false,
+        "options": {
+          "temperature": 0
+        },
+        "messages": [
+          {
+            "role": "system",
+            "content": "You extract candidate details from a job application (email body + resume text). Return every field as a string; use an empty string when a field is not present. For location, extract the candidate's CURRENT contact/home location only. Prefer the resume header/contact section or an explicit current-location statement; never use a past school, employer, project, or hometown as the current location. 'location' should be city and state/region only \u2014 do NOT include the country (e.g. 'Austin, Texas' or 'Bengaluru, Karnataka' or 'London'). 'country' is the country name (e.g. 'United States' or 'India' or 'UK') \u2014 always infer the country from context clues (area codes, universities, addresses, currency, employer names). 'skills' is a short comma-separated list of individual skills or tools ACTUALLY NAMED in the text below - never invent or add a skill that is not written in the resume, and never return section headings, categories, or descriptive phrases; 'looking_for_role' is the job title/role they seek. 'education' is the candidate's highest degree and field of study, plus school if given (e.g. 'B.S. Computer Science, Arizona State University') - empty string if the resume doesn't mention any degree or schooling.\n\nA deterministic pattern-matcher already found these candidate values from the text below - confirm each is correct, or correct it if the text says otherwise:\n- full_name: Alex Morgan\n- location: Austin, Texas\n- country: United States\n- looking_for_role: focused on backend services\n- education: Bachelor of Science in Computer Science, University of Texas at Austin Respond ONLY with a JSON object whose keys are full_name, phone, location, country, skills, looking_for_role, education."
+          },
+          {
+            "role": "user",
+            "content": "Alex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with product managers to define acceptance criteria and document API contracts for internal consumers.\n- Built React and TypeScript screens that let operations staff search orders, correct incomplete records, and review shipment history. Added accessible forms, loading indicators, and clear validation messages.\n- Used Docker and AWS to package and deploy services. Maintained GitHub Actions workflows for automated builds, unit tests, and deployment checks. Investigated failed releases and documented recovery steps.\n- Improved SQL queries used by daily operational reports. Added indexes after reviewing query plans, reduced duplicate database calls, and verified that totals matched existing financial exports.\n- Wrote pytest tests for data validation, authorization, and retry behavior. Reviewed pull requests with an emphasis on readable code and preserving existing customer workflows.\n- Participated in an on-call rotation, investigated production incidents, and added structured logs and dashboards to make recurring failures easier to diagnose. Shared incident findings with the team.\n\nJunior Software Engineer | Willow Analytics | Austin, Texas\nSeptember 2020 - August 2022\n- Implemented Django endpoints and PostgreSQL migrations for an internal reporting application. Coordinated releases with analysts who relied on the reports during weekly planning meetings.\n- Wrote Python scripts to validate incoming CSV files, flag duplicate records, and produce error summaries. Added regression tests for missing columns and inconsistent date formats.\n- Updated JavaScript interfaces, fixed browser compatibility issues, and worked with designers to improve keyboard navigation. Maintained documentation for common support requests.\n- Used Git for version control and Linux for development and troubleshooting. Paired with senior engineers to review requirements and break larger changes into smaller releases.\n\nEDUCATION\nBachelor of Science in Computer Science, University of Texas at Austin\nAugust 2016 - May 2020\nCoursework included data structures, algorithms, databases, operating systems, and software engineering. Completed a team project that exposed a REST API and a web interface for scheduling community events.\n\nTECHNICAL SKILLS\nPython, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS.\n\nPROJECTS\nCommunity Events Scheduler: Developed a Python API and React interface for event registration. Implemented input validation and PostgreSQL storage, wrote setup instructions, and collected feedback from volunteer coordinators.\nData Quality Toolkit: Created Python utilities for checking CSV exports before loading them into reporting tables. Included automated tests, sample inputs, and documentation explaining each validation rule."
+          }
+        ]
+      },
+      "timeout": 180
+    },
+    "raw": {
+      "model": "qwen3-1.7b-p2:latest",
+      "created_at": "2026-09-06T20:40:20.0055657Z",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"full_name\": \"Alex Morgan\",\n  \"phone\": \"+1 (512) 555-0142\",\n  \"location\": \"Austin, Texas\",\n  \"country\": \"United States\",\n  \"skills\": \"Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS\",\n  \"looking_for_role\": \"Senior Software Engineer\",\n  \"education\": \"Bachelor of Science in Computer Science, University of Texas at Austin\"\n}",
+        "thinking": "Okay, let's tackle this step by step. The user provided a job application email and resume, and I need to extract specific details into a JSON format. Let me start by breaking down each required field.\n\nFirst, the full name. The email starts with \"Alex Morgan\", so that's straightforward. The location is given as \"Austin, Texas, United States\". But according to the instructions, I should use the current contact/home location. The resume mentions \"Austin, Texas\" in the professional experience section, so that's the current location. The country is inferred as United States from the email.\n\nNext, the phone number. The email has \"alex.morgan@example.com | +1 (512) 555-0142\". The phone number is the second part, so that's +1 (512) 555-0142.\n\nSkills are listed in the technical skills section. The resume lists Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS. I need to extract these as a comma-separated list. The user mentioned not to include section headings or categories, so I'll just list the individual skills.\n\nLooking for the role is mentioned in the professional summary: \"Seeking a Senior Software Engineer role focused on backend services\". So the looking_for_role is \"Senior Software Engineer\".\n\nEducation is the Bachelor of Science in Computer Science from University of Texas at Austin. The resume mentions that, so education is as given.\n\nWait, the user's example response has \"education\" as \"Bachelor of Science in Computer Science, University of Texas at Austin\". The resume does mention that, so that's correct.\n\nI need to make sure all fields are present. The JSON should have full_name, phone, location, country, skills, looking_for_role, education. All these are present in the provided data.\n\nCheck if any fields are missing. The phone is there, location is correct, country is inferred. Skills are all listed. Looking for role is correct. Education is correct.\n\nNo issues with the extracted data. The location is Austin, Texas, which is the current location. The country is United States. The phone number is correctly extracted. Skills are all the listed technologies. The role is Senior Software Engineer. Education is as stated.\n\nEverything seems to fit. The user's example response matches this, so the answer should be the JSON with these details.\n"
+      },
+      "done": true,
+      "done_reason": "stop",
+      "total_duration": 5562448700,
+      "load_duration": 2056875900,
+      "prompt_eval_count": 1052,
+      "prompt_eval_cached_count": 0,
+      "prompt_eval_duration": 239527000,
+      "eval_count": 637,
+      "eval_duration": 3242718000
+    },
+    "status_code": 200,
+    "seconds": 7.620348100012052
+  },
+  {
+    "call": "extract_2",
+    "request": {
+      "json": {
+        "model": "qwen3-1.7b-p2:latest",
+        "format": "json",
+        "stream": false,
+        "options": {
+          "temperature": 0
+        },
+        "messages": [
+          {
+            "role": "system",
+            "content": "You extract candidate details from a job application (email body + resume text). Return every field as a string; use an empty string when a field is not present. For location, extract the candidate's CURRENT contact/home location only. Prefer the resume header/contact section or an explicit current-location statement; never use a past school, employer, project, or hometown as the current location. 'location' should be city and state/region only \u2014 do NOT include the country (e.g. 'Austin, Texas' or 'Bengaluru, Karnataka' or 'London'). 'country' is the country name (e.g. 'United States' or 'India' or 'UK') \u2014 always infer the country from context clues (area codes, universities, addresses, currency, employer names). 'skills' is a short comma-separated list of individual skills or tools ACTUALLY NAMED in the text below - never invent or add a skill that is not written in the resume, and never return section headings, categories, or descriptive phrases; 'looking_for_role' is the job title/role they seek. 'education' is the candidate's highest degree and field of study, plus school if given (e.g. 'B.S. Computer Science, Arizona State University') - empty string if the resume doesn't mention any degree or schooling.\n\nA deterministic pattern-matcher already found these candidate values from the text below - confirm each is correct, or correct it if the text says otherwise:\n- full_name: Alex Morgan\n- location: Austin, Texas\n- country: United States\n- looking_for_role: focused on backend services\n- education: Bachelor of Science in Computer Science, University of Texas at Austin Respond ONLY with a JSON object whose keys are full_name, phone, location, country, skills, looking_for_role, education."
+          },
+          {
+            "role": "user",
+            "content": "Alex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with product managers to define acceptance criteria and document API contracts for internal consumers.\n- Built React and TypeScript screens that let operations staff search orders, correct incomplete records, and review shipment history. Added accessible forms, loading indicators, and clear validation messages.\n- Used Docker and AWS to package and deploy services. Maintained GitHub Actions workflows for automated builds, unit tests, and deployment checks. Investigated failed releases and documented recovery steps.\n- Improved SQL queries used by daily operational reports. Added indexes after reviewing query plans, reduced duplicate database calls, and verified that totals matched existing financial exports.\n- Wrote pytest tests for data validation, authorization, and retry behavior. Reviewed pull requests with an emphasis on readable code and preserving existing customer workflows.\n- Participated in an on-call rotation, investigated production incidents, and added structured logs and dashboards to make recurring failures easier to diagnose. Shared incident findings with the team.\n\nJunior Software Engineer | Willow Analytics | Austin, Texas\nSeptember 2020 - August 2022\n- Implemented Django endpoints and PostgreSQL migrations for an internal reporting application. Coordinated releases with analysts who relied on the reports during weekly planning meetings.\n- Wrote Python scripts to validate incoming CSV files, flag duplicate records, and produce error summaries. Added regression tests for missing columns and inconsistent date formats.\n- Updated JavaScript interfaces, fixed browser compatibility issues, and worked with designers to improve keyboard navigation. Maintained documentation for common support requests.\n- Used Git for version control and Linux for development and troubleshooting. Paired with senior engineers to review requirements and break larger changes into smaller releases.\n\nEDUCATION\nBachelor of Science in Computer Science, University of Texas at Austin\nAugust 2016 - May 2020\nCoursework included data structures, algorithms, databases, operating systems, and software engineering. Completed a team project that exposed a REST API and a web interface for scheduling community events.\n\nTECHNICAL SKILLS\nPython, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS.\n\nPROJECTS\nCommunity Events Scheduler: Developed a Python API and React interface for event registration. Implemented input validation and PostgreSQL storage, wrote setup instructions, and collected feedback from volunteer coordinators.\nData Quality Toolkit: Created Python utilities for checking CSV exports before loading them into reporting tables. Included automated tests, sample inputs, and documentation explaining each validation rule."
+          }
+        ]
+      },
+      "timeout": 180
+    },
+    "raw": {
+      "model": "qwen3-1.7b-p2:latest",
+      "created_at": "2026-09-06T20:40:25.5701389Z",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"full_name\": \"Alex Morgan\",\n  \"phone\": \"+1 (512) 555-0142\",\n  \"location\": \"Austin, Texas\",\n  \"country\": \"United States\",\n  \"skills\": \"Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS\",\n  \"looking_for_role\": \"Senior Software Engineer\",\n  \"education\": \"Bachelor of Science in Computer Science, University of Texas at Austin\"\n}",
+        "thinking": "Okay, let's tackle this step by step. The user provided a job application email and resume, and I need to extract specific details into a JSON object. Let me start by breaking down each required field.\n\nFirst, the full name. The email starts with \"Alex Morgan\", so that's straightforward. The location is given as \"Austin, Texas, United States\" in the email, but the user specified to use the current contact/home location. The resume mentions \"Austin, Texas\" in the professional experience section, so that's the current location. The country is inferred as United States from the email.\n\nNext, the phone number. The email has \"alex.morgan@example.com | +1 (512) 555-0142\", so the phone number is +1 (512) 555-0142. The resume doesn't mention a phone number, but the email does, so I should include it.\n\nSkills are listed in the technical skills section. The resume lists Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS. I need to extract these as a comma-separated list. The user mentioned not to include section headings or descriptive phrases, so I'll just list the skills as they are.\n\nLooking for the role is mentioned in the professional summary: \"Seeking a Senior Software Engineer role focused on backend services\". So the looking_for_role is \"Senior Software Engineer\".\n\nEducation is the Bachelor of Science in Computer Science from University of Texas at Austin, which is the highest degree. The resume mentions that, so education is as given.\n\nWait, the user's example JSON has \"education\" as \"Bachelor of Science in Computer Science, University of Texas at Austin\" and the user's answer includes that. But the user's example shows the JSON with \"education\" as that. So I need to make sure that's correct.\n\nDouble-checking the resume: yes, the education section says that. So all fields are correctly extracted. The location is Austin, Texas, country is United States. The phone number is from the email. Skills are the listed ones. The role is Senior Software Engineer. Education is as stated.\n\nI need to make sure that the JSON keys are correct: full_name, phone, location, country, skills, looking_for_role, education. All fields are present, and the values are correctly extracted. The user's example has the phone as a string, so I'll include it as is. The skills are a comma-separated list, so I'll format that correctly.\n"
+      },
+      "done": true,
+      "done_reason": "stop",
+      "total_duration": 3445494300,
+      "load_duration": 1697300,
+      "prompt_eval_count": 1052,
+      "prompt_eval_cached_count": 1051,
+      "prompt_eval_duration": 7524000,
+      "eval_count": 666,
+      "eval_duration": 3415038000
+    },
+    "status_code": 200,
+    "seconds": 5.509166499992716
+  },
+  {
+    "call": "extract_3",
+    "request": {
+      "json": {
+        "model": "qwen3-1.7b-p2:latest",
+        "format": "json",
+        "stream": false,
+        "options": {
+          "temperature": 0
+        },
+        "messages": [
+          {
+            "role": "system",
+            "content": "You extract candidate details from a job application (email body + resume text). Return every field as a string; use an empty string when a field is not present. For location, extract the candidate's CURRENT contact/home location only. Prefer the resume header/contact section or an explicit current-location statement; never use a past school, employer, project, or hometown as the current location. 'location' should be city and state/region only \u2014 do NOT include the country (e.g. 'Austin, Texas' or 'Bengaluru, Karnataka' or 'London'). 'country' is the country name (e.g. 'United States' or 'India' or 'UK') \u2014 always infer the country from context clues (area codes, universities, addresses, currency, employer names). 'skills' is a short comma-separated list of individual skills or tools ACTUALLY NAMED in the text below - never invent or add a skill that is not written in the resume, and never return section headings, categories, or descriptive phrases; 'looking_for_role' is the job title/role they seek. 'education' is the candidate's highest degree and field of study, plus school if given (e.g. 'B.S. Computer Science, Arizona State University') - empty string if the resume doesn't mention any degree or schooling.\n\nA deterministic pattern-matcher already found these candidate values from the text below - confirm each is correct, or correct it if the text says otherwise:\n- full_name: Alex Morgan\n- location: Austin, Texas\n- country: United States\n- looking_for_role: focused on backend services\n- education: Bachelor of Science in Computer Science, University of Texas at Austin Respond ONLY with a JSON object whose keys are full_name, phone, location, country, skills, looking_for_role, education."
+          },
+          {
+            "role": "user",
+            "content": "Alex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with product managers to define acceptance criteria and document API contracts for internal consumers.\n- Built React and TypeScript screens that let operations staff search orders, correct incomplete records, and review shipment history. Added accessible forms, loading indicators, and clear validation messages.\n- Used Docker and AWS to package and deploy services. Maintained GitHub Actions workflows for automated builds, unit tests, and deployment checks. Investigated failed releases and documented recovery steps.\n- Improved SQL queries used by daily operational reports. Added indexes after reviewing query plans, reduced duplicate database calls, and verified that totals matched existing financial exports.\n- Wrote pytest tests for data validation, authorization, and retry behavior. Reviewed pull requests with an emphasis on readable code and preserving existing customer workflows.\n- Participated in an on-call rotation, investigated production incidents, and added structured logs and dashboards to make recurring failures easier to diagnose. Shared incident findings with the team.\n\nJunior Software Engineer | Willow Analytics | Austin, Texas\nSeptember 2020 - August 2022\n- Implemented Django endpoints and PostgreSQL migrations for an internal reporting application. Coordinated releases with analysts who relied on the reports during weekly planning meetings.\n- Wrote Python scripts to validate incoming CSV files, flag duplicate records, and produce error summaries. Added regression tests for missing columns and inconsistent date formats.\n- Updated JavaScript interfaces, fixed browser compatibility issues, and worked with designers to improve keyboard navigation. Maintained documentation for common support requests.\n- Used Git for version control and Linux for development and troubleshooting. Paired with senior engineers to review requirements and break larger changes into smaller releases.\n\nEDUCATION\nBachelor of Science in Computer Science, University of Texas at Austin\nAugust 2016 - May 2020\nCoursework included data structures, algorithms, databases, operating systems, and software engineering. Completed a team project that exposed a REST API and a web interface for scheduling community events.\n\nTECHNICAL SKILLS\nPython, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS.\n\nPROJECTS\nCommunity Events Scheduler: Developed a Python API and React interface for event registration. Implemented input validation and PostgreSQL storage, wrote setup instructions, and collected feedback from volunteer coordinators.\nData Quality Toolkit: Created Python utilities for checking CSV exports before loading them into reporting tables. Included automated tests, sample inputs, and documentation explaining each validation rule."
+          }
+        ]
+      },
+      "timeout": 180
+    },
+    "raw": {
+      "model": "qwen3-1.7b-p2:latest",
+      "created_at": "2026-09-06T20:40:31.1910406Z",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"full_name\": \"Alex Morgan\",\n  \"phone\": \"+1 (512) 555-0142\",\n  \"location\": \"Austin, Texas\",\n  \"country\": \"United States\",\n  \"skills\": \"Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS\",\n  \"looking_for_role\": \"Senior Software Engineer\",\n  \"education\": \"Bachelor of Science in Computer Science, University of Texas at Austin\"\n}",
+        "thinking": "Okay, let's tackle this step by step. The user provided a job application email and resume, and I need to extract specific details into a JSON object. Let me start by breaking down each required field.\n\nFirst, the full name. The email starts with \"Alex Morgan\", so that's straightforward. The location is given as \"Austin, Texas, United States\" in the email, but the user specified to use the current contact/home location. The resume mentions \"Austin, Texas\" in the professional experience section, so that's the current location. The country is inferred as United States from the email.\n\nNext, the phone number. The email has \"alex.morgan@example.com | +1 (512) 555-0142\", so the phone number is +1 (512) 555-0142. The resume doesn't mention a phone number, but the email does, so I should include it.\n\nSkills are listed in the technical skills section. The resume lists Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS. I need to extract these as a comma-separated list. The user mentioned not to include section headings or descriptive phrases, so I'll just list the skills as they are.\n\nLooking for the role is mentioned in the professional summary: \"Seeking a Senior Software Engineer role focused on backend services\". So the looking_for_role is \"Senior Software Engineer\".\n\nEducation is the Bachelor of Science in Computer Science from University of Texas at Austin, which is the highest degree. The resume mentions that, so education is as given.\n\nWait, the user's example JSON has \"education\" as \"Bachelor of Science in Computer Science, University of Texas at Austin\" and the user's answer includes that. But the user's example shows the JSON with \"education\" as that. So I need to make sure that's correct.\n\nDouble-checking the resume: yes, the education section says that. So all fields are correctly extracted. The location is Austin, Texas, country is United States. The phone number is from the email. Skills are the listed ones. The role is Senior Software Engineer. Education is as stated.\n\nI need to make sure that the JSON keys are correct: full_name, phone, location, country, skills, looking_for_role, education. All fields are present, and the values are correctly extracted. The user's example has the phone as a string, so I'll include it as is. The skills are a comma-separated list, so I'll format that correctly.\n"
+      },
+      "done": true,
+      "done_reason": "stop",
+      "total_duration": 3481408800,
+      "load_duration": 1601100,
+      "prompt_eval_count": 1052,
+      "prompt_eval_cached_count": 1051,
+      "prompt_eval_duration": 17860000,
+      "eval_count": 666,
+      "eval_duration": 3440407000
+    },
+    "status_code": 200,
+    "seconds": 5.563229799998226
+  },
+  {
+    "call": "recheck",
+    "request": {
+      "json": {
+        "model": "qwen3-1.7b-p2:latest",
+        "format": "json",
+        "stream": false,
+        "options": {
+          "temperature": 0
+        },
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are rechecking extracted candidate fields for accuracy. I will give you the MAIL BODY (the candidate's email), the RESUME TEXT, and the CURRENT extracted fields. Your job:\n1. Verify each field. Fix obvious errors (wrong name, partial phone, etc.).\n2. For 'looking_for_role': this is the role the candidate WANTS. First understand what they say in the MAIL BODY (e.g. 'applying for X', their email signature title, or the job they mention). If the mail body has no clue, infer from the resume what kind of role they are seeking based on their experience and skills.\n3. For 'location': city and state/region only (no country). For 'country': the country name.\n4. For 'skills': keep as comma-separated technical skills/tools only.\n5. For 'education': the candidate's highest degree and field of study, plus school if given (e.g. 'B.S. Computer Science, Arizona State University'); empty string if the resume doesn't mention any degree or schooling.\nReturn ONLY a JSON object with keys: full_name, phone, location, country, skills, looking_for_role, education. Use the current value if it is already correct. Use empty string only if truly unknown."
+          },
+          {
+            "role": "user",
+            "content": "=== MAIL BODY ===\n\n\n=== RESUME TEXT ===\nAlex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with product managers to define acceptance criteria and document API contracts for internal consumers.\n- Built React and TypeScript screens that let operations staff search orders, correct incomplete records, and review shipment history. Added accessible forms, loading indicators, and clear validation messages.\n- Used Docker and AWS to package and deploy services. Maintained GitHub Actions workflows for automated builds, unit tests, and deployment checks. Investigated failed releases and documented recovery steps.\n- Improved SQL queries used by daily operational reports. Added indexes after reviewing query plans, reduced duplicate database calls, and verified that totals matched existing financial exports.\n- Wrote pytest tests for data validation, authorization, and retry behavior. Reviewed pull requests with an emphasis on readable code and preserving existing customer workflows.\n- Participated in an on-call rotation, investigated production incidents, and added structured logs and dashboards to make recurring failures easier to diagnose. Shared incident findings with the team.\n\nJunior Software Engineer | Willow Analytics | Austin, Texas\nSeptember 2020 - August 2022\n- Implemented Django endpoints and PostgreSQL migrations for an internal reporting application. Coordinated releases with analysts who relied on the reports during weekly planning meetings.\n- Wrote Python scripts to validate incoming CSV files, flag duplicate records, and produce error summaries. Added regression tests for missing columns and inconsistent date formats.\n- Updated JavaScript interfaces, fixed browser compatibility issues, and worked with designers to improve keyboard navigation. Maintained documentation for common support requests.\n- Used Git for version control and Linux for development and troubleshooting. Paired with senior engineers to review requirements and break larger changes into smaller releases.\n\nEDUCATION\nBachelor of Science in Computer Science, University of Texas at Austin\nAugust 2016 - May 2020\nCoursework included data structures, algorithms, databases, operating systems, and software engineering. Completed a team project that exposed a REST API and a web interface for scheduling community events.\n\nTECHNICAL SKILLS\nPython, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS.\n\nPROJECTS\nCommunity Events Scheduler: Developed a Python API and React interface for event registration. Implemented input validation and PostgreSQL storage, wrote setup instructions, and collected feedback from volunteer coordinators.\nData Quality Toolkit: Created Python utilities for checking CSV exports before loading them into reporting tables. Included automated tests, sample inputs, and documentation explaining each validation rule.\n\n\n=== CURRENT EXTRACTED FIELDS ===\nfull_name: Alex Morgan\nphone: +1 (512) 555-0142\nlocation: Austin, Texas\ncountry: United States\nskills: Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS, REST\nlooking_for_role: Senior Software Engineer\neducation: Bachelor of Science in Computer Science, University of Texas at Austin\n"
+          }
+        ]
+      },
+      "timeout": 180
+    },
+    "raw": {
+      "model": "qwen3-1.7b-p2:latest",
+      "created_at": "2026-09-06T20:40:36.5877777Z",
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"full_name\": \"Alex Morgan\",\n  \"phone\": \"+1 (512) 555-0142\",\n  \"location\": \"Austin, Texas\",\n  \"country\": \"United States\",\n  \"skills\": \"Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS\",\n  \"looking_for_role\": \"Senior Software Engineer\",\n  \"education\": \"Bachelor of Science in Computer Science, University of Texas at Austin\"\n}",
+        "thinking": "Okay, let's tackle this step by step. The user provided a mail body, resume text, and current extracted fields. My job is to verify each field and make sure they're accurate. Let me start with the full name. The resume says \"Alex Morgan\" and the mail body has \"Alex Morgan\" in the email, so that's correct.\n\nNext, the phone number. The resume has \"+1 (512) 555-0142\" and the mail body has the same number. So the phone is already correct.\n\nLocation is \"Austin, Texas\" which matches the mail body's \"Austin, Texas, United States\". The country is \"United States\", which is correct.\n\nSkills are listed as Python, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS, REST. Wait, the mail body has \"REST API\" and \"HTML, CSS\" in the skills. But the resume lists \"REST API\" as a skill. The current extracted skills include \"REST API\" and \"HTML, CSS\". So that's okay.\n\nLooking_for_role is \"Senior Software Engineer\" which matches the mail body's \"Seeking a Senior Software Engineer role\". Education is \"Bachelor of Science in Computer Science, University of Texas at Austin\" which is correct.\n\nWait, the mail body says \"Austin, Texas, United States\" but the location field is \"Austin, Texas\". The country is \"United States\", which is correct. The current extracted fields have location as \"Austin, Texas\" and country as \"United States\", so that's fine.\n\nI need to check if there are any errors. The phone number is in the correct format. The skills list is accurate. The education is correct. The looking_for_role is correct. So all fields seem okay. The user might have wanted to check if the location is correctly specified, but since the mail body has \"Austin, Texas, United States\" and the location is \"Austin, Texas\", that's correct. The country is \"United States\" which is correct. So no issues here.\n"
+      },
+      "done": true,
+      "done_reason": "stop",
+      "total_duration": 3318946500,
+      "load_duration": 2319300,
+      "prompt_eval_count": 1061,
+      "prompt_eval_cached_count": 4,
+      "prompt_eval_duration": 229144000,
+      "eval_count": 569,
+      "eval_duration": 2988637000
+    },
+    "status_code": 200,
+    "seconds": 5.365970099999686
+  },
+  {
+    "call": "role_note",
+    "request": {
+      "json": {
+        "model": "qwen3-1.7b-p2:latest",
+        "format": "json",
+        "stream": false,
+        "options": {
+          "temperature": 0
+        },
+        "messages": [
+          {
+            "role": "system",
+            "content": "You write a short note on what role a job candidate is likely seeking, for a recruiter reading a spreadsheet. First check the MAIL BODY: if the candidate says what role, team, or kind of work they want, summarize that in your own words. If the mail body gives no clue, ignore it and instead read the RESUME SKILLS and describe in 1-2 short sentences the type of role their background suggests they are suited for or seeking. Always write real content - never answer 'not extracted', 'unknown', 'unclear', or leave it blank, even if you have to guess from skills alone. Keep it to 1-2 plain sentences, no bullet points, no labels, under 200 characters. Return ONLY a JSON object: {\"summary\": \"...\"}"
+          },
+          {
+            "role": "user",
+            "content": "=== MAIL BODY ===\n\n\n=== RESUME SKILLS ===\nPython, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS, REST\n\n=== RESUME TEXT (for context only) ===\nAlex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with product managers to define acceptance criteria and document API contracts for internal consumers.\n- Built React and TypeScript screens that let operations staff search orders, correct incomplete records, and review shipment history. Added accessible forms, loading indicators, and clear validation messages.\n- Used Docker and AWS to package and deploy services. Maintained GitHub Actions workflows for automated builds, unit tests, and deployment checks. Investigated failed releases and documented recovery steps.\n- Improved SQL queries used by daily operational reports. Added indexes after reviewing query plans, reduced duplicate database calls, and verified that totals matched existing financial exports.\n- Wrote pytest tests for data validation, authorization, and retry behavior. Reviewed pull requests with an emphasis on readable code and preserving existing customer workflows.\n- Participated in an on-call rotation, investigated production incidents, and added structured logs and dashboards to make recurring failures easier to diagnose. Shared incident findings with the team.\n\nJunior Software Engineer | Willow Analytics | Austin, Texas\nSeptember 2020 - August 2022\n- Implemented Django endpoints and PostgreSQL migrations for an internal reporting application. Coordinated releases with analysts who relied on the reports during weekly planning meetings.\n- Wrote Python scripts to validate incoming CSV files, flag duplicate records, and produce error summaries. Added regression tests for missing columns and inconsistent date formats.\n- Updated JavaScript interfaces, fixed browser compatibility issues, and worked with designers to improve keyboard navigation. Maintained documentation for common support requests.\n- Used Git for version control and Linux for development and troubleshooting. Paired with senior engineers to review requirements and break larger changes into smaller releases.\n\nEDUCATION\nBachelor of Science in Computer Science, University of Texas at Austin\nAugust 2016 - May 2020\nCoursework included data structures, algorithms, databases, operating systems, and software engineering. Completed a team project that exposed a REST API and a web interface for scheduling community events.\n\nTECHNICAL SKILLS\nPython, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS.\n\nPROJECTS\nCommunity Events Scheduler: Developed a Python API and React interface for event registration. Implemented input validation and PostgreSQL storage, wrote setup instructions, and collected feedback from volunteer coordinators.\nData Quality Toolkit: Created Python utilities for checking CSV exports before loading them into reporting tables. Included automated tests, sample inputs, and documentation explaining each validation rule.\n\n"
+          }
+        ]
+      },
+      "timeout": 180
+    },
+    "raw": {
+      "model": "qwen3-1.7b-p2:latest",
+      "created_at": "2026-09-06T20:40:40.6030301Z",
+      "message": {
+        "role": "assistant",
+        "content": "{\"summary\":\"Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners.\"}",
+        "thinking": "Okay, let's see. The user provided a mail body and a resume. The task is to write a JSON object with a summary based on the mail body and resume skills.\n\nFirst, check the mail body. The candidate's email says they're seeking a Senior Software Engineer role focused on backend services, reliable delivery, and collaboration with product partners. The resume mentions Python, FastAPI, Django, React, TypeScript, SQL, Docker, AWS, etc. The skills list includes Python, FastAPI, Django, which are backend technologies. The professional experience highlights working on backend services, API development, deployment with Docker and AWS, and working with product managers. The summary should reflect that they're looking for a Senior role in backend services, emphasizing their experience with Python and FastAPI, and their ability to collaborate with product teams.\n\nThe mail body does mention the role they're seeking, so I should include that. The resume skills and experience confirm that they're suited for a Senior Software Engineer position in backend services. So the summary should be something like \"Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners.\" But need to make sure it's concise and under 200 characters. Let me check the character count. \"Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners.\" That's 135 characters. Perfect. So the JSON would have that summary.\n"
+      },
+      "done": true,
+      "done_reason": "stop",
+      "total_duration": 1946539700,
+      "load_duration": 1947900,
+      "prompt_eval_count": 904,
+      "prompt_eval_cached_count": 4,
+      "prompt_eval_duration": 238890000,
+      "eval_count": 328,
+      "eval_duration": 1626232000
+    },
+    "status_code": 200,
+    "seconds": 4.013531900011003
+  },
+  {
+    "call": "portfolios",
+    "request": {
+      "json": {
+        "model": "qwen3-1.7b-p2:latest",
+        "format": "json",
+        "stream": false,
+        "options": {
+          "temperature": 0
+        },
+        "messages": [
+          {
+            "role": "system",
+            "content": "Look for a candidate's professional profile links in the resume text below: a LinkedIn profile, a GitHub profile, a personal website/portfolio, or a design-portfolio site (Behance/Dribbble/Figma). Only report a URL that is actually present in the text - never invent, guess, or complete a partial one. If a category has no real link in the text, use an empty string for that category. Return ONLY a JSON object: {\"linkedin\": \"...\", \"github\": \"...\", \"other\": \"...\"}"
+          },
+          {
+            "role": "user",
+            "content": "Alex Morgan\nAustin, Texas, United States\nalex.morgan@example.com | +1 (512) 555-0142\nhttps://www.linkedin.com/in/alex-morgan-example\nhttps://github.com/alex-morgan-example\n\nPROFESSIONAL SUMMARY\nSoftware engineer with 6 years of experience building Python services and React applications for operations teams. Seeking a Senior Software Engineer role focused on backend services, reliable delivery, and practical collaboration with product partners. Comfortable translating written requirements into maintainable code, reviewing changes, and supporting services after release.\n\nPROFESSIONAL EXPERIENCE\nSoftware Engineer | Cedar Systems | Austin, Texas\nSeptember 2022 - August 2026\n- Developed Python and FastAPI services backed by PostgreSQL for inventory management and shipment tracking. Worked with product managers to define acceptance criteria and document API contracts for internal consumers.\n- Built React and TypeScript screens that let operations staff search orders, correct incomplete records, and review shipment history. Added accessible forms, loading indicators, and clear validation messages.\n- Used Docker and AWS to package and deploy services. Maintained GitHub Actions workflows for automated builds, unit tests, and deployment checks. Investigated failed releases and documented recovery steps.\n- Improved SQL queries used by daily operational reports. Added indexes after reviewing query plans, reduced duplicate database calls, and verified that totals matched existing financial exports.\n- Wrote pytest tests for data validation, authorization, and retry behavior. Reviewed pull requests with an emphasis on readable code and preserving existing customer workflows.\n- Participated in an on-call rotation, investigated production incidents, and added structured logs and dashboards to make recurring failures easier to diagnose. Shared incident findings with the team.\n\nJunior Software Engineer | Willow Analytics | Austin, Texas\nSeptember 2020 - August 2022\n- Implemented Django endpoints and PostgreSQL migrations for an internal reporting application. Coordinated releases with analysts who relied on the reports during weekly planning meetings.\n- Wrote Python scripts to validate incoming CSV files, flag duplicate records, and produce error summaries. Added regression tests for missing columns and inconsistent date formats.\n- Updated JavaScript interfaces, fixed browser compatibility issues, and worked with designers to improve keyboard navigation. Maintained documentation for common support requests.\n- Used Git for version control and Linux for development and troubleshooting. Paired with senior engineers to review requirements and break larger changes into smaller releases.\n\nEDUCATION\nBachelor of Science in Computer Science, University of Texas at Austin\nAugust 2016 - May 2020\nCoursework included data structures, algorithms, databases, operating systems, and software engineering. Completed a team project that exposed a REST API and a web interface for scheduling community events.\n\nTECHNICAL SKILLS\nPython, FastAPI, Django, React, TypeScript, JavaScript, SQL, PostgreSQL, Docker, AWS, Git, GitHub Actions, Linux, pytest, REST API, HTML, CSS.\n\nPROJECTS\nCommunity Events Scheduler: Developed a Python API and React interface for event registration. Implemented input validation and PostgreSQL storage, wrote setup instructions, and collected feedback from volunteer coordinators.\nData Quality Toolkit: Created Python utilities for checking CSV exports before loading them into reporting tables. Included automated tests, sample inputs, and documentation explaining each validation rule.\n"
+          }
+        ]
+      },
+      "timeout": 180
+    },
+    "raw": {
+      "model": "qwen3-1.7b-p2:latest",
+      "created_at": "2026-09-06T20:40:44.2341346Z",
+      "message": {
+        "role": "assistant",
+        "content": "{\"linkedin\": \"https://www.linkedin.com/in/alex-morgan-example\", \"github\": \"https://github.com/alex-morgan-example\", \"other\": \"\"}",
+        "thinking": "Okay, let's see. The user wants me to find the professional profile links from the resume text. The possible links are LinkedIn, GitHub, personal website/portfolio, or design portfolio. They want the actual URLs present in the text, no guessing or completing partial ones.\n\nLooking at the resume text, the first link is \"https://www.linkedin.com/in/alex-morgan-example\" which is a LinkedIn profile. Then there's \"https://github.com/alex-morgan-example\" which is a GitHub profile. The other links are mentioned in the projects section, but the user specified to only report URLs that are actually present. The projects section mentions \"Community Events Scheduler\" and \"Data Quality Toolkit,\" but those are project titles, not actual URLs. The resume doesn't mention any personal website or design portfolio links. So, the LinkedIn and GitHub links are the only ones present. The other categories are empty. I need to make sure not to include anything else. So the JSON should have linkedin as the first URL, github as the second, and other as an empty string.\n"
+      },
+      "done": true,
+      "done_reason": "stop",
+      "total_duration": 1550628000,
+      "load_duration": 2326700,
+      "prompt_eval_count": 787,
+      "prompt_eval_cached_count": 3,
+      "prompt_eval_duration": 209891000,
+      "eval_count": 258,
+      "eval_duration": 1272363000
+    },
+    "status_code": 200,
+    "seconds": 3.630426100004115
+  }
+]

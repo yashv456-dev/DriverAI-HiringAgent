@@ -155,6 +155,10 @@ def _apply_env(args) -> None:
         os.environ["HIRING_SCORING_BATCH_LIMIT"] = str(args.batch_size)
     if args.excel:
         os.environ["HIRING_EXCEL_FILE"] = str(Path(args.excel).resolve())
+    if getattr(args, "sqlite", False) or getattr(args, "backend", None) == "sqlite":
+        os.environ["HIRING_STORAGE_BACKEND"] = "sqlite"
+    elif getattr(args, "backend", None) == "excel":
+        os.environ["HIRING_STORAGE_BACKEND"] = "excel"
 
 
 def _run_doctor() -> None:
@@ -181,12 +185,22 @@ def _run_doctor() -> None:
     gui = [m for m in ("customtkinter", "dotenv") if not _have(m)]
     _line("Desktop deps", "OK" if not gui else "MISSING " + ", ".join(gui))
 
-    ocr_missing = [m for m in ("fitz", "pytesseract", "PIL") if not _have(m)]
-    _line("OCR libs", "OK (pymupdf/pytesseract/pillow)" if not ocr_missing
-          else "MISSING " + ", ".join(ocr_missing))
+    ocr_missing = [m for m in ("pymupdf", "pytesseract", "PIL") if not _have(m)]
+    rapidocr_have = _have("rapidocr_onnxruntime")
+    pymupdf4llm_have = _have("pymupdf4llm")
+
+    layout_status = "OK (pymupdf4llm multi-column Markdown)" if pymupdf4llm_have else "fallback (pypdf/pdfplumber)"
+    _line("Layout engine", layout_status)
+
     from hiring_agent.extraction import find_tesseract
     tess = find_tesseract()
-    _line("Tesseract engine", tess if tess else "NOT FOUND - scanned/image PDFs will be skipped")
+    if rapidocr_have:
+        ocr_desc = "OK (RapidOCR PaddleOCR ONNX, native)"
+    elif tess:
+        ocr_desc = f"OK (Tesseract: {tess})"
+    else:
+        ocr_desc = "NOT FOUND - scanned/image PDFs will be skipped"
+    _line("Image OCR engine", ocr_desc)
 
     from hiring_agent.ollama_scorer import ollama_health
     ok_ai, ai_msg = ollama_health()
@@ -204,17 +218,36 @@ def _run_doctor() -> None:
             _line("JD cache", "present but unreadable (run --refresh-jd)")
     else:
         _line("JD cache", f"not built - using {len(DEFAULT_ROLES)} built-in roles (run --refresh-jd)")
+
+    # JD folder reachability (added 2026-08-21). --doctor is the read-only health check that
+    # should have caught the misconfigured folder path; before this it only reported that a
+    # cache EXISTED, never whether the folder behind it could still be read. A cache can look
+    # perfectly healthy while being built entirely from stale pasted text.
+    try:
+        from hiring_agent.jd_sources import load_jd_sources, _jd_folder_fingerprint
+        _jdcfg = load_jd_sources()
+        _folder = _jdcfg.get("sharepoint_jd_folder", "")
+        if not _jdcfg.get("enabled"):
+            _line("JD folder", "JD sources disabled - using built-in roles")
+        elif not _folder:
+            _line("JD folder", "no folder configured (URL/pasted JD sources only)")
+        elif _jd_folder_fingerprint(_jdcfg) is not None:
+            _line("JD folder", f"reachable: '{_folder}'")
+        else:
+            _line("JD folder", f"! UNREACHABLE: '{_folder}' - the cache above is STALE. "
+                               f"Check the path/permissions, then run --refresh-jd")
+    except Exception as _e:
+        _line("JD folder", f"could not be checked: {_e}")
     _line("SharePoint", "configured (online mode)" if SHAREPOINT_CONFIGURED
           else "not configured (local mode only)")
 
     print("-" * 56)
-    ocr_ready = (not ocr_missing) and bool(tess)
+    ocr_ready = rapidocr_have or ((not ocr_missing) and bool(tess))
     if not ocr_ready:
         print("  ! OCR not fully set up - scanned/image-only PDFs won't be read.")
-        print("    Fix: run Launch.bat, or `winget install -e --id UB-Mannheim.TesseractOCR`")
-        print("         and `pip install pymupdf pytesseract pillow`.")
+        print("    Fix: `pip install rapidocr-onnxruntime pymupdf4llm` or run Launch.bat.")
     else:
-        print("  OCR ready - scanned/image PDFs will be read.")
+        print("  OCR ready - scanned/image PDFs and multi-column layouts supported.")
     if env_issue:
         print(f"  ! {env_issue}.")
     print("")
@@ -268,6 +301,12 @@ def main() -> None:
                      help="ONLINE RECOVERY: re-audit historical geo rejections with the "
                           "tri-state policy. Uses deterministic phone/education extraction, "
                           "does not rescore roles, and never sends decline email.")
+    src.add_argument("--export-results", action="store_true",
+                     help="ONLINE READ-ONLY (workbook): rebuild the client-facing result "
+                          "sheet from the current Candidate List and upload the latest copy "
+                          "to SharePoint. Scores nothing, sends no mail, changes no row. "
+                          "Use when the client needs a refreshed workbook without waiting "
+                          "for the next scoring run.")
 
     parser.add_argument("--watch", action="store_true",
                         help="With --score-sharepoint: poll the queue every --interval seconds.")
@@ -280,6 +319,13 @@ def main() -> None:
                         help="With --score-sharepoint: also upload a per-candidate scorecard .txt.")
     parser.add_argument("--excel", metavar="FILE",
                         help="Target/output workbook (pins all reads & writes to this file).")
+    parser.add_argument("--force-rescore", action="store_true",
+                        help="With --recheck-row/--recheck-all: also re-score Suggested Role "
+                             "1/2/3 (and the Category derived from them) on rows that ALREADY "
+                             "have a role, not just blank ones. Use after the JD set or the "
+                             "skill vocabulary changes, since normal healing is gap-only and "
+                             "would otherwise leave those rows on their old match forever. "
+                             "Identical re-scores are skipped, so the sheet is not churned.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Parse and log only - write nothing.")
     parser.add_argument("--ai", action="store_true", help="Force the Ollama brain on.")
@@ -289,6 +335,10 @@ def main() -> None:
     parser.add_argument("--host", help="Ollama host URL (default: http://localhost:11434).")
     parser.add_argument("--no-geo", action="store_true",
                         help="Disable the USA-only geo filter (score everyone).")
+    parser.add_argument("--sqlite", action="store_true",
+                        help="Use decoupled SQLite store to eliminate Excel 409 conflicts and lockouts.")
+    parser.add_argument("--backend", choices=("sqlite", "excel"), default=None,
+                        help="Storage backend: 'sqlite' or 'excel'.")
     # Older launch notes used ``--test-sharepoint run``. Keep accepting that harmless
     # trailing word so the diagnostic works on machines deployed from those notes.
     parser.add_argument("legacy_action", nargs="?", choices=("run",),
@@ -424,14 +474,15 @@ def main() -> None:
         if not SHAREPOINT_CONFIGURED:
             logger.error("SharePoint credentials missing! See .env.example.")
             return
-        recheck_all_rows(dry_run=args.dry_run)
+        recheck_all_rows(dry_run=args.dry_run, force_roles=args.force_rescore)
     elif args.recheck_row:
         from hiring_agent.config import SHAREPOINT_CONFIGURED
         from hiring_agent.sharepoint_scoring import recheck_selected_rows
         if not SHAREPOINT_CONFIGURED:
             logger.error("SharePoint credentials missing! See .env.example.")
             return
-        recheck_selected_rows(args.recheck_row, dry_run=args.dry_run)
+        recheck_selected_rows(args.recheck_row, dry_run=args.dry_run,
+                              force_roles=args.force_rescore)
     elif args.recover_location_rejections:
         from hiring_agent.config import SHAREPOINT_CONFIGURED
         from hiring_agent.sharepoint_scoring import recover_location_rejections
@@ -439,6 +490,23 @@ def main() -> None:
             logger.error("SharePoint credentials missing! See .env.example.")
             return
         recover_location_rejections(dry_run=args.dry_run)
+    elif args.export_results:
+        from hiring_agent.config import SHAREPOINT_CONFIGURED
+        if not SHAREPOINT_CONFIGURED:
+            logger.error("SharePoint credentials missing! See .env.example.")
+            return
+        from sharepoint_client import SharePointClient
+        from hiring_agent.sharepoint_scoring import export_client_results
+        logger.info("Rebuilding the client result sheet from the live Candidate List...")
+        path = export_client_results(SharePointClient(),
+                                     upload_to_sharepoint=not args.dry_run)
+        if path:
+            logger.info(f"Client workbook written -> {path}")
+            if args.dry_run:
+                logger.info("Dry run: the local copy was written, "
+                            "but nothing was uploaded to SharePoint.")
+        else:
+            logger.warning("No client workbook was produced.")
     elif args.score_folder:
         run_intake(path=args.score_folder, dry_run=args.dry_run)
     elif args.score_excel:

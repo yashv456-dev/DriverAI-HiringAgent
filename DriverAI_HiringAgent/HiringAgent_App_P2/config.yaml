@@ -22,10 +22,63 @@ status_values:
   # this many times in a row is moved to Rejected under this status - a permanently
   # unprocessable row would otherwise retry forever, once per --score-sharepoint run.
   processing_failed: "Rejected - Processing Error"
+  # P1 already screens incoming mail for spam/scam/vendor-pitch content before a row is
+  # ever created (see HiringAgent_P1/flow/flow_config.json spam_filters). This is P2's
+  # secondary safety net for the rare row that still slips through: the resume/mail text
+  # itself gets checked against content_safety.suspicious_phrases below, and a match stops
+  # normal scoring, alerts admin_email, and leaves the row here for a human to look at -
+  # added 2026-08-01 after the Futurism Technologies vendor-pitch incident.
+  needs_review_spam: "Needs Review - Possible Spam"
 
 # How many times a row may fail processing (unreadable resume OR an exception during
 # scoring) before it's given up on and moved to Rejected. Env override: HIRING_SCORE_RETRY_MAX.
 score_retry_max: 3
+
+# Maximum consecutive candidate failures or timeouts before tripping the circuit breaker
+# and stopping the bot. Protects the queue during an outage. Env override: HIRING_CONSECUTIVE_FAILURE_LIMIT.
+consecutive_failure_limit: 3
+
+# How many days a review row may sit unanswered before it is quietly closed off the main
+# sheet. Applies to 'Needs Review - Location Confirmation' (clock starts when the
+# clarification email went out) and 'Needs Review - Possible Spam' (clock starts from the
+# row's last update). Closing is SILENT - the candidate is never emailed - and reversible:
+# location rows are closed as 'Rejected - Location Not Confirmed', which is exactly what
+# `bot.py --recover-locations` re-audits. Set to 0 to disable aging entirely and let review
+# rows park indefinitely (the pre-2026-08-04 behaviour).
+# Env override: HIRING_REVIEW_AGE_OUT_DAYS.
+review_age_out_days: 14
+
+# Seconds to pause between candidates while scoring. Each candidate costs several Graph
+# calls, so a small gap keeps a long unattended run clear of throttling. Raise it if the
+# client's tenant is throttling; set 0 to process back-to-back (the pre-2026-08-04
+# behaviour). Never applied in --dry-run, or after the last candidate in a batch.
+# Env override: HIRING_ROW_DELAY_SECONDS.
+row_delay_seconds: 2
+
+# P2's secondary content-safety net (see status_values.needs_review_spam above). Checked
+# against the resume text AND mail body of every row before normal extraction runs.
+# Deliberately short and specific - each phrase should be one essentially no genuine
+# resume or cover email would ever contain, to keep false positives near zero. Not meant
+# to be a comprehensive spam filter (that is P1's job, in flow_config.json) - only a
+# backstop for the rare row that slips past it.
+content_safety:
+  suspicious_phrases:
+    # vendor/agency self-promotion mistaken for a resume - live case, Futurism
+    # Technologies (2026-08-01): a services vendor's "Company Profile and Corporate
+    # Deck" was scored as if it were a candidate's resume.
+    - "company profile and corporate deck"
+    - "capability deck"
+    - "engagement models"
+    # unambiguous phishing/scam boilerplate - never appears in a genuine resume
+    - "click here to claim"
+    - "verify your account"
+    - "wire transfer"
+    - "crypto investment"
+    - "you have won"
+    - "claim your prize"
+    - "your account has been suspended"
+    - "confirm your identity"
+    - "urgent action required"
 
 # Admin alert email when a row is given up on after score_retry_max failures - separate
 # from the non-USA decline (geo_reject_email) and from P1's own Notify_failure. Env
@@ -33,10 +86,16 @@ score_retry_max: 3
 # a bulk historical-replay test where no mail at all should go out.
 error_email: true
 
-# MASTER kill-switch for every outbound P2 email - the direct counterpart of P1's
-# flow_config.json test_mode.suppress_emails. Env override: HIRING_SUPPRESS_EMAILS.
+# Kill-switch for outbound APPLICANT email - the direct counterpart of P1's
+# flow_config.json email.send_applicant_emails. Env override: HIRING_SUPPRESS_EMAILS.
 #
-# suppress_emails: true means NO applicant or admin mail leaves P2, while the rest of the
+# Admin/error alerts are governed SEPARATELY by error_email above (P1's equivalent is
+# send_admin_failure_alerts), so a silent-to-candidates system still reports its own
+# breakage. Until 2026-08-03 this was a single master switch covering both, which meant
+# P2 ran continuously and, if it broke, told nobody. For a genuine no-mail-whatsoever run
+# (a bulk historical replay), set suppress_emails: true AND error_email: false.
+#
+# suppress_emails: true means no APPLICANT mail leaves P2, while the rest of the
 # pipeline runs completely normally: rows are scored and patched, resumes are renamed and
 # moved, the Rejected sheet is maintained, the client workbook is exported. It is enforced
 # inside SharePointClient.send_mail(), the one function every sender calls, so it cannot be
@@ -47,10 +106,40 @@ error_email: true
 # Mail Sent / Decline Sent / Info Request Sent instead of 'Sent <timestamp>', so a replayed
 # row is never mistaken for a candidate who was really contacted.
 #
-# MUST be set back to false when a historical replay is finished, or genuine new applicants
-# silently receive nothing.
+# CURRENT OPERATING POSTURE (set 2026-08-11, client instruction): LIVE APPLICANT MAIL.
+# P2 processes real candidates against the live workbook AND contacts them for real - the
+# non-USA decline, the missing-info / current-location nudge, and the Mail Sent stamp are all
+# active. This matches P1's flow_config.json email.send_applicant_emails=true, so both phases
+# now send. (Superseded the 2026-08-03 silent-running posture, which contacted nobody.)
+#
+# It is set HERE, in committed config, on purpose. It used to be true only because
+# HIRING_SUPPRESS_EMAILS=true sat in .env - and .env is gitignored, so a fresh checkout, a
+# redeploy, or a cleared .env would silently resume emailing real applicants. Defaulting to
+# suppressed means the safe state survives losing that file; the .env override now only
+# reinforces it. To genuinely start contacting applicants, change BOTH this value and the
+# .env line, deliberately.
+#
+# NOTE when you do turn mail back on: nothing to do. A 'TEST-MODE (suppressed)' marker
+# records that a send was WITHHELD, so since 2026-09-05 it no longer counts as contact -
+# those rows stay in the queue and are emailed for real on the first live run, and the
+# 14-day review age-out clock never started on them either. See _awaiting_send /
+# _parse_marker_datetime in sharepoint_scoring.py.
 test_mode:
-  suppress_emails: false
+  # TRUE as of 2026-09-04 (user instruction): SILENT REPLAY POSTURE, set so the whole
+  # back catalogue can be re-imported and re-scored to backfill the new 'Experience'
+  # column without re-contacting 167 candidates who were already answered. Declines,
+  # missing-info nudges and the Mail Sent stamp are all withheld; scoring, resume
+  # moves, the Rejected sheet and the client export keep running normally. Admin/error
+  # alerts stay ON (error_email above), so a broken replay still reports itself.
+  #
+  # REVERT BOTH THIS AND .env's HIRING_SUPPRESS_EMAILS TO false ONCE THE REPLAY IS DONE,
+  # or new applicants stop being contacted. Test Y10 in test_p2.py pins this value, so
+  # the revert is enforced rather than remembered.
+  #
+  # See the NOTE above: rows touched during the replay keep their place in the mail queue -
+  # a suppressed marker is not a send, so nothing has to be cleared by hand before going
+  # live. (Superseded the 2026-08-11 live-applicant-mail posture, which is what to restore.)
+  suppress_emails: true
 
 columns:
   - "Application ID"
@@ -67,8 +156,34 @@ columns:
   - "Phone"
   - "Location"
   - "Country"
+  # Total professional experience in whole years ("6 years"). Only ever a total the
+  # candidate STATED: the resume's Summary/Profile blurb first (client's stated source,
+  # 2026-09-04), then the headline block, then anywhere else in the document. Stored as
+  # the lower bound of whatever was claimed ("6+ years" and "6 to 8 years" both store
+  # "6 years"). Blank -> "Missing", same as its neighbours.
+  #
+  # NEVER derived. Not from graduation year, not from the job count, and not from the
+  # span of the dated work history - that last one shipped briefly and was removed the
+  # same day on user instruction ("just add years if its existing in summary"). It is
+  # also NOT a scoring input: suggested_roles()/ai_score_roles() never see it, so
+  # seniority cannot move a match % or a Category.
+  #
+  # Named and positioned to match what the client already added BY HAND to the live
+  # master file, the Rejected sheet and the results sheet (2026-09-04): the header is
+  # exactly "Years Exp" and it sits directly after Country, before
+  # Current Skills. Both must stay in step with the live workbook - ensure_columns()
+  # matches on the exact header text, so a rename here would add a SECOND column
+  # alongside the hand-made one rather than adopting it.
+  - "Years Exp"
   - "Current Skills"
   - "Education"
+  # Start/end date of the candidate's most recent education entry, scanned from the same
+  # resume text as 'Education' itself (added 2026-08-18, client request) - lets the client
+  # see at a glance whether a candidate has graduated (past end date) or is still enrolled
+  # ('Present'/'Expected <date>' as the end date). Blank when the resume states no dates;
+  # never inferred or guessed.
+  - "Education Start Date"
+  - "Education End Date"
   - "Looking For Role"
   - "Suggested Role 1"
   - "Suggested Role 2"
@@ -215,6 +330,92 @@ skills:
     - "ios"
     - "android"
     - "firebase"
+    # Added 2026-08-21: these 6 are listed in _MOBILE_TOOL_SKILLS (hiring_agent/scoring.py)
+    # but were never in this vocabulary, so the offline scanner could not extract them from
+    # a resume at all. kotlin/swift/flutter/react native already covered the override, but a
+    # candidate whose stack is stated only as "SwiftUI, Xcode, Objective-C" was invisible.
+    - "swiftui"
+    - "dart"
+    - "jetpack compose"
+    - "android sdk"
+    - "objective-c"
+    - "xcode"
+
+    # --- Game engines / 3D / graphics tooling (added 2026-08-21) ---
+    # These are the 14 terms in _GRAPHICS_TOOL_SKILLS (hiring_agent/scoring.py), which vetoes
+    # the native-mobile category override for genuine game/graphics developers. NONE of them
+    # were in this vocabulary, so the veto could never fire from scanned skills: a resume
+    # reading "Unity, Unreal Engine, Blender, Shader, HLSL, Kotlin, Swift" scraped down to
+    # "c#, kotlin, swift, ios, android" and the candidate was filed under Mobile Apps -
+    # exactly the mis-categorisation the veto exists to prevent. Also gives the Gaming and
+    # Graphics categories real skill signal (see the design block below).
+    - "unity"
+    - "unreal"
+    - "unreal engine"
+    - "godot"
+    - "opengl"
+    - "directx"
+    - "shader"
+    - "hlsl"
+    - "glsl"
+    - "blender"
+    - "maya"
+    - "3ds max"
+    - "cinema 4d"
+    - "c4d"
+    - "zbrush"
+    - "substance painter"
+    - "3d modeling"
+    - "texturing"
+    - "rigging"
+
+    # --- Design / creative (added 2026-08-21) ---
+    # The Graphics category had almost no vocabulary: "Graphics Position Announcement"
+    # scraped down to exactly ['marketing'] - a design JD with zero design terms, so no
+    # designer could match it and it could not distinguish itself from a marketing posting.
+    # Same both-sides failure the finance block below was added to fix on 2026-08-04.
+    - "figma"
+    - "photoshop"
+    - "illustrator"
+    - "indesign"
+    - "after effects"
+    - "premiere pro"
+    - "adobe"
+    - "adobe creative suite"
+    - "canva"
+    - "sketch"
+    - "wireframing"
+    - "wireframes"
+    - "prototyping"
+    - "typography"
+    - "motion graphics"
+    - "graphic design"
+    - "ui design"
+    - "ux design"
+    - "user research"
+    - "storyboarding"
+    - "illustration"
+
+    # --- Sales / CRM / business development (added 2026-08-21) ---
+    # The Sales category (split out 2026-08-21) had no vocabulary at all: its only JD
+    # scraped down to "automation, cybersecurity, compliance, marketing, social media,
+    # forecasting" - not one sales term, and two outright false positives.
+    # NOTE: bare "pipeline" is deliberately NOT here - it collides with data/CI pipelines.
+    - "crm"
+    - "salesforce"
+    - "hubspot"
+    - "lead generation"
+    - "prospecting"
+    - "cold calling"
+    - "sales pipeline"
+    - "pipeline management"
+    - "account management"
+    - "client relationship"
+    - "negotiation"
+    - "upselling"
+    - "b2b"
+    - "b2c"
+    - "quota"
     # --- Cybersecurity ---
     - "cybersecurity"
     - "siem"
@@ -246,6 +447,49 @@ skills:
     - "data entry"
     - "microsoft office"
     - "google sheets"
+    # --- Finance / accounting (added 2026-08-04) ---
+    # The vocabulary was 133 terms and ALL of them were tech/engineering: not one finance,
+    # accounting or general-business term existed. That broke matching from BOTH sides at
+    # once - a finance candidate's resume was scraped down to "Data Analysis, Excel", and
+    # the "Finance Intern" JD was scraped down to "computer vision, python, sql, excel,
+    # power bi, tableau, marketing, google sheets" (that 'computer vision' being a false
+    # positive in a finance posting). A finance candidate therefore could not match a
+    # finance opening at all, and instead landed on an unrelated Automation JD.
+    # Real case: APP-20260716-2052-6112, MS Finance / FP&A, matched nothing above 20%.
+    # NOTE: JD skills are cached, so these terms only take effect for JDs after a
+    # `bot.py --refresh-jd` re-scan.
+    - "financial reporting"
+    - "financial modeling"
+    - "financial analysis"
+    - "financial planning"
+    - "financial statement analysis"
+    - "fp&a"
+    - "variance analysis"
+    - "budgeting"
+    - "forecasting"
+    - "cash flow analysis"
+    - "account reconciliation"
+    - "accounts payable"
+    - "accounts receivable"
+    - "accounting"
+    - "bookkeeping"
+    - "general ledger"
+    - "gaap"
+    - "auditing"
+    - "internal controls"
+    - "cost accounting"
+    - "valuation"
+    - "due diligence"
+    - "treasury"
+    - "payroll"
+    - "invoicing"
+    - "quickbooks"
+    - "netsuite"
+    - "sap"
+    - "erp"
+    - "oracle financials"
+    - "pivot tables"
+    - "vlookup"
 
   # Nicer display casing for skills; anything not here falls back to .title().
   display_names:
@@ -361,6 +605,81 @@ skills:
     "data entry": "Data Entry"
     "microsoft office": "Microsoft Office"
     "google sheets": "Google Sheets"
+    # Finance acronyms (added 2026-08-21). Without these the .title() fallback rendered them
+    # as "Fp&A", "Gaap", "Sap", "Erp", "Quickbooks", "Netsuite", "Vlookup" in the client-facing
+    # 'Current Skills' column.
+    "fp&a": "FP&A"
+    gaap: "GAAP"
+    sap: "SAP"
+    erp: "ERP"
+    quickbooks: "QuickBooks"
+    netsuite: "NetSuite"
+    vlookup: "VLOOKUP"
+    # Mobile tooling (added 2026-08-21 alongside the new keywords)
+    swiftui: "SwiftUI"
+    dart: "Dart"
+    "jetpack compose": "Jetpack Compose"
+    "android sdk": "Android SDK"
+    "objective-c": "Objective-C"
+    xcode: "Xcode"
+    # Game engines / 3D / graphics tooling (added 2026-08-21)
+    unity: "Unity"
+    unreal: "Unreal"
+    "unreal engine": "Unreal Engine"
+    godot: "Godot"
+    opengl: "OpenGL"
+    directx: "DirectX"
+    shader: "Shaders"
+    hlsl: "HLSL"
+    glsl: "GLSL"
+    blender: "Blender"
+    maya: "Maya"
+    "3ds max": "3ds Max"
+    "cinema 4d": "Cinema 4D"
+    c4d: "Cinema 4D"
+    zbrush: "ZBrush"
+    "substance painter": "Substance Painter"
+    "3d modeling": "3D Modeling"
+    texturing: "Texturing"
+    rigging: "Rigging"
+    # Design / creative (added 2026-08-21)
+    figma: "Figma"
+    photoshop: "Photoshop"
+    illustrator: "Illustrator"
+    indesign: "InDesign"
+    "after effects": "After Effects"
+    "premiere pro": "Premiere Pro"
+    adobe: "Adobe"
+    "adobe creative suite": "Adobe Creative Suite"
+    canva: "Canva"
+    sketch: "Sketch"
+    wireframing: "Wireframing"
+    wireframes: "Wireframing"
+    prototyping: "Prototyping"
+    typography: "Typography"
+    "motion graphics": "Motion Graphics"
+    "graphic design": "Graphic Design"
+    "ui design": "UI Design"
+    "ux design": "UX Design"
+    "user research": "User Research"
+    storyboarding: "Storyboarding"
+    illustration: "Illustration"
+    # Sales / CRM (added 2026-08-21)
+    crm: "CRM"
+    salesforce: "Salesforce"
+    hubspot: "HubSpot"
+    "lead generation": "Lead Generation"
+    prospecting: "Prospecting"
+    "cold calling": "Cold Calling"
+    "sales pipeline": "Sales Pipeline"
+    "pipeline management": "Pipeline Management"
+    "account management": "Account Management"
+    "client relationship": "Client Relationship Management"
+    negotiation: "Negotiation"
+    upselling: "Upselling"
+    b2b: "B2B"
+    b2c: "B2C"
+    quota: "Quota Attainment"
 
 # Heading / job-title words that must never be mistaken for a person's name.
 section_words:
@@ -2834,6 +3153,7 @@ filters:
     - "prince edward island"
     - "yukon"
     - "nunavut"
+    - "ontario"
     - "maharashtra"
     - "karnataka"
     - "tamil nadu"
@@ -3349,18 +3669,31 @@ filters:
 # alone, exactly as documented above.
 role_categories:
   rules:
-    # ── 1. Senior & Executive (Precedence at top) ────────────────────────────
-    - {match: "senior",            category: "Senior & Executive"}
-    - {match: "lead",              category: "Senior & Executive"}
-    - {match: "manager",           category: "Senior & Executive"}
-    - {match: "director",          category: "Senior & Executive"}
-    - {match: "head",              category: "Senior & Executive"}
-    - {match: "principal",         category: "Senior & Executive"}
-    - {match: "executive",         category: "Senior & Executive"}
-    - {match: "chief",             category: "Senior & Executive"}
-    - {match: "ciso",              category: "Senior & Executive"}
-    - {match: "cmo",               category: "Senior & Executive"}
-    - {match: "officer",           category: "Senior & Executive"}
+    # ── 1a. Senior (Precedence at top) ───────────────────────────────────────
+    - {match: "senior",            category: "Senior Manager"}
+    - {match: "lead",              category: "Senior Manager"}
+    - {match: "manager",           category: "Senior Manager"}
+    - {match: "director",          category: "Senior Manager"}
+    - {match: "head",              category: "Senior Manager"}
+    - {match: "principal",         category: "Senior Manager"}
+
+    # ── 1b. Executive (Precedence at top, split out of Senior & Executive,
+    # client request 2026-08-21) ─────────────────────────────────────────────
+    # 'word: true' means whole-word match instead of the default substring (see
+    # assign_category). Required for the C-suite acronyms, which are all substrings of
+    # ordinary title words: cto -> contraCTOr/doCTOr/faCTOry/seCTOr/direCTOr,
+    # coo -> COOrdinator, cio -> suspiCIOus. Without it, "Contractor Position" and
+    # "Sector Analyst" would both land in Executive.
+    - {match: "executive",         category: "Executive"}
+    - {match: "chief",             category: "Executive"}
+    - {match: "ciso",              category: "Executive", word: true}
+    - {match: "cmo",               category: "Executive", word: true}
+    - {match: "cto",               category: "Executive", word: true}
+    - {match: "ceo",               category: "Executive", word: true}
+    - {match: "cfo",               category: "Executive", word: true}
+    - {match: "coo",               category: "Executive", word: true}
+    - {match: "cio",               category: "Executive", word: true}
+    - {match: "officer",           category: "Executive"}
 
     # ── 2. AI/ML/CV (SIN2) ───────────────────────────────────────────────────
     - {match: "ai/ml",            category: "AI/ML/CV (SIN2)"}
@@ -3403,16 +3736,25 @@ role_categories:
     - {match: "full stack",       category: "Web Team (Full stack/Back end & UI/UX)"}
     - {match: "ui/ux",            category: "Web Team (Full stack/Back end & UI/UX)"}
     - {match: "ui ux",            category: "Web Team (Full stack/Back end & UI/UX)"}
-    - {match: "ux",               category: "Web Team (Full stack/Back end & UI/UX)"}
+    # word: true added 2026-08-21 - bare 'ux' as a substring also matched inside ordinary
+    # words ("a-UX-iliary Systems Engineer" was landing in Web Team). Whole-word still
+    # matches "UI/UX Designer" and "UI UX Developer", since '/' is not a word character.
+    - {match: "ux",               category: "Web Team (Full stack/Back end & UI/UX)", word: true}
     - {match: "website",          category: "Web Team (Full stack/Back end & UI/UX)"}
     - {match: "web dev",          category: "Web Team (Full stack/Back end & UI/UX)"}
 
-    # ── 6b. Graphics (design/rendering/gaming - client request 2026-07-15) ───
+    # ── 6b. Gaming (split out of Graphics 2026-08-21, client request) ────────
+    # MUST precede Graphics: "Game Designer" contains both 'game' and 'design', so if
+    # Graphics ran first every game designer would land in Graphics instead of Gaming.
+    - {match: "gaming",           category: "Gaming"}
+    - {match: "game",             category: "Gaming"}
+
+    # ── 6c. Graphics (design/rendering - originally split out of Web Team 2026-07-15;
+    # gaming/game moved out to their own category 2026-08-21) ────────────────
     - {match: "graphics",         category: "Graphics"}
     - {match: "design",           category: "Graphics"}
     - {match: "rendering",        category: "Graphics"}
-    - {match: "gaming",           category: "Graphics"}
-    - {match: "game",             category: "Graphics"}
+    - {match: "animation",        category: "Graphics"}
 
     # ── 7. Mobile Apps (Android IOS) ─────────────────────────────────────────
     - {match: "mobile",           category: "Mobile Apps (Android IOS)"}
@@ -3423,12 +3765,38 @@ role_categories:
     - {match: "flutter",          category: "Mobile Apps (Android IOS)"}
     - {match: "react native",     category: "Mobile Apps (Android IOS)"}
 
-    # ── 8. Business Analytics ────────────────────────────────────────────────
+    # ── 8. Business Analytics / Sales / Marketing ────────────────────────────
+    # Split into three departments 2026-08-21 (client request); previously all one
+    # "Business Analytics" category. ORDER INSIDE THIS BLOCK IS LOAD-BEARING - read on.
+    #
+    # The JD library has a genuinely dual-titled opening: "Business Analytics Marketing
+    # Intern", which contains BOTH the analytics and marketing keywords, so whichever rule
+    # is listed first claims it. The client's ruling (2026-08-21): the two JDs explicitly
+    # named "DriverAI DUAL Business Analytics Marketing Intern" are Business Analytics,
+    # while the plain "Business Analytics Marketing Intern" is Marketing. That is why the
+    # narrow 'dual business analytics' rule is hoisted ABOVE Marketing and the general
+    # 'business analytics' rule sits BELOW it - the specific case is matched first, then
+    # anything still carrying 'marketing' falls to Marketing, and only a title with neither
+    # reaches the general Business Analytics rules at the bottom.
+
+    # 8a. The explicit dual-role JD only (must precede Marketing - see above).
+    - {match: "dual business analytics", category: "Business Analytics"}
+
+    # 8b. Sales - the PDs folder grew a 'Sales - Admin' bucket and "Sales and Business
+    # Development Representative" was falling through to General. 'word: true' keeps
+    # 'sales' off wholesales/presales-style compounds.
+    - {match: "sales",            category: "Sales - Admin", word: true}
+    - {match: "business development", category: "Sales - Admin"}
+
+    # 8c. Marketing - also claims the plain "Business Analytics Marketing Intern".
+    - {match: "marketing",        category: "Marketing - Admin"}
+    - {match: "marketer",         category: "Marketing - Admin"}
+
+    # 8d. Business Analytics (general) - only reached by titles with no sales/marketing
+    # signal at all, e.g. a plain "Business Analyst" or "Business Analytics Intern".
     - {match: "business analyst", category: "Business Analytics"}
     - {match: "business analytics", category: "Business Analytics"}
     - {match: "consultant",       category: "Business Analytics"}
-    - {match: "marketing",        category: "Business Analytics"}
-    - {match: "marketer",         category: "Business Analytics"}
 
     # ── 9. Supply Chain ──────────────────────────────────────────────────────
     - {match: "supply chain",     category: "Supply Chain"}
@@ -3436,10 +3804,10 @@ role_categories:
     - {match: "procurement",      category: "Supply Chain"}
 
     # ── 10. Finance ──────────────────────────────────────────────────────────
-    - {match: "finance",          category: "Finance"}
-    - {match: "financial",        category: "Finance"}
-    - {match: "accountant",       category: "Finance"}
-    - {match: "accounting",       category: "Finance"}
+    - {match: "finance",          category: "Finance - Admin"}
+    - {match: "financial",        category: "Finance - Admin"}
+    - {match: "accountant",       category: "Finance - Admin"}
+    - {match: "accounting",       category: "Finance - Admin"}
 
     # ── 11. Cybersecurity and IT Admin ───────────────────────────────────────
     - {match: "cybersecurity",    category: "Cybersecurity and IT Admin"}
@@ -3696,12 +4064,32 @@ ai_extraction:
   text_limit: 12000
   ollama:
     enabled: true
-    model: "llama3.2"
+    model: "qwen3-1.7b-p2:latest"
     host: "http://localhost:11434"
-    timeout: 60
+    # Give-up threshold per attempt, not a performance setting: about 3x the earlier
+    # worst measured extraction (62.1s). Retained at 180 after measuring thinking off,
+    # a 512-token output cap, and JSON schemas; see docs/benchmarks/stage2a/REPORT.md.
+    # Extraction retries a timeout once; a second timeout uses the existing fallback
+    # and require_ai gate. Connection failures are not retried.
+    timeout: 180
     # Separate, longer timeout just for role-fit scoring (rates the candidate against
     # every open role in one prompt - the heaviest Ollama call, needs real headroom).
+    # Measured 48.4s against 106 roles.
     scoring_timeout: 150
+    # NEVER publish a row the model did not actually read. When true, a candidate whose
+    # extraction or scoring fell back to the offline parser / keyword scorer is DEFERRED,
+    # not written: its Status stays 'New Email Received' and the next run retries it.
+    #
+    # Deliberately NOT wired to Retry Count. That counter is for candidate-side problems
+    # (an unreadable resume) and gives up to 'Rejected - Processing Error' after
+    # score_retry_max strikes. A model timeout is an INFRASTRUCTURE problem - rejecting a
+    # real applicant because the machine was slow three times would be far worse than the
+    # bug this setting fixes.
+    #
+    # Tier 1 regex (phone, skills, portfolio URLs) is NOT affected. That is deliberate
+    # extraction, not a fallback: a regex is strictly better than a 1.7B model at pulling
+    # a URL or a phone number out of text, and Ollama is never asked to override it.
+    require_ai: true
     # Use the Ollama brain for SCORING too (role-fit % + reasoning), not just reading.
     # Falls back to the deterministic keyword scorer when Ollama is off/unavailable.
     scoring: true
