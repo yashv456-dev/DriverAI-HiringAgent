@@ -31,4 +31,6 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 *.lock
-jd_roles_cache.json
+# jd_roles_cache.json is deliberately NOT ignored: it is the cached job-description
+# set the scorer matches against, it carries no personal data, and shipping it means a
+# fresh clone can score without first fetching every JD.
