@@ -756,6 +756,9 @@ def export_client_results(client, upload_to_sharepoint: bool = False) -> str:
         country = str(vals.get("Country", "") or "").strip().lower()
         if country and country not in ("united states", "usa", "us"):
             continue
+        phone = str(vals.get("Phone", "") or "").strip()
+        if phone.startswith("+") and not (phone.startswith("+1") or phone.startswith("+ 1")):
+            continue
         scored_candidates.append(vals)
 
     # Sort newest-first so deduplication keeps the newest scored application
