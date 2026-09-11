@@ -1,0 +1,47 @@
+{
+  "Send_acknowledgment": {
+    "emailMessage/MailboxAddress": "apply@driverai.io",
+    "emailMessage/To": "@outputs('CurrentEmail')?['from']",
+    "emailMessage/Subject": "Application Received - DriverAI (Ref: @{outputs('AppRef')})",
+    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for applying to <strong>DriverAI</strong>. Your application has been received and is under review.</p><p>Reference number: <strong>@{outputs('AppRef')}</strong></p><p>If you are selected, a member of our team will contact you to discuss next steps. You do not need to reply unless you are updating your resume. To do that, send a new or reply email to <em>apply@driverai.io</em> with the subject <strong>\"Update - @{outputs('AppRef')}\"</strong> and attach the new file.</p><p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+    "emailMessage/Importance": "Normal",
+    "emailMessage/Bcc": "yashv@driverai.io"
+  },
+  "Send_duplicate_notice": {
+    "emailMessage/MailboxAddress": "apply@driverai.io",
+    "emailMessage/To": "@outputs('CurrentEmail')?['from']",
+    "emailMessage/Subject": "Your DriverAI Application Is Already On File (Ref: @{first(body('Filter_submitted'))?['Application ID']})",
+    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Your application is already on file with <strong>DriverAI</strong> and under review, so there's no need to resubmit.</p>@{if(greaterOrEquals(int(coalesce(first(body('Filter_submitted'))?['Application Updates'],'0')),2),'<p>This is our final automated reply regarding this application. If there is a match, a member of our team will contact you directly. You do not need to reply, and you are welcome to apply again after 90 days.</p>',concat('<p>If you are selected, a member of our team will contact you to discuss next steps. You do not need to reply unless you are updating your resume. To do that, send a new or reply email to <em>apply@driverai.io</em> with the subject <strong>\"Update - ',first(body('Filter_submitted'))?['Application ID'],'\"</strong> and attach the new file.</p>'))}<p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+    "emailMessage/Importance": "Normal",
+    "emailMessage/Bcc": "yashv@driverai.io"
+  },
+  "Send_CV_request": {
+    "emailMessage/MailboxAddress": "apply@driverai.io",
+    "emailMessage/To": "@outputs('CurrentEmail')?['from']",
+    "emailMessage/Subject": "Please Attach Your Resume - DriverAI",
+    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for your interest in <strong>DriverAI</strong>. We didn't see a resume attached, so your application isn't complete yet.</p><p>Please reply with your resume attached in <strong>PDF or Word (.docx)</strong> format. Once we have it, your application goes under review, and if you are selected, a member of our team will contact you to discuss next steps.</p><p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+    "emailMessage/Importance": "Normal",
+    "emailMessage/Bcc": "yashv@driverai.io"
+  },
+  "Send_wrong_format": {
+    "emailMessage/To": "@outputs('CurrentEmail')?['from']",
+    "emailMessage/Subject": "Please Resend Your Resume as PDF or Word - DriverAI",
+    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for your interest in <strong>DriverAI</strong>. We received your submission, but we couldn't open the attached file.</p><p>Please reply with your resume as a <strong>PDF (.pdf)</strong> or <strong>Word (.docx)</strong> file and we'll process it right away. If you are selected, a member of our team will contact you to discuss next steps.</p><p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+    "emailMessage/MailboxAddress": "apply@driverai.io",
+    "emailMessage/Bcc": "yashv@driverai.io"
+  },
+  "Send_update_ack": {
+    "emailMessage/To": "@outputs('CurrentEmail')?['from']",
+    "emailMessage/Subject": "Updated Resume Received - DriverAI (Ref: @{outputs('AppRef_current')})",
+    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for sending your updated resume. Your application now reflects the latest version and our team will review it.</p>@{if(greaterOrEquals(int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'],'0')),2),'<p>This is our final automated reply regarding this application. If there is a match, a member of our team will contact you directly. You do not need to reply, and you are welcome to apply again after 90 days.</p>',concat('<p>If you are selected, a member of our team will contact you to discuss next steps. You do not need to reply unless you are updating your resume again. To do that, send a new or reply email to <em>apply@driverai.io</em> with the subject <strong>\"Update - ',outputs('AppRef_current'),'\"</strong> and attach the new file.</p>'))}<p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+    "emailMessage/MailboxAddress": "apply@driverai.io",
+    "emailMessage/Bcc": "yashv@driverai.io"
+  },
+  "Send_noted_reply": {
+    "emailMessage/To": "@outputs('CurrentEmail')?['from']",
+    "emailMessage/Subject": "Message Received - DriverAI (Ref: @{outputs('AppRef_current')})",
+    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.7;\"><p>Hello,</p><p>Thanks for following up. Your message has been noted alongside your application.</p>@{if(greaterOrEquals(int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'],'0')),2),'<p>This is our final automated reply regarding this application. If there is a match, a member of our team will contact you directly. You do not need to reply, and you are welcome to apply again after 90 days.</p>',concat('<p>If you are selected, a member of our team will contact you to discuss next steps. You do not need to reply unless you are updating your resume. To send one, reply with the subject <strong>\"Update - ',outputs('AppRef_current'),'\"</strong> and attach the file (<strong>PDF or Word</strong>).</p>'))}<p>Good luck on your next journey.</p><p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0 12px 0;\"><p style=\"font-size:12px;color:#888;line-height:1.5;\">This is an auto-generated email and this mailbox is not monitored.</p></div>",
+    "emailMessage/MailboxAddress": "apply@driverai.io",
+    "emailMessage/Bcc": "yashv@driverai.io"
+  }
+}

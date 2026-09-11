@@ -32,27 +32,98 @@ from pathlib import Path
 HERE = Path(__file__).parent
 ZIP = HERE / "DriverAI-Hiring-AutoReply-apply.zip"
 CONFIG_FILE = HERE / "flow_config.json"
-GUID = "36d96cc9-25b1-4e7c-952c-378ba087f142"
-BASE = f"Microsoft.Flow/flows/{GUID}/"
-
 # ── load config (single source of truth) ─────────────────────────────────────
 cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
 email, trig_cfg = cfg["email"], cfg["trigger"]
-test_mode = cfg.get("test_mode", {})
-suppress_emails = bool(test_mode.get("suppress_emails", False))
+send_applicant_emails = bool(email.get("send_applicant_emails", True))
+send_admin_failure_alerts = bool(email.get("send_admin_failure_alerts", True))
 rules, sp, ex = cfg["business_rules"], cfg["sharepoint"], cfg["excel"]
 appref, filt = cfg["appref"], cfg["spam_filters"]
+
+
+# ── local time (2026-08-27) ──────────────────────────────────────────────────
+# Outlook's receivedDateTime and utcNow() are both UTC. Every date P1 derives from them
+# is user-facing - the Application ID, the two date columns, the Year/Month resume folder,
+# the year/month separator rows - so all of them belong in local wall-clock time. Arizona
+# is UTC-7, so a mail received before 07:00 UTC belongs to the PREVIOUS local day; on the
+# 1st of a month that put the resume in the wrong month folder (a real applicant, 2026-05-01
+# 06:41 UTC = 2026-04-30 23:41 local, filed under May instead of April).
+#
+# convertFromUtc() is used rather than convertTimeZone() because the source is always UTC.
+# The format string is fixed at the ISO shape the Excel columns already use, so a converted
+# value stays parseable by ticks(), by formatDateTime() downstream, and by P2's date parser.
+#
+# id='UTC' skips the wrapper entirely instead of emitting a no-op conversion, so the old
+# behaviour is restorable byte-for-byte.
+_TZ_ID = (cfg.get("timezone") or {}).get("id", "UTC")
+_TZ_OFFSET_H = int((cfg.get("timezone") or {}).get("utc_offset_hours", 0) or 0)
+
+
+def _local(utc_expr: str) -> str:
+    """Wrap a UTC timestamp expression so it reads as local wall-clock time.
+
+    Uses addHours(), NOT convertFromUtc(). convertFromUtc was tried and fails at runtime on
+    this connector's values: it demands a first parameter that declares itself UTC, and
+    rejected the Outlook timestamp outright ("expects its first parameter to be a string
+    that contains a UTC date time. The value was '2026-05-01T06:41:25.0000000'"). Wrapping
+    it in formatDateTime() to normalise the shape made it worse - that strips the Z/offset
+    convertFromUtc relies on to recognise the value as UTC in the first place. addHours()
+    parses whatever the connector emits, offset or not, and cannot fail this way.
+
+    EXACT ONLY FOR A NO-DST ZONE. Arizona is UTC-7 every day of the year, so a fixed offset
+    is not an approximation here. A DST zone would need a real timezone function.
+
+    ONLY for genuinely-UTC expressions - the trigger's receivedDateTime and utcNow(). A value
+    read back OUT of the workbook was written local by this same build and must NOT be passed
+    through here, or it shifts a second time.
+    """
+    if _TZ_OFFSET_H == 0:
+        return utc_expr
+    return "addHours(%s,%d,'yyyy-MM-ddTHH:mm:ss')" % (utc_expr, _TZ_OFFSET_H)
+
+
+# The trigger's receivedDateTime, in local time. Section 19 rewrites the inner
+# triggerOutputs()?['body/...'] to outputs('CurrentEmail')?['...'] by plain substring
+# replacement, which reaches inside the convertFromUtc() wrapper unchanged.
+_RECEIVED_UTC = "triggerOutputs()?['body/receivedDateTime']"
+_RECEIVED_LOCAL = _local(_RECEIVED_UTC)
+# The separator actions are authored directly against outputs('CurrentEmail') rather than
+# triggerOutputs(), so they need their own already-rewritten twin.
+_RECEIVED_LOCAL_CE = _local("outputs('CurrentEmail')?['receivedDateTime']")
+_NOW_LOCAL = _local("utcNow()")
 year_sep = cfg.get("year_separator", {"enabled": True})
 month_sep = cfg.get("month_separator", {"enabled": True})
 flow_name = cfg.get("flow_name", "DriverAI - Hiring Auto-Reply P1")
 
 # ── read the current package (structural base; keeps GUIDs/connections intact) ─
+# The base zip's per-flow folder may be under a DIFFERENT GUID than the one we are writing
+# (that is the whole point of flow_id: retarget the package at the live flow). Detect the
+# folder that is actually in the archive rather than assuming it matches, otherwise a
+# retarget makes the very first read fail.
 with zipfile.ZipFile(ZIP, "r") as zf:
-    defn = json.loads(zf.read(BASE + "definition.json").decode("utf-8"))
-    apis_map = zf.read(BASE + "apisMap.json").decode("utf-8")
-    conns_map = zf.read(BASE + "connectionsMap.json").decode("utf-8")
+    _existing = [n for n in zf.namelist()
+                 if n.startswith("Microsoft.Flow/flows/") and n.endswith("/definition.json")]
+    if not _existing:
+        raise SystemExit(f"{ZIP} has no Microsoft.Flow/flows/<guid>/definition.json")
+    READ_BASE = _existing[0][: -len("definition.json")]
+    _BASE_GUID = READ_BASE.split("/")[-2]        # the GUID actually present in the base zip
+    defn = json.loads(zf.read(READ_BASE + "definition.json").decode("utf-8"))
+    apis_map = zf.read(READ_BASE + "apisMap.json").decode("utf-8")
+    conns_map = zf.read(READ_BASE + "connectionsMap.json").decode("utf-8")
     flow_mf = zf.read("Microsoft.Flow/flows/manifest.json").decode("utf-8")
     root_mf = zf.read("manifest.json").decode("utf-8")
+
+# The LIVE flow id (flow_config.json: flow_id). Power Automate binds an "Update" import by
+# this GUID; a stale one leaves the update nothing to land on, so the import appears to
+# succeed while the running flow keeps its OLD definition - three imports on 2026-08-27
+# changed nothing because of exactly that.
+#
+# Computed HERE, not earlier: the documented fallback is "whatever GUID the base zip carries",
+# and _BASE_GUID only exists once the archive has been opened above. Assigning this before the
+# read left the fallback referencing an unbound name - harmless only while flow_id is set,
+# because `or` short-circuits, and a NameError the moment anyone blanked it.
+GUID = str(cfg.get("flow_id") or _BASE_GUID).strip()
+BASE = f"Microsoft.Flow/flows/{GUID}/"
 
 # Enforce package identity: the definition's name/id MUST equal the asset-folder GUID
 # referenced by the manifests. A definition re-exported from the tenant carries the
@@ -64,6 +135,29 @@ defn["id"] = f"/providers/Microsoft.Flow/flows/{GUID}"
 
 wd = defn["properties"]["definition"]
 actions = wd["actions"]
+
+# The ZIP is also the next build's structural base. The first unread-poll build
+# wrapped the whole processing graph inside Has_unread_email; Power Automate rejected
+# that package because the extra control level pushed existing level-8 actions to
+# level 9. Unwrap that one historical shape, or strip the newer flat poll plumbing,
+# before reapplying overlays. Repeated builds therefore stay idempotent.
+if "Has_unread_email" in actions and "CONFIG" in actions["Has_unread_email"].get("actions", {}):
+    _saved_branch = actions["Has_unread_email"]["actions"]
+    _saved_branch.pop("CurrentEmail", None)
+    actions = _saved_branch
+else:
+    for _poll_action in (
+        "Get_unread_emails",
+        "Has_unread_email",
+        "CurrentEmail",
+        "Notify_poll_failure",
+        "Notify_processing_scope_failure",
+        "Move_unhandled_failure_to_recruiting_review",
+    ):
+        actions.pop(_poll_action, None)
+if "CONFIG" in actions:
+    actions["CONFIG"]["runAfter"] = {}
+wd["actions"] = actions
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -111,7 +205,7 @@ def set_excel(node) -> None:
     p["file"] = ex["file"]
 
 
-def resume_folder_path(rd: str = "triggerOutputs()?['body/receivedDateTime']") -> str:
+def resume_folder_path(rd: str = None) -> str:
     """folderPath expression for resume Create-file actions.
 
     Flat = the configured resumes folder. Dated = .../<yyyy>/<MMMM> computed from the date
@@ -121,6 +215,7 @@ def resume_folder_path(rd: str = "triggerOutputs()?['body/receivedDateTime']") -
     path from that same date) finds it. No week-level subfolder (dropped 2026-07-08 — one
     folder per month is enough at this volume and made the tree harder to browse).
     """
+    rd = _RECEIVED_LOCAL if rd is None else rd
     if not sp.get("dated_resume_subfolders", False):
         return "@outputs('CONFIG')['resumes_folder']"
     return (
@@ -130,11 +225,12 @@ def resume_folder_path(rd: str = "triggerOutputs()?['body/receivedDateTime']") -
     )
 
 
-def resume_folder_path_lib_relative(rd: str = "triggerOutputs()?['body/receivedDateTime']") -> str:
+def resume_folder_path_lib_relative(rd: str = None) -> str:
     """Library-relative twin of resume_folder_path() (no '/Shared Documents' prefix) - the shape
     CreateNewFolder's 'parameters/path' needs (same fix as Create_workbook_folder). CreateFile does
     NOT auto-create missing folders (confirmed: it fails with NotFound) - so the very first resume
     of a new year/month needs its dated folder created explicitly before Create_file runs."""
+    rd = _RECEIVED_LOCAL if rd is None else rd
     if not sp.get("dated_resume_subfolders", False):
         return "@{'%s'}" % _sf_folder_lib_relative
     return (
@@ -189,12 +285,38 @@ def _deep_find(tree, name):
     return None
 
 
+def _find_owner_actions(tree, name):
+    """Return the `actions` dict that DIRECTLY contains `name`, or None.
+
+    _deep_find hands back the action itself; this hands back its parent map, which is what
+    you need to insert a true SIBLING. runAfter may only reference a literal sibling at the
+    same nesting level, so anything wired to an existing action must be added here.
+    """
+    if isinstance(tree, dict):
+        for key, value in tree.items():
+            if key == "actions" and isinstance(value, dict):
+                if name in value:
+                    return value
+            # The top-level `actions` map is passed in bare, so check it directly too.
+            if name in tree and not isinstance(tree.get(name), str):
+                return tree
+            r = _find_owner_actions(value, name)
+            if r is not None:
+                return r
+    elif isinstance(tree, list):
+        for v in tree:
+            r = _find_owner_actions(v, name)
+            if r is not None:
+                return r
+    return None
+
+
 # ── self-healing pristine restore for email-sending actions ──────────────────
 # The zip is BOTH the deployable output AND the next run's structural base, and nothing
 # else in this script reconstructs Notify_failure/Send_* from scratch - _set_email() and
 # Notify_failure's setup only overlay Subject/Body onto an ASSUMED-real base. If a prior
-# build ran with test_mode.suppress_emails=true (replacing these 7 actions with no-op
-# Compose actions), every subsequent build - suppressed or not - would find a corrupted
+# build suppressed outbound actions (replacing them with no-op Compose actions), every
+# subsequent build - suppressed or not - would find a corrupted
 # base and crash trying to set dynamic-content fields on a Compose action. Force these 7
 # back to their real connector shape (host/apiId/operationId/authentication) from a
 # permanent pristine snapshot at the START of every single build, before anything else
@@ -211,19 +333,39 @@ for _name, _real_shape in _pristine_shapes.items():
 
 
 # ── 1. trigger: mailbox + poll interval ──────────────────────────────────────
-trg = wd["triggers"]["When_a_new_email_arrives_in_a_shared_mailbox_(V2)"]
-trg["inputs"]["parameters"]["mailboxAddress"] = email["trigger_mailbox"]
 interval = int(trig_cfg["interval_min"])
-trg["recurrence"]["interval"] = interval
-if isinstance(trg.get("evaluatedRecurrence"), dict):
-    trg["evaluatedRecurrence"]["interval"] = interval
+unread_per_run = int(trig_cfg.get("unread_per_run", 1))
+# False (the default since 2026-08-04) makes the INBOX the queue rather than the read
+# flag: every terminal path already moves the message out of the Inbox, whereas merely
+# OPENING a message used to drop it from the queue silently and permanently.
+# See _comment_fetch_only_unread in flow_config.json.
+fetch_only_unread = bool(trig_cfg.get("fetch_only_unread", False))
+if unread_per_run != 1:
+    raise ValueError(
+        "trigger.unread_per_run must be 1: P1 intentionally processes one unread email per run"
+    )
+wd["triggers"] = {
+    "Poll_unread_shared_mailbox": {
+        "recurrence": {"frequency": "Minute", "interval": interval},
+        "evaluatedRecurrence": {"frequency": "Minute", "interval": interval},
+        "type": "Recurrence",
+        "runtimeConfiguration": {"concurrency": {"runs": 1}},
+    }
+}
 
 # ── 1b. flow + package display name (config-driven; fixes the "new2" package name) ──
 defn["properties"]["displayName"] = flow_name
 _root = json.loads(root_mf)
 if isinstance(_root.get("details"), dict):
     _root["details"]["displayName"] = flow_name          # package name (import dialog / list)
-_res = _root.get("resources", {}).get(GUID)
+# Re-key the flow resource from whatever GUID the base zip carried onto the LIVE flow id.
+# The package folder name, defn["id"] and this manifest key must all agree, or the import
+# dialog cannot offer "Update" against the real flow and silently falls back to creating a
+# new one - three imports on 2026-08-27 changed nothing because of exactly this.
+_resources = _root.setdefault("resources", {})
+if GUID != _BASE_GUID and _BASE_GUID in _resources:
+    _resources[GUID] = _resources.pop(_BASE_GUID)
+_res = _resources.get(GUID)
 if isinstance(_res, dict) and isinstance(_res.get("details"), dict):
     _res["details"]["displayName"] = flow_name           # flow resource name
 root_mf = json.dumps(_root, ensure_ascii=False)
@@ -269,13 +411,17 @@ actions["BadSenders"]["inputs"] = list(filt["bad_senders"])
 bad_subjects = list(filt["bad_subjects"])
 actions["BadSubjects"]["inputs"] = bad_subjects
 # Spam gate also enforces content safety: scam + offensive/harassment + malware/exe links +
-# non-English scam, all checked (lowercased substring) against subject, body, AND attachment
-# names. Any match => Terminate_Spam (silent, no reply). Lists live in flow_config.json.
+# non-English scam + vendor/agency solicitation, all checked (lowercased substring) against
+# subject, body, AND attachment names. Any match => Terminate_Spam (silent, no reply). Lists
+# live in flow_config.json. vendor_solicitation_phrases added 2026-08-01 (Futurism
+# Technologies case): a services vendor pitching itself to us, not applying for a job,
+# triggered none of the other lists since nothing in the email was malicious.
 actions["SpamPhrases"]["inputs"] = (
     list(filt["spam_phrases"])
     + list(filt.get("offensive_phrases", []))
     + list(filt.get("malware_phrases", []))
     + list(filt.get("foreign_scam_phrases", []))
+    + list(filt.get("vendor_solicitation_phrases", []))
 )
 # link_shortener_phrases are a SEPARATE gate (see HasValidResumeEarly above): checked always, but
 # bypassed when a real resume is attached, since a shortened social/portfolio link in a normal
@@ -288,7 +434,71 @@ actions["LinkShortenerPhrases"] = {
 # Keywords Compose is dead — its output is never referenced; keyword matching is done
 # inline in the Has_application_keyword expression. Remove it and re-anchor MatchSender.
 actions.pop("Keywords", None)
-actions["MatchSender"]["runAfter"] = {"LinkShortenerPhrases": ["Succeeded"]}
+
+# ── allow-list: internal testers must never be silently junked ───────────────
+# Mail from these addresses skips ALL THREE spam screens and goes straight into normal
+# processing. Without it, a live test from an internal account can be moved to Junk with no
+# row, no reply and no alert - the documented blind spot - and the tester has no way to tell
+# that from a genuine processing failure.
+#
+# These two Compose/Query actions sit at the TOP level. IsSubject and IsSpam are nested and
+# therefore cannot list MatchAllowSender in their runAfter (PA rejects cross-level runAfter,
+# see the ResumeFilesEarly note below), but they CAN read its output in an expression - the
+# same thing MatchLinkShortener already does with the top-level LowerSubject/LowerBody. The
+# ordering is safe regardless: MatchAllowSender gates IsSystem, which precedes both.
+allow_senders = [str(x).strip().lower() for x in filt.get("allow_senders", []) if str(x).strip()]
+if "apply@driverai.io" in allow_senders or email["trigger_mailbox"].lower() in allow_senders:
+    raise ValueError(
+        "spam_filters.allow_senders must not contain the trigger mailbox: allow-listing it "
+        "defeats the self-loop guard in bad_senders and the flow would answer its own mail."
+    )
+actions["AllowSenders"] = {
+    "runAfter": {"LinkShortenerPhrases": ["Succeeded"]},
+    "type": "Compose",
+    "inputs": allow_senders,
+}
+actions["MatchAllowSender"] = {
+    "runAfter": {"AllowSenders": ["Succeeded"]},
+    "type": "Query",
+    "inputs": {
+        "from": "@outputs('AllowSenders')",
+        "where": "@contains(outputs('LowerFrom'), item())",
+    },
+}
+# QuotedRef: the APP-... reference the sender actually typed, pulled out of the subject (or the
+# body if it is not in the subject). An Application ID is exactly 22 characters - APP- + 8 date
+# + - + 4 time + - + 4 hex - so a fixed-length substring from the 'app-20' marker is enough; the
+# length guard stops substring() overrunning when the marker sits at the very end of a truncated
+# body. Empty string when nothing usable is found, which the Get_rows_ref filter treats as absent.
+_SUBJ = "outputs('LowerSubject')"
+_BODY = "outputs('LowerBody')"
+
+
+def _extract_ref(src):
+    return ("if(and(contains({s},'app-20'), greaterOrEquals(length({s}), "
+            "add(indexOf({s},'app-20'),22))), substring({s}, indexOf({s},'app-20'), 22), '')"
+            ).format(s=src)
+
+
+actions["QuotedRef"] = {
+    "runAfter": {"MatchAllowSender": ["Succeeded"]},
+    "type": "Compose",
+    "inputs": "@toUpper(if(not(equals(%s,'')), %s, %s))" % (
+        _extract_ref(_SUBJ), _extract_ref(_SUBJ), _extract_ref(_BODY)),
+}
+actions["MatchSender"]["runAfter"] = {"QuotedRef": ["Succeeded"]}
+
+# An empty allow list makes this clause always true, so the gates behave exactly as before.
+_NOT_ALLOWLISTED = {"equals": ["@length(body('MatchAllowSender'))", 0]}
+
+actions["IsSystem"]["expression"] = {"and": [
+    {"greater": ["@length(body('MatchSender'))", 0]},
+    _NOT_ALLOWLISTED,
+]}
+actions["IsSystem"]["else"]["actions"]["IsSubject"]["expression"] = {"and": [
+    {"greater": ["@length(body('MatchSubject'))", 0]},
+    _NOT_ALLOWLISTED,
+]}
 # ResumeFilesEarly/HasValidResumeEarly are dead at the top level - an earlier build put them here,
 # but they had to move into spam_gate (below) as same-level siblings of IsSpam, since PA rejects a
 # runAfter reference from a nested action to anything not at its exact same level, even a top-level
@@ -332,12 +542,16 @@ spam_gate["IsSpam"]["runAfter"] = {
     "MatchLinkShortener": ["Succeeded"],
     "HasValidResumeEarly": ["Succeeded"],
 }
-spam_gate["IsSpam"]["expression"] = {"or": [
-    {"greater": ["@length(body('MatchSpam'))", 0]},
-    {"and": [
-        {"greater": ["@length(body('MatchLinkShortener'))", 0]},
-        {"equals": ["@outputs('HasValidResumeEarly')", False]},
+spam_gate["IsSpam"]["expression"] = {"and": [
+    {"or": [
+        {"greater": ["@length(body('MatchSpam'))", 0]},
+        {"and": [
+            {"greater": ["@length(body('MatchLinkShortener'))", 0]},
+            {"equals": ["@outputs('HasValidResumeEarly')", False]},
+        ]},
     ]},
+    # allow-listed internal testers bypass the content screen too (see AllowSenders above)
+    _NOT_ALLOWLISTED,
 ]}
 
 spam = spam_gate["IsSpam"]["else"]["actions"]
@@ -354,17 +568,39 @@ gate = spam["HasAppRefGate"]
 # and the saved resume filename). toUpper() so the ref round-trips through the reply-extraction's
 # toUpper() and matches the stored Application ID and the saved <ref>_<file> name exactly.
 _time_fmt = appref.get("time_format", "HHmm")   # PA formatDateTime token, e.g. "HHmm" or "HHmmss"
-_suffix_len = int(appref.get("hex_length", 4))  # random uppercase-hex tail (guid); 4 hex = 65 536 combos/minute
+_suffix_len = int(appref.get("hex_length", 4))   # length of the tail sliced off the message id
+_tail_skip = int(appref.get("id_tail_skip", 2))  # low-entropy trailing chars to step over
 #   Ref shape: APP-20260624-2238-A5F2 (~22 chars at the defaults). The minute timestamp + 4-hex
 #   tail still makes a same-minute collision astronomically unlikely at this volume, and the '-'
 #   delimiters keep it readable. _ref_len below recomputes automatically from _time_fmt/_suffix_len,
 #   so minting and reply-extraction can never drift apart even if these config values change.
-_rd = "coalesce(triggerOutputs()?['body/receivedDateTime'], utcNow())"
-spam["AppRef"]["runAfter"] = {}
+_rd = _local("coalesce(triggerOutputs()?['body/receivedDateTime'], utcNow())")
+# The reference must be DETERMINISTIC: the same email has to mint the same ref every time
+# it is processed, or a retry saves the resume under one ref and keys the row to another.
+# guid() cannot do that. The message's own Graph id can - see AppRefSeed.
+#
+# Section 19 rewrites triggerOutputs()?['body/id'] to outputs('CurrentEmail')?['id'], the
+# same way it does for receivedDateTime.
+spam["AppRefSeed"] = {
+    "runAfter": {},
+    "type": "Compose",
+    # Alphanumerics only (a base64url id also carries '-', '_' and '=' padding), left-padded
+    # so the slice below can never run off the front of a short or missing value.
+    "inputs": ("@{concat('%s', replace(replace(replace("
+               "coalesce(triggerOutputs()?['body/id'],''),'-',''),'_',''),'=',''))}"
+               % ("0" * (_suffix_len + _tail_skip))),
+}
+spam["AppRef"]["runAfter"] = {"AppRefSeed": ["Succeeded"]}
+# The tail sits _tail_skip characters from the END - measured across 241 real messages in
+# this mailbox: the first, middle and last 4 characters of an Outlook id are IDENTICAL on
+# every message (they are the mailbox guid and the trailing 'AAA' padding), while the four
+# characters at offset -6 are the per-message counter and gave 185 distinct values. Two
+# emails in the same minute are consecutive, so they always differ there.
 spam["AppRef"]["inputs"] = (
-    "@{concat('APP-', formatDateTime(%s,'%s'), '-', formatDateTime(%s,'%s'), "
-    "'-', toUpper(substring(guid(),0,%d)))}"
-    % (_rd, appref["date_format"], _rd, _time_fmt, _suffix_len)
+    "@{concat('APP-', formatDateTime(%s,'%s'), '-', formatDateTime(%s,'%s'), '-', "
+    "toUpper(substring(outputs('AppRefSeed'), "
+    "sub(length(outputs('AppRefSeed')), %d), %d)))}"
+    % (_rd, appref["date_format"], _rd, _time_fmt, _suffix_len + _tail_skip, _suffix_len)
 )
 # The old row-counting actions are gone; drop them if the base zip still carries them.
 for _dead in ("TodayPrefix", "Get_rows_count", "Filter_today"):
@@ -378,16 +614,137 @@ spam["FileRef"] = {
 }
 
 # ResumeFiles now waits for FileRef
-spam["ResumeFiles"]["runAfter"] = {"FileRef": ["Succeeded"]}
+# ── attachment triage: resume yes, portfolio/cover letter no (2026-08-27) ──────────
+# Three Query actions rather than one, because a Query cannot fall back to its own input:
+#   ResumeFilesAll   every .pdf/.docx with real bytes            (what P1 used to use)
+#   ResumeFilesKept  the same list minus the excluded filenames
+#   ResumeFiles      whichever of those two is non-empty         (unchanged name, so the
+#                    three Foreach loops and ResumeNames need no edits at all)
+# The fallback is the safety property: if the exclusion would leave nothing, the unfiltered
+# list is used, so an applicant whose ONLY attachment is called portfolio.pdf is still a
+# normal application rather than a "please attach your resume" reply.
+_ATTACH_EXCLUDE = [str(p).strip().lower()
+                   for p in (cfg.get("resume_attachments") or {}).get("exclude_name_phrases", [])
+                   if str(p).strip()]
+
+_IS_RESUME_FILE = ("@and(or(endsWith(toLower(item()?['name']), '.pdf'), "
+                   "endsWith(toLower(item()?['name']), '.docx')), "
+                   "not(empty(item()?['contentBytes'])))")
+
+spam["ResumeFilesAll"] = {
+    "type": "Query",
+    "runAfter": {"FileRef": ["Succeeded"]},
+    "inputs": {
+        "from": "@coalesce(triggerOutputs()?['body/attachments'], json('[]'))",
+        "where": _IS_RESUME_FILE,
+    },
+}
+
+if _ATTACH_EXCLUDE:
+    # Logic Apps' or() is BINARY - or(a, b), exactly two arguments. A flat or(a, b, c, ...)
+    # is rejected at RUNTIME, not at import: the flow imports clean, then every run dies
+    # inside this Query. That took out a live run on 2026-08-27 (a real applicant: no row, no
+    # file, no acknowledgment, "Reference: n/a" because AppRef never resolved, and the mail
+    # quarantined unread to Archive). Every pre-existing multi-term test in this flow is
+    # either a Query over the term list (MatchAllowSender, MatchSpam) or a binary or() -
+    # there was no flat multi-arg or() anywhere before this one. Fold right-associatively
+    # into nested binary or() calls instead: or(a, or(b, or(c, d))).
+    def _or_chain(terms: list) -> str:
+        """Right-fold a list of boolean expressions into nested BINARY or() calls."""
+        if len(terms) == 1:
+            return terms[0]
+        return "or(%s, %s)" % (terms[0], _or_chain(terms[1:]))
+
+    _excl_terms = ["contains(toLower(item()?['name']), '%s')" % p.replace("'", "''")
+                   for p in _ATTACH_EXCLUDE]
+    spam["ResumeFilesKept"] = {
+        "type": "Query",
+        "runAfter": {"ResumeFilesAll": ["Succeeded"]},
+        "inputs": {
+            "from": "@body('ResumeFilesAll')",
+            "where": "@not(%s)" % _or_chain(_excl_terms),
+        },
+    }
+    _chosen = ("if(greater(length(body('ResumeFilesKept')), 0), "
+               "body('ResumeFilesKept'), body('ResumeFilesAll'))")
+    _resume_files_after = {"ResumeFilesKept": ["Succeeded"]}
+else:
+    spam.pop("ResumeFilesKept", None)
+    _chosen = "body('ResumeFilesAll')"
+    _resume_files_after = {"ResumeFilesAll": ["Succeeded"]}
+
+# Pass-through Query: same array, but body('ResumeFiles') keeps its meaning everywhere.
+spam["ResumeFiles"] = {
+    "type": "Query",
+    "runAfter": _resume_files_after,
+    "inputs": {"from": "@%s" % _chosen, "where": "@not(empty(item()?['name']))"},
+}
 
 # ── 6. duplicate-block window (days) ─────────────────────────────────────────
+# The window is measured from the sender's MOST RECENT application. This used to be written
+# as last(Filter_submitted), which silently assumed the sheet is in P1's own append order
+# (oldest -> newest). P2's resort_candidate_sheets.py (2026-07-31) re-sorts the live sheet to
+# newest-FIRST, which inverted that assumption: last() started returning the sender's OLDEST
+# row, so a returning applicant whose first contact was >90 days ago was read as brand new -
+# new row, fresh acknowledgment, cap system bypassed - while every OTHER expression in the
+# flow reads first() and was therefore correct. The two halves disagreed by construction, and
+# under either ordering one of them had to be wrong.
+#
+# Fixed 2026-08-03 by removing the ordering assumption entirely rather than swapping one end
+# for the other: project every matching row to its tick value and take the max. Correct under
+# append order, newest-first, or any future re-sort, so this can never silently invert again.
+#
+# The union with [0] guarantees a non-empty collection: Logic Apps evaluates BOTH operands of
+# an `and` (no short-circuit), so a brand-new applicant - whose Filter_submitted is empty -
+# would otherwise hit max([]) and fail the run. 0 is below any real tick value, so the window
+# check is simply false for them, which is what the length() operand already means.
 days = int(rules["duplicate_check_days"])
+hr["actions"]["Submitted_ticks"] = {
+    "type": "Select",
+    "runAfter": {"Filter_submitted": ["Succeeded"]},
+    "inputs": {
+        "from": "@body('Filter_submitted')",
+        "select": "@ticks(coalesce(item()?['Received Date'], '2000-01-01T00:00:00Z'))",
+    },
+}
+dup.setdefault("runAfter", {})["Submitted_ticks"] = ["Succeeded"]
+# The 90-day window exists so a candidate who applied long ago and applies again is treated as
+# a genuinely NEW application rather than an edit of a stale record. That is right when the row
+# was found by ADDRESS - the window is the only evidence we have about intent.
+#
+# It is wrong when the row was found by an EXPLICITLY QUOTED reference. There the sender has
+# named the exact application this belongs to, which is stronger evidence than any date
+# heuristic, and applying the window anyway re-introduces the very bug the ref lookup fixes:
+# Saniya's row is dated 2026-02-04, so a 2026-08-25 forward quoting her ref is ~200 days old,
+# fails the window, and falls through to Add_row - a new row again, just found by a different
+# key. So: when the lookup was BY REFERENCE, skip the window; otherwise keep it exactly as-is.
+_looked_up_by_ref = {"and": [
+    {"greater": ["@length(body('MatchAllowSender'))", 0]},
+    {"not": {"equals": ["@outputs('QuotedRef')", ""]}},
+]}
 dup["expression"] = {
     "and": [
         {"greater": ["@length(body('Filter_submitted'))", 0]},
-        {"greaterOrEquals": [
-            "@ticks(coalesce(last(body('Filter_submitted'))?['Received Date'], '2000-01-01T00:00:00Z'))",
-            "@ticks(addDays(utcNow(), -%d))" % days,
+        {"or": [
+            _looked_up_by_ref,
+            {"greaterOrEquals": [
+                "@max(union(body('Submitted_ticks'), json('[0]')))",
+                # Submitted_ticks reads 'Received Date', which is stored in LOCAL time, so
+                # the boundary is converted too. Left as UTC this drifts by the offset -
+                # immaterial against a 90-day window, but the two sides should be one clock.
+                #
+                # The boundary is measured from THIS EMAIL'S OWN received date, not utcNow()
+                # (changed 2026-08-28). Anchoring it to "now" silently disables duplicate
+                # protection for any REPLAY of mail older than the window: the gate finds the
+                # prior row, then rejects it as too old and falls through to Add_row. Live case:
+                # redacted-applicant2@example.edu had two physical copies of ONE message in the mailbox (same
+                # internetMessageId, received 2026-05-08). Replayed on 2026-08-28 - 112 days
+                # later - each copy cleared the 90-day test independently and minted its own
+                # row (APP-20260508-1642-20A1 and -E766). Against the email's own date the two
+                # copies are 0 days apart, so the second is correctly seen as a duplicate.
+                # For live intake received ~= now, so ordinary behaviour is unchanged.
+                "@ticks(addDays(%s, -%d))" % (_RECEIVED_LOCAL_CE, days),
+            ]},
         ]},
     ]
 }
@@ -403,6 +760,81 @@ _send_cv = _deep_find(kw["actions"], "Send_CV_request")
 _send_cv["runAfter"] = {}
 kw["actions"] = {"Send_CV_request": _send_cv}
 
+# ── 7b. IGNORED mail: tell the admin instead of archiving it silently (2026-08-24) ───────
+# This else branch is everything that cleared ALL THREE spam gates, quoted no reference,
+# attached no resume and matched no application keyword. It used to be completely empty: the
+# message was marked read, moved to Archive, and left no row, no reply and no signal anywhere.
+# A press enquiry from a national financial daily sat unnoticed for ten weeks because of it -
+# the mail was handled perfectly by design and nobody could tell it had arrived.
+#
+# Volume is inherently low: real spam is already gone by this point and real applications carry
+# a keyword or an attachment, so what lands here is genuine human mail that simply is not an
+# application. That is exactly the mail worth a human glance, so the alert is informational
+# (Importance Low) rather than a failure.
+#
+# NON-BLOCKING, and that is load-bearing: the top-level Mark_as_read/Move_to_processed pair
+# runs on `HasResume: Succeeded`, and an If only succeeds when its nested actions do. A bare
+# failing send here would flip HasResume to Failed, skip the tidy, strand the message in the
+# Inbox, and - because the Inbox IS the queue - have it re-processed and re-alerted every
+# minute. The trailing Compose absorbs Failed/TimedOut so the branch always closes clean,
+# the same catch pattern already used by Ack_stamp_done and Dup_patch_done.
+if send_admin_failure_alerts:
+    _notify_ignored = {
+        "type": "OpenApiConnection",
+        "runAfter": {},
+        "runtimeConfiguration": {"retryPolicy": {"type": "exponential", "count": 2,
+                                                 "interval": "PT10S"}},
+        "inputs": {
+            "parameters": {
+                "emailMessage/To": email["admin_email"],
+                "emailMessage/Subject": (
+                    "[Hiring Auto-Reply] Non-application mail archived: "
+                    "@{coalesce(outputs('CurrentEmail')?['subject'],'(no subject)')}"
+                ),
+                "emailMessage/Body": (
+                    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;">'
+                    '<p><strong>An email reached the hiring mailbox that is not an '
+                    'application.</strong> It passed every spam screen, but carried no resume, '
+                    'no application keyword and no application reference, so P1 created no row '
+                    'and sent no reply.</p>'
+                    '<p><strong>From:</strong> '
+                    "@{coalesce(outputs('CurrentEmail')?['from'],'(unknown)')}<br>"
+                    '<strong>Subject:</strong> '
+                    "@{coalesce(outputs('CurrentEmail')?['subject'],'(no subject)')}<br>"
+                    '<strong>Received:</strong> '
+                    "@{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</p>"
+                    '<p><strong>Preview:</strong><br>'
+                    "@{coalesce(outputs('CurrentEmail')?['bodyPreview'],'(empty)')}</p>"
+                    '<p>The message has been marked read and moved to <strong>Archive</strong> '
+                    '- nothing was lost. Reply from the mailbox directly if it needs a human '
+                    'answer. This alert is informational, not a failure.</p></div>'
+                ),
+                "emailMessage/Importance": "Low",
+            },
+            "host": {
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                "connectionName": "shared_office365",
+                "operationId": "SendEmailV2",
+            },
+            "authentication": "@parameters('$authentication')",
+        },
+    }
+else:
+    _notify_ignored = {
+        "type": "Compose",
+        "runAfter": {},
+        "inputs": "Admin alerts disabled: non-application mail archived without notification",
+    }
+kw["else"]["actions"] = {
+    "Notify_ignored_mail": _notify_ignored,
+    # CATCH: consume a failed alert so the enclosing If still succeeds (see the note above).
+    "Ignored_alert_done": {
+        "type": "Compose",
+        "runAfter": {"Notify_ignored_mail": ["Succeeded", "Failed", "Skipped", "TimedOut"]},
+        "inputs": "non-application mail alert best-effort",
+    },
+}
+
 # ── 8. reply-detection pattern (update/reply branch) ─────────────────────────
 pat = appref["detect_pattern"]
 gate["expression"] = {"or": [
@@ -417,13 +849,15 @@ gate["expression"] = {"or": [
 gate["runAfter"] = {"ResumeNames": ["Succeeded"]}
 hr["runAfter"] = {"HasAppRefGate": ["Succeeded", "Skipped"]}
 
-# FileRef_from_subject: sanitize the reply's quoted ref for filenames
+# FileRef_from_subject: filename-safe form of the MATCHED ROW's real Application ID (fixed
+# 2026-07-31: was built from the text-quoted AppRef_from_subject - see AppRef_current's comment
+# in section 14b for why that let an updated resume get saved under a stale/dead reference).
 # (use _deep_find because after the first build these live inside IsKnownSender)
 _frs = _deep_find(gate["actions"], "FileRef_from_subject")
 if _frs is None:
     _frs = {"type": "Compose", "inputs": ""}
-_frs["runAfter"] = {"AppRef_from_subject": ["Succeeded"]}
-_frs["inputs"] = "@{replace(outputs('AppRef_from_subject'), '/', '-')}"
+_frs["runAfter"] = {"AppRef_current": ["Succeeded"]}
+_frs["inputs"] = "@{replace(outputs('AppRef_current'), '/', '-')}"
 _hru = _deep_find(gate["actions"], "Has_resume_in_update")
 if _hru is not None:
     _hru["runAfter"] = {"FileRef_from_subject": ["Succeeded"]}
@@ -462,7 +896,25 @@ _email_norm_expr = (
 # o'brien@x.com breaks the Excel `$filter`. Used by Get_rows and Get_rows_ref.
 _EMAIL_FILTER = "@concat('Email eq ''', replace(%s, '''', ''''''), '''')" % _email_norm_expr
 set_excel(hr["actions"]["Get_rows"])
-hr["actions"]["Get_rows"]["inputs"]["parameters"]["$filter"] = _EMAIL_FILTER
+# Get_rows feeds Filter_submitted -> Is_duplicate, i.e. the NEW-vs-DUPLICATE decision. Keying
+# it purely on the sender's address means an internal forward is never recognised as belonging
+# to an existing candidate: the row is looked up under the FORWARDER's address, nothing matches,
+# and Add_row mints a brand-new row in the forwarder's name with the real candidate's resume
+# attached to it. Live case 2026-08-25: yashv@driverai.io forwarded Saniya Sekhon's updated
+# resume quoting APP-20260204-1433-3B16 in the subject; P1 created APP-20260825-1505-F08E under
+# yashv@driverai.io, sent HIM the acknowledgment, and left Saniya's real row untouched at
+# Application Updates 0.
+#
+# Same conditional shape as Get_rows_ref below, and deliberately the SAME safety restriction:
+# by-reference lookup only for ALLOW-LISTED senders. Without that, any external sender could
+# quote someone else's Application ID and overwrite that candidate's row and resume file.
+_REF_OR_EMAIL_FILTER = (
+    "@if(and(greater(length(body('MatchAllowSender')), 0), "
+    "not(equals(outputs('QuotedRef'), ''))), "
+    "concat('Application ID eq ''', outputs('QuotedRef'), ''''), "
+    "%s)" % _EMAIL_FILTER[1:]
+)
+hr["actions"]["Get_rows"]["inputs"]["parameters"]["$filter"] = _REF_OR_EMAIL_FILTER
 set_excel(dup["else"]["actions"]["Add_row"])
 
 # ── 10a. Workbook is NON-DESTRUCTIVE now — NO auto-create/overwrite (changed 2026-07-04) ──
@@ -506,30 +958,42 @@ hr["actions"]["Get_rows"]["runAfter"] = {}
 set_email_mailbox(wd)                                   # all SharedMailbox sends
 spam["Notify_failure"]["inputs"]["parameters"]["emailMessage/To"] = email["admin_email"]
 
-# ── 10b. Year-boundary separator: one blank row before the FIRST new-applicant row of
-#         each calendar year, in CandidateList only (visual/organizational, does not
-#         affect duplicate detection/scoring - both phases already skip fully-blank
-#         rows when reading). Only the brand-new-applicant path adds a row at all;
-#         duplicate/update/follow-up only PATCH an existing row, so they never need this.
-#         Detection is a cheap server-side $filter for 'any row already this year' -
-#         bounded to this year's volume, never a full-table scan, so it stays cheap as
-#         the table grows across multiple years. Best-effort: if P1 is down across the
-#         exact New Year's boundary, the separator still lands right before whichever
-#         new-applicant row happens to trigger the check first, just not necessarily
-#         before literally the first row of the new year if others already landed while
-#         it was down. Received Date's stored shape (yyyy-MM-ddTHH:mm:ss, zero-padded
-#         ISO 8601) is lexicographically sortable, so a plain string 'ge' comparison
-#         gives the same result as a real chronological one either way.
-if year_sep.get("enabled", True):
-    _yr_expr = "formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy')"
-    _year_filter = "@{concat('Received Date ge ''', %s, '-01-01T00:00:00''')}" % _yr_expr
+# ── 10b/10c. Year/month separator rows ──────────────────────────────────────
+# Excel Online's List rows action only supports alphanumeric column names in OData
+# Filter Query. "Received Date ge ..." therefore fails at runtime with a syntax error
+# at the space (confirmed live 2026-07-31). Do one paginated, unfiltered row scan and
+# use built-in Query actions to filter the returned ISO timestamps in memory. This is
+# one Excel request path shared by both checks, supports the visible header unchanged,
+# and avoids every OData reference to the spaced column name.
+_year_sep_enabled = year_sep.get("enabled", True)
+_month_sep_enabled = month_sep.get("enabled", True)
 
-    _get_rows_this_year = {
+_sep_actions = dup["else"]["actions"]
+for _old_separator_action in (
+    "Get_rows_any_applicant",
+    "Get_rows_this_year",
+    "Get_rows_this_month",
+    "Get_rows_for_separators",
+    "Filter_rows_this_year",
+    "Filter_rows_this_month",
+    "IsFirstOfNewYear",
+    "IsFirstOfNewMonth",
+):
+    _sep_actions.pop(_old_separator_action, None)
+for _old_separator_dep in ("IsFirstOfNewYear", "IsFirstOfNewMonth"):
+    _sep_actions["Add_row"]["runAfter"].pop(_old_separator_dep, None)
+
+# The workbook ships with one permanent blank table row directly under each header
+# because Excel/Graph reject header-only tables. A separator is only needed after at
+# least one real applicant exists; otherwise the first applicant would get two stacked
+# blanks (the seed row plus a new period separator).
+if _year_sep_enabled or _month_sep_enabled:
+    _get_rows_any_applicant = {
         "type": "OpenApiConnection",
         "runAfter": {},
         "inputs": {
             "parameters": {"source": "", "drive": "", "file": "", "table": "",
-                           "$filter": _year_filter},
+                           "$filter": "Email ne ''", "$top": 1},
             "host": {
                 "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
                 "connectionName": "shared_excelonlinebusiness",
@@ -538,8 +1002,44 @@ if year_sep.get("enabled", True):
             "authentication": "@parameters('$authentication')",
         },
     }
-    set_excel(_get_rows_this_year)
-    dup["else"]["actions"]["Get_rows_this_year"] = _get_rows_this_year
+    set_excel(_get_rows_any_applicant)
+    _sep_actions["Get_rows_any_applicant"] = _get_rows_any_applicant
+
+    _get_rows_for_separators = {
+        "type": "OpenApiConnection",
+        "runAfter": {},
+        "runtimeConfiguration": {
+            "paginationPolicy": {"minimumItemCount": 5000}
+        },
+        "inputs": {
+            "parameters": {
+                "source": "", "drive": "", "file": "", "table": "",
+                "$top": 5000,
+                "dateTimeFormat": "ISO 8601",
+            },
+            "host": {
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+                "connectionName": "shared_excelonlinebusiness",
+                "operationId": "GetItems",
+            },
+            "authentication": "@parameters('$authentication')",
+        },
+    }
+    set_excel(_get_rows_for_separators)
+    _sep_actions["Get_rows_for_separators"] = _get_rows_for_separators
+
+if _year_sep_enabled:
+    _sep_actions["Filter_rows_this_year"] = {
+        "type": "Query",
+        "runAfter": {"Get_rows_for_separators": ["Succeeded"]},
+        "inputs": {
+            "from": "@coalesce(body('Get_rows_for_separators')?['value'], json('[]'))",
+            "where": (
+                "@startsWith(string(item()?['Received Date']), "
+                "concat(formatDateTime(%s,'yyyy'), '-'))" % _RECEIVED_LOCAL_CE
+            ),
+        },
+    }
 
     _add_row_separator = {
         "type": "OpenApiConnection",
@@ -556,10 +1056,14 @@ if year_sep.get("enabled", True):
     }
     set_excel(_add_row_separator)
 
-    dup["else"]["actions"]["IsFirstOfNewYear"] = {
+    _sep_actions["IsFirstOfNewYear"] = {
         "type": "If",
-        "runAfter": {"Get_rows_this_year": ["Succeeded"]},
-        "expression": {"equals": ["@length(body('Get_rows_this_year')?['value'])", 0]},
+        "runAfter": {"Filter_rows_this_year": ["Succeeded"],
+                     "Get_rows_any_applicant": ["Succeeded"]},
+        "expression": {"and": [
+            {"equals": ["@length(body('Filter_rows_this_year'))", 0]},
+            {"greater": ["@length(body('Get_rows_any_applicant')?['value'])", 0]},
+        ]},
         "actions": {"Add_row_year_separator": _add_row_separator},
         "else": {"actions": {}},
     }
@@ -567,51 +1071,25 @@ if year_sep.get("enabled", True):
     # Add_row (the real candidate row) always waits for the separator check to finish -
     # regardless of outcome - so a just-inserted blank row is guaranteed to land BEFORE
     # the real row, never after or concurrently with it.
-    dup["else"]["actions"]["Add_row"]["runAfter"] = {
-        **dup["else"]["actions"]["Add_row"]["runAfter"],
+    _sep_actions["Add_row"]["runAfter"] = {
+        **_sep_actions["Add_row"]["runAfter"],
         "IsFirstOfNewYear": ["Succeeded", "Failed", "Skipped"],
     }
-else:
-    # Strip leftovers from a prior build with this enabled, so a re-build with it off
-    # can never carry stale dead actions forward (same pattern as every other feature
-    # toggle in this file).
-    dup["else"]["actions"].pop("Get_rows_this_year", None)
-    dup["else"]["actions"].pop("IsFirstOfNewYear", None)
-    dup["else"]["actions"]["Add_row"]["runAfter"].pop("IsFirstOfNewYear", None)
 
-# ── 10c. Month-boundary separator: one blank row before the FIRST new-applicant row of
-#         each calendar month. Mirrors 10b exactly, with a month-bounded $filter.
-#         At a January boundary the YEAR separator already fires, so this check also
-#         requires 'at least one row already exists this year' - that makes the year
-#         separator win and guarantees exactly ONE blank row at any boundary rather
-#         than two stacked. When year_separator is off, Get_rows_this_year does not
-#         exist, so the month check falls back to the plain 'none this month' test.
-if month_sep.get("enabled", True):
-    _mo_start = "formatDateTime(startOfMonth(triggerOutputs()?['body/receivedDateTime']),'yyyy-MM-dd')"
-    _mo_next = ("formatDateTime(addToTime(startOfMonth("
-                "triggerOutputs()?['body/receivedDateTime']),1,'Month'),'yyyy-MM-dd')")
-    _month_filter = (
-        "@{concat('Received Date ge ''', %s, 'T00:00:00'' and Received Date lt ''', "
-        "%s, 'T00:00:00''')}" % (_mo_start, _mo_next)
-    )
-
-    _get_rows_this_month = {
-        "type": "OpenApiConnection",
-        "runAfter": ({"Get_rows_this_year": ["Succeeded"]}
-                     if year_sep.get("enabled", True) else {}),
+# At a January boundary the year separator already fires. Requiring at least one row
+# in the incoming year makes the year separator win, so exactly one blank row lands.
+if _month_sep_enabled:
+    _sep_actions["Filter_rows_this_month"] = {
+        "type": "Query",
+        "runAfter": {"Get_rows_for_separators": ["Succeeded"]},
         "inputs": {
-            "parameters": {"source": "", "drive": "", "file": "", "table": "",
-                           "$filter": _month_filter},
-            "host": {
-                "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
-                "connectionName": "shared_excelonlinebusiness",
-                "operationId": "GetItems",
-            },
-            "authentication": "@parameters('$authentication')",
+            "from": "@coalesce(body('Get_rows_for_separators')?['value'], json('[]'))",
+            "where": (
+                "@startsWith(string(item()?['Received Date']), "
+                "formatDateTime(%s,'yyyy-MM'))" % _RECEIVED_LOCAL_CE
+            ),
         },
     }
-    set_excel(_get_rows_this_month)
-    dup["else"]["actions"]["Get_rows_this_month"] = _get_rows_this_month
 
     _add_row_month_separator = {
         "type": "OpenApiConnection",
@@ -628,34 +1106,39 @@ if month_sep.get("enabled", True):
     }
     set_excel(_add_row_month_separator)
 
-    _none_this_month = {"equals": ["@length(body('Get_rows_this_month')?['value'])", 0]}
-    _month_expr = ({"and": [_none_this_month,
-                            {"greater": ["@length(body('Get_rows_this_year')?['value'])", 0]}]}
-                   if year_sep.get("enabled", True) else _none_this_month)
+    _none_this_month = {"equals": ["@length(body('Filter_rows_this_month'))", 0]}
+    _has_any_applicant = {
+        "greater": ["@length(body('Get_rows_any_applicant')?['value'])", 0]}
+    _month_expr = ({"and": [_none_this_month, _has_any_applicant,
+                            {"greater": ["@length(body('Filter_rows_this_year'))", 0]}]}
+                   if _year_sep_enabled else
+                   {"and": [_none_this_month, _has_any_applicant]})
 
-    dup["else"]["actions"]["IsFirstOfNewMonth"] = {
+    _month_run_after = {
+        "Filter_rows_this_month": ["Succeeded"],
+        "Get_rows_any_applicant": ["Succeeded"],
+    }
+    if _year_sep_enabled:
+        _month_run_after["Filter_rows_this_year"] = ["Succeeded"]
+
+    _sep_actions["IsFirstOfNewMonth"] = {
         "type": "If",
-        "runAfter": {"Get_rows_this_month": ["Succeeded"]},
+        "runAfter": _month_run_after,
         "expression": _month_expr,
         "actions": {"Add_row_month_separator": _add_row_month_separator},
         "else": {"actions": {}},
     }
 
-    dup["else"]["actions"]["Add_row"]["runAfter"] = {
-        **dup["else"]["actions"]["Add_row"]["runAfter"],
+    _sep_actions["Add_row"]["runAfter"] = {
+        **_sep_actions["Add_row"]["runAfter"],
         "IsFirstOfNewMonth": ["Succeeded", "Failed", "Skipped"],
     }
-else:
-    dup["else"]["actions"].pop("Get_rows_this_month", None)
-    dup["else"]["actions"].pop("IsFirstOfNewMonth", None)
-    dup["else"]["actions"]["Add_row"]["runAfter"].pop("IsFirstOfNewMonth", None)
 
 # ── 11. resume save location (flat, or dated Year/Month subfolders) ──────────
 # CreateFile does NOT auto-create missing folders (fails with NotFound) - so the dated folder must
 # be explicitly ensured before every Create_file call, not just assumed to exist.
 _folder = resume_folder_path()
-dup["else"]["actions"]["Ensure_resume_folder"] = _make_ensure_resume_folder(
-    "triggerOutputs()?['body/receivedDateTime']")
+dup["else"]["actions"]["Ensure_resume_folder"] = _make_ensure_resume_folder(_RECEIVED_LOCAL)
 # Strip any stale folder-wait actions the base zip still carries (all delays removed 2026-07-04).
 dup["else"]["actions"].pop("Wait_after_resume_folder", None)
 # No wait between folder-create and file-save: CreateNewFolder returns after the folder exists, and
@@ -729,11 +1212,41 @@ _name_expr_body = (
     "))"
 )
 
+def _attach_slug(item_expr: str) -> str:
+    """A short, deterministic tag distinguishing two attachments saved for the same row.
+
+    ONLY appended when the email really carried more than one kept attachment - the single
+    attachment case (essentially all of them, especially now that portfolios are excluded)
+    keeps the exact '<FirstLast>_<AppRef>.<ext>' shape P2's _resume_name_slots() reconstructs,
+    so nothing downstream changes for it.
+
+    Definition, which hiring_agent/sharepoint_scoring.py::_attachment_slug MIRRORS EXACTLY -
+    change one and you must change the other: lowercase the WHOLE original filename, delete
+    space _ - ' , ( ) and . , then take the first 16 characters. The dot is deleted rather
+    than split on, so 'my.name.resume.pdf' needs no multi-dot handling on either side.
+
+    Two attachments with the IDENTICAL filename still collide; Outlook allows that and there
+    is no loop index in Power Automate to break the tie. It is rare enough to accept, and it
+    is strictly better than today, where ANY two same-extension files collide.
+    """
+    clean = "toLower(%s)" % item_expr
+    for ch in (" ", "_", "-", "''", ",", "(", ")", "."):
+        clean = "replace(%s,'%s','')" % (clean, ch)
+    return "substring(%s,0,min(16,length(%s)))" % (clean, clean)
+
+
+def _multi_suffix(loop_name: str) -> str:
+    """'' for a single attachment, '_<slug>' when this email kept more than one."""
+    item_expr = "items('%s')?['name']" % loop_name
+    return ("@{if(greater(length(body('ResumeFiles')),1),concat('_',%s),'')}"
+            % _attach_slug(item_expr))
+
+
 # New applicant: NamePart derived from THIS email's From header (becomes the row's Full Name too).
 (dup["else"]["actions"]["Save_resumes_to_SharePoint"]["actions"]["Create_file"]
  ["inputs"]["parameters"]["name"]) = (
-    "@{%s}_@{outputs('FileRef')}.@{last(split(items('Save_resumes_to_SharePoint')?['name'],'.'))}"
-    % _name_part_expr(_name_expr_body)
+    "@{%s}_@{outputs('FileRef')}%s.@{last(split(items('Save_resumes_to_SharePoint')?['name'],'.'))}"
+    % (_name_part_expr(_name_expr_body), _multi_suffix("Save_resumes_to_SharePoint"))
 )
 # Update (ref-reply): OVERWRITE fix (2026-07-04) - save under the ORIGINAL row's identity, not
 # the update attachment's name. NamePart is recomputed from the ORIGINAL row's stored 'Full
@@ -757,9 +1270,10 @@ _name_expr_body = (
 # (_resume_name_slots / _download_resume_text) for the actual reconciliation logic.
 _deep_find(gate["actions"], "Create_update_file")[
     "inputs"]["parameters"]["name"] = (
-    "@{%s}_@{outputs('FileRef_from_subject')}.@{last(split("
+    "@{%s}_@{outputs('FileRef_from_subject')}%s.@{last(split("
     "first(body('Get_rows_ref')?['value'])?['Original Filename'],'.'))}"
-    % _name_part_expr("coalesce(first(body('Get_rows_ref')?['value'])?['Full Name'],'')")
+    % (_name_part_expr("coalesce(first(body('Get_rows_ref')?['value'])?['Full Name'],'')"),
+       _multi_suffix("Save_update_resume"))
 )
 
 # ── 13. row fields: Subject, Email Body, improved Full Name ──────────────
@@ -784,10 +1298,10 @@ _ROW_ITEM = {
     # ISO 8601 without the timezone offset — drops the confusing '+00:00' and the sub-minute
     # noise while staying a valid ISO timestamp so the 90-day dup check's ticks() and P2's
     # date parser both still read it. e.g. '2026-06-24T22:38:50'.
-    "Received Date": "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}",
+    "Received Date": "@{formatDateTime(%s,'yyyy-MM-ddTHH:mm:ss')}" % _RECEIVED_LOCAL,
     # Latest resume-bearing email timestamp. On first intake it equals Received Date; update
     # and duplicate-resend paths patch this while leaving Received Date fixed for folder paths.
-    "Last Updated Date": "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}",
+    "Last Updated Date": "@{formatDateTime(%s,'yyyy-MM-ddTHH:mm:ss')}" % _RECEIVED_LOCAL,
     "Full Name": _name_expr,
     "Email": "@%s" % _email_norm_expr,
     "Mail Subject": "@coalesce(triggerOutputs()?['body/subject'],'')",
@@ -814,7 +1328,7 @@ _item.update(_ROW_ITEM)
 # ensure_columns creates it on the live workbook.
 # Stamp carries a date/time (not just 'Yes') so it reads consistently with the
 # Rejected sheet's 'Decline Sent' timestamp ("Sent 2026-07-07 09:15").
-_MAIL_SENT_STAMP = "@{concat('Sent ', formatDateTime(utcNow(),'yyyy-MM-dd HH:mm'))}"
+_MAIL_SENT_STAMP = "@{concat('Sent ', formatDateTime(%s,'yyyy-MM-dd HH:mm'))}" % _NOW_LOCAL
 
 # Ack path: stamp right after the send succeeds (Send_acknowledgment itself runs
 # between Add_row and this patch, which is settle time enough - and PA Consumption
@@ -827,6 +1341,16 @@ _ack_acts = dup["else"]["actions"]
 # template) - pop it every build so it can never resurface (same pattern as
 # Wait_after_resume_folder above).
 _ack_acts.pop("Wait_before_mail_stamp", None)
+
+# Never acknowledge an application that was not actually recorded. The zip base shipped
+# Send_acknowledgment with runAfter Add_row [Succeeded, Failed, Skipped], so an Excel write
+# failure (locked workbook, schema mismatch, throttling) still sent the applicant a mail
+# quoting an Application ID that has no row - telling a candidate they are in a system they
+# are not in, and leaving nothing for P2 to score. Notify_failure does alert the admin, but
+# by then the mail has gone. Pinned here (not left to the base template) so it is re-asserted
+# on every build. Add_row Skipped is deliberately excluded too: it is skipped only when an
+# upstream save timed out, which is equally not a recorded application.
+_deep_find(wd["actions"], "Send_acknowledgment")["runAfter"] = {"Add_row": ["Succeeded"]}
 _patch_mail_sent = {
     "type": "OpenApiConnection",
     "runAfter": {"Send_acknowledgment": ["Succeeded"]},
@@ -869,6 +1393,27 @@ followup_cap = int(rules["followup_reply_max"])
 reply_cap = int(rules["reply_cap"])
 
 
+def _last_updated_expr(rows: str) -> str:
+    """max(row's existing Last Updated Date, this email's own receivedDateTime) - never move
+    the column BACKWARD. Backlog replay can process an older queued email after a newer one
+    already patched the same row (e.g. two stale unread replies from the same sender, whichever
+    order the trigger's Inbox happens to drain them in) - a blind overwrite would then stamp an
+    earlier timestamp than the row already has. That corrupts P2's _updated_after_location_request()
+    (sharepoint_scoring.py), which trusts this column to mean "most recent candidate contact".
+    Falls back to Received Date (then a fixed epoch) when Last Updated Date is blank, matching the
+    existing coalesce shape already proven safe by the 90-day dup-window ticks() check above."""
+    return (
+        # Both sides of the comparison are LOCAL: the stored column was written local by
+        # _ROW_ITEM above, so the incoming timestamp is converted before it is compared -
+        # otherwise every fresh email would look 7 hours newer than it is.
+        "@{if(greater(ticks(%s),"
+        "ticks(coalesce(first(%s)?['Last Updated Date'], first(%s)?['Received Date'], '2000-01-01T00:00:00'))),"
+        "formatDateTime(%s,'yyyy-MM-ddTHH:mm:ss'),"
+        "coalesce(first(%s)?['Last Updated Date'], first(%s)?['Received Date']))}"
+        % (_RECEIVED_LOCAL, rows, rows, _RECEIVED_LOCAL, rows, rows)
+    )
+
+
 def _make_patch_item(source_action: str, run_after: dict, excel: bool = False,
                      stamp_last_updated: bool = False) -> dict:
     """PatchItem action: increment CV Attempts on an existing row.
@@ -886,11 +1431,11 @@ def _make_patch_item(source_action: str, run_after: dict, excel: bool = False,
         # blanking it. run_after's single key is that send action.
         "Mail Sent": (
             "@{if(equals(actions('%s')?['status'],'Succeeded'),"
-            "concat('Sent ', formatDateTime(utcNow(),'yyyy-MM-dd HH:mm')),"
-            "coalesce(first(%s)?['Mail Sent'],''))}" % (next(iter(run_after)), rows)),
+            "concat('Sent ', formatDateTime(%s,'yyyy-MM-dd HH:mm')),"
+            "coalesce(first(%s)?['Mail Sent'],''))}" % (next(iter(run_after)), _NOW_LOCAL, rows)),
     }
     if stamp_last_updated:
-        item["Last Updated Date"] = "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}"
+        item["Last Updated Date"] = _last_updated_expr(rows)
     return {
         "runAfter": run_after,
         "type": "OpenApiConnection",
@@ -921,7 +1466,7 @@ def _make_patch_item_noreply(source_action: str, run_after: dict, excel: bool = 
     rows = ("body('%s')?['value']" if excel else "body('%s')") % source_action
     item = {"Application Updates": "@add(int(coalesce(first(%s)?['Application Updates'], '0')), 1)" % rows}
     if stamp_last_updated:
-        item["Last Updated Date"] = "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}"
+        item["Last Updated Date"] = _last_updated_expr(rows)
     if requeue:
         item["Status"] = "New Email Received"
     return {
@@ -1023,7 +1568,9 @@ _save_dup_resume = {
                     "dataset": sp["site"],
                     "folderPath": resume_folder_path(
                         "first(body('Filter_submitted'))?['Received Date']"),
-                    "name": "@{%s}_@{outputs('FileRef_from_dup')}.%s" % (_dup_name_part, _dup_orig_ext),
+                    "name": "@{%s}_@{outputs('FileRef_from_dup')}%s.%s"
+                            % (_dup_name_part, _multi_suffix("Save_dup_update_resume"),
+                               _dup_orig_ext),
                     "body": "@base64ToBinary(items('Save_dup_update_resume')?['contentBytes'])",
                 },
                 "authentication": "@parameters('$authentication')",
@@ -1075,6 +1622,31 @@ dup["actions"] = {
                 },
                 "else": {"actions": {
                     "Patch_dup_attempts_noreply": _patch_dup_noreply,
+                    # CATCH (2026-08-27). This patch used to be the LAST action in its scope,
+                    # which was deliberate: with nothing after it, a failure propagated up to
+                    # HasResume, turned the run RED and fired Notify_failure as well, so the
+                    # one swallowed-by-design path still had a loud signal.
+                    #
+                    # That trade is now wrong. Rows and resumes get deleted deliberately while
+                    # the flow is polling every 60 seconds - resetting a candidate to re-run
+                    # them is normal operating procedure here. Get_rows reads a row at second
+                    # 2, the row is deleted, and the patch at second 15 has nothing to write
+                    # to. A routine data reset should not surface as a failed flow run.
+                    #
+                    # The failure is NOT hidden: Notify_dup_attempts_noreply_failed still
+                    # fires on [Failed, TimedOut] exactly as before - it is a sibling and is
+                    # unaffected by this Compose. All this changes is that the RUN stays
+                    # green, matching the other six patch paths (Ack_stamp_done,
+                    # Dup_patch_done and the four Mark_as_read_* absorbers). Same depth as the
+                    # patch, so it adds no nesting - which matters, because the update and
+                    # follow-up patches already sit at the depth-8 ceiling.
+                    "Dup_noreply_patch_done": {
+                        "type": "Compose",
+                        "runAfter": {"Patch_dup_attempts_noreply":
+                                     ["Succeeded", "Failed", "Skipped", "TimedOut"]},
+                        "inputs": "dup no-reply patch best-effort "
+                                  "(a row deleted mid-run is expected, not a failure)",
+                    },
                 }},
             },
         },
@@ -1088,7 +1660,44 @@ gate_acts = gate["actions"]
 gate_acts["Get_rows_ref"] = _make_get_items({})
 set_excel(gate_acts["Get_rows_ref"])
 
-_appref_subj = _deep_find(gate_acts, "AppRef_from_subject")
+# ── ref lookup: by Application ID for allow-listed testers, by sender for everyone else ──────
+# Default behaviour is unchanged and deliberate: a reply is matched to a row by WHO SENT IT, never
+# by the APP-... text it quotes, so one applicant can never patch another applicant's row by
+# quoting their reference (references appear in every acknowledgment email, so they are not
+# secret). That rule also makes internal testing impossible - yashv@ quoting a candidate's
+# reference has no row of their own, falls through to intake, and lands as a brand-new row.
+#
+# So for allow-listed senders ONLY, and only when a reference was actually quoted, look the row up
+# by Application ID instead. Everything downstream already derives from whatever row Get_rows_ref
+# returns - AppRef_current, the resume filename, and every Patch_* (which addresses rows by
+# idColumn 'Application ID') - so redirecting this one filter redirects the whole update path.
+gate_acts["Get_rows_ref"]["inputs"]["parameters"]["$filter"] = (
+    "@if(and(greater(length(body('MatchAllowSender')), 0), "
+    "not(equals(outputs('QuotedRef'), ''))), "
+    "concat('Application ID eq ''', outputs('QuotedRef'), ''''), "
+    "%s)" % _EMAIL_FILTER[1:]
+)
+
+# AppRef_current: the MATCHED row's real, live Application ID (Get_rows_ref matches by sender
+# email, not by whatever ref the email happens to quote). Fixed 2026-07-31: the saved
+# update-resume filename and the "Ref:" shown back to the applicant used to be built from
+# AppRef_from_subject instead - the reference literally quoted in the email text. That's fine
+# for a normal thread, but a sender who is still replying to an OLD email thread (their original
+# application never got a row due to a since-fixed flow bug, so every reply since then keeps
+# quoting that dead reference) would have their real, current row's Application ID silently
+# ignored: Get_rows_ref finds the right row and Patch_update_attempts/Patch_followup_attempts
+# correctly patch it (by Application ID from the matched row), but the resume got saved under
+# the OLD quoted ref instead - a file P2's _resume_name_slots() (sharepoint_scoring.py), which
+# only ever looks for the row's OWN current Application ID, can never find. AppRef_current is
+# always the row's own truth. AppRef_from_subject (the ref the sender literally quoted) became
+# unused at that point and was deleted 2026-08-24 along with RefSrc, its only input - see the
+# removal note further down for why the pristine snapshot had to be rewritten in the same pass.
+gate_acts["AppRef_current"] = {
+    "type": "Compose",
+    "runAfter": {},
+    "inputs": "@{first(body('Get_rows_ref')?['value'])?['Application ID']}",
+}
+
 _fileref_subj = _deep_find(gate_acts, "FileRef_from_subject")
 _has_resume_up = _deep_find(gate_acts, "Has_resume_in_update")
 _save_up = _deep_find(gate_acts, "Save_update_resume")
@@ -1097,34 +1706,18 @@ _term_up = _deep_find(gate_acts, "Terminate_update")
 _send_fu = _deep_find(gate_acts, "Send_noted_reply")
 _term_fu = _deep_find(gate_acts, "Terminate_noted")
 
-# RefSrc: where to look for the quoted reference - the subject if it carries the ref,
-# else the body. Computed once so the extraction below stays small.
-_subj_expr = "coalesce(triggerOutputs()?['body/subject'],'')"
-_body_expr = "coalesce(triggerOutputs()?['body/body'],triggerOutputs()?['body/bodyPreview'],'')"
-gate_acts["RefSrc"] = {
-    "type": "Compose",
-    "runAfter": {},
-    "inputs": "@{if(contains(toLower(%s),'%s'),%s,%s)}" % (_subj_expr, pat, _subj_expr, _body_expr),
-}
-
-# AppRef_from_subject: pull the clean APP-... token out of RefSrc so the ack subject, the
-# in-body "Update - ..." example, AND the saved update-resume filename all use a real
-# reference (e.g. APP-20260622-001) instead of the whole quoted "Re: ..." subject. The old
-# whole-subject value also carried ':' into the filename, which SharePoint rejects - so a
-# reply-based update used to fail the file save. _ref_len is computed from the live
-# date_format/_time_fmt/_suffix_len (currently APP- + 8-digit date + - + HHmm + - + 4 hex = 22
-# chars), so trimming the ref shape above automatically keeps this extraction length in sync.
-# Guarded: if the token is not found it falls back to the subject (the prior behaviour) and
-# min() keeps the substring in range, so this can never error a run.
-_ref_len = len("APP-") + len(appref["date_format"]) + len("-") + len(_time_fmt) + len("-") + _suffix_len
-_idx_expr = "indexOf(toLower(outputs('RefSrc')),'%s')" % pat
-_appref_subj["runAfter"] = {"RefSrc": ["Succeeded"]}
-_appref_subj["inputs"] = (
-    "@{if(greaterOrEquals(%s,0),"
-    "toUpper(substring(outputs('RefSrc'),%s,min(%d,sub(length(outputs('RefSrc')),%s)))),"
-    "%s)}" % (_idx_expr, _idx_expr, _ref_len, _idx_expr, _subj_expr)
-)
-_fileref_subj["runAfter"] = {"AppRef_from_subject": ["Succeeded"]}
+# RefSrc / AppRef_from_subject were REMOVED 2026-08-24 (dead code, see AppRef_current above).
+# They extracted the APP-... token the sender literally quoted, which every consumer stopped
+# using on 2026-07-31 when the ack subject, the in-body "Update - ..." example and the saved
+# update-resume filename all switched to AppRef_current (the MATCHED ROW's own live Application
+# ID). After that they computed a value nothing read: two Compose actions per ref-reply, plus a
+# comment block claiming three consumers that no longer existed. RefSrc had no other consumer
+# than AppRef_from_subject, so both went together, along with the pristine snapshot's last two
+# references to them (_pristine_send_actions.json now names AppRef_current directly, matching
+# what every build already overlaid). Deleting the action while that snapshot still referenced
+# it would have left a dangling reference the moment an overlay was skipped - which is why they
+# had to be removed as a pair, not one at a time.
+_fileref_subj["runAfter"] = {"AppRef_current": ["Succeeded"]}
 _has_resume_up["runAfter"] = {"FileRef_from_subject": ["Succeeded"]}
 
 # --- Resume-update: Ensure folder + Save + Send + PATCH CV Attempts + Terminate ---
@@ -1181,15 +1774,19 @@ _has_resume_up["actions"] = {
 
 # --- Follow-up: Send + PATCH CV Attempts + Terminate ---
 _send_fu["runAfter"] = {}
+# stamp_last_updated=True (fixed 2026-07-31): a text-only follow-up is still a genuine candidate
+# contact and must move Last Updated Date same as the dup/update paths - this was the one patch
+# site silently omitting it, which P2's _updated_after_location_request() depends on to detect
+# a reply.
 _patch_fu = _make_patch_item("Get_rows_ref",
                               {"Send_noted_reply": ["Succeeded", "Failed", "Skipped"]},
-                              excel=True)
+                              excel=True, stamp_last_updated=True)
 set_excel(_patch_fu)
 _term_fu["runAfter"] = {"Patch_followup_attempts": ["Succeeded", "Failed"]}
 
 # Contact reply_cap and beyond (but still under followup_cap): no resume in a follow-up, so
 # nothing to re-queue - just the increment, no email.
-_patch_fu_noreply = _make_patch_item_noreply("Get_rows_ref", {}, excel=True)
+_patch_fu_noreply = _make_patch_item_noreply("Get_rows_ref", {}, excel=True, stamp_last_updated=True)
 set_excel(_patch_fu_noreply)
 _term_fu_noreply = {"type": "Terminate", "runAfter": {"Patch_followup_attempts_noreply": ["Succeeded", "Failed"]},
                      "inputs": {"runStatus": "Succeeded"}}
@@ -1224,13 +1821,19 @@ gate["actions"] = {
     "Get_rows_ref": gate_acts["Get_rows_ref"],
     "IsKnownSender": {
         "type": "If",
-        "runAfter": {"Get_rows_ref": ["Succeeded"]},
+        # Failed/Skipped are handled here for the same reason Filter_submitted handles them
+        # on Get_rows: an unguarded read makes HasAppRefGate fail, and NOTHING watches that
+        # gate for Failed (HasResume only runs on Succeeded/Skipped, and Notify_failure only
+        # watches HasResume). A locked or missing workbook on a reply carrying 'app-20' would
+        # otherwise skip the alert AND the quarantine move, leaving the message in the Inbox
+        # to be re-polled and re-failed silently. The expression already coalesces a missing
+        # body to [], so a failed read evaluates false and falls through to normal intake.
+        "runAfter": {"Get_rows_ref": ["Succeeded", "Failed", "Skipped"]},
         "expression": {"greater": [
             "@length(coalesce(outputs('Get_rows_ref')?['body/value'], json('[]')))", 0
         ]},
         "actions": {
-            "RefSrc": gate_acts["RefSrc"],
-            "AppRef_from_subject": _appref_subj,
+            "AppRef_current": gate_acts["AppRef_current"],
             "FileRef_from_subject": _fileref_subj,
             "Has_resume_in_update": _has_resume_up,
         },
@@ -1375,7 +1978,7 @@ _set_email(
 # ── Email 5: Resume update acknowledged (ref-reply with a new resume)
 _set_email(
     _deep_find(gate_acts, "Send_update_ack"),
-    "Updated Resume Received - DriverAI (Ref: @{outputs('AppRef_from_subject')})",
+    "Updated Resume Received - DriverAI (Ref: @{outputs('AppRef_current')})",
 
     '<p>Hello,</p>'
 
@@ -1387,7 +1990,7 @@ _set_email(
         '<p>If you are selected, a member of our team will contact you to discuss next steps. '
         'You do not need to reply unless you are updating your resume again. To do that, send a new '
         'or reply email to <em>apply@driverai.io</em> with the subject <strong>"Update - ',
-        "outputs('AppRef_from_subject')",
+        "outputs('AppRef_current')",
         '"</strong> and attach the new file.</p>',
     ) +
 
@@ -1398,7 +2001,7 @@ _set_email(
 # ── Email 6: Follow-up noted (ref-reply without a resume)
 _set_email(
     _deep_find(gate_acts, "Send_noted_reply"),
-    "Message Received - DriverAI (Ref: @{outputs('AppRef_from_subject')})",
+    "Message Received - DriverAI (Ref: @{outputs('AppRef_current')})",
 
     '<p>Hello,</p>'
 
@@ -1409,7 +2012,7 @@ _set_email(
         '<p>If you are selected, a member of our team will contact you to discuss next steps. '
         'You do not need to reply unless you are updating your resume. To send one, reply with the '
         'subject <strong>"Update - ',
-        "outputs('AppRef_from_subject')",
+        "outputs('AppRef_current')",
         '"</strong> and attach the file (<strong>PDF or Word</strong>).</p>',
     ) +
 
@@ -1421,13 +2024,19 @@ _set_email(
 # Dynamic on purpose - one alert covers ANY failure. Pulls whatever context exists: the
 # reference from the new-application branch, plus sender / subject / received time, all
 # coalesced so a missing value never breaks the message.
-# NOTE: cannot also coalesce AppRef_from_subject here - it's computed inside HasAppRefGate's
-# conditional true-branch (only runs if the email quoted a ref), so it's not on Notify_failure's
-# guaranteed runAfter path and referencing it fails PA's template validation ("InvalidTemplate" -
+# NOTE: cannot coalesce anything computed inside HasAppRefGate's conditional true-branch here
+# (AppRef_current, and formerly AppRef_from_subject before its 2026-08-24 removal) - those only
+# run if the email quoted a ref, so they are not on Notify_failure's guaranteed runAfter path and
+# referencing one fails PA's template validation ("InvalidTemplate" -
 # the same bug class fixed on IsSpam/HasValidResumeEarly above). AppRef IS safe to reference here:
 # it's an unconditional sibling action in this same scope. The raw Subject line below still shows
 # the quoted reference text for ref-reply-branch failures, so no information is actually lost.
-spam["Notify_failure"]["runtimeConfiguration"] = {"retryPolicy": {"type": "none"}}
+# Retries ARE wanted here (changed 2026-08-03) - see Notify_poll_failure for the reasoning:
+# the no-retry rule protects MoveV2/MarkAsRead from racing the mutable Outlook message ID,
+# which does not apply to a send, and this alert is the primary failure signal.
+spam["Notify_failure"]["runtimeConfiguration"] = {"retryPolicy": {"type": "exponential",
+                                                                 "count": 2,
+                                                                 "interval": "PT10S"}}
 _notify = spam["Notify_failure"]["inputs"]["parameters"]
 _ref_any = "@{coalesce(outputs('AppRef'),'n/a')}"
 _notify["emailMessage/Subject"] = "[Hiring Auto-Reply] A run needs attention (Ref %s)" % _ref_any
@@ -1443,7 +2052,7 @@ _notify["emailMessage/Body"] = (
     '<li>Received: @{coalesce(triggerOutputs()?[\'body/receivedDateTime\'],\'(unknown)\')}</li>'
     '</ul>'
     '<p>Open the flow run history for the exact step and error. '
-    'The email was left unread, so it can be reprocessed.</p>'
+    'The failed email is moved unread to Archive so it cannot block the Inbox queue.</p>'
     '</div>'
 )
 
@@ -1451,18 +2060,23 @@ _notify["emailMessage/Body"] = (
 # TWO destinations (changed 2026-07-04):
 #   LEGITIMATE application mail -> mark READ (MarkAsRead_V3) + move to `destination` (Archive).
 #   SPAM/JUNK (the 3 gates)     -> just MOVE to `spam_destination` (Junk Email), left UNREAD.
-# So Archive holds only real application traffic; junk lands in Junk Email standing out as unread.
+# Archive holds successful legitimate mail (read) plus admin-alerted failures (unread);
+# junk lands in Junk Email standing out as unread.
 # Uses MoveV2 (+ optional MarkAsRead_V3) on the shared mailbox. Non-blocking: the move runs even if
-# a preceding mark fails, and the Terminate/flow-end is not gated on tidy success. An email moved out
-# of the Inbox is not re-polled (the trigger reads the Inbox only), so 'unread in Junk' is safe.
+# a preceding mark fails, and every terminal move has a success/failure/timeout continuation. This
+# matters because Outlook IDs are mutable and MoveV2 can return ErrorItemNotFound after another
+# actor has already moved the message. An email moved out of the Inbox is not re-polled (the trigger
+# reads the Inbox only), so 'unread in Junk' is safe.
 # Skipped entirely when inbox_tidy.enabled is false.
 tidy_cfg = cfg.get("inbox_tidy", {})
 if tidy_cfg.get("enabled", False):
     _tidy_mailbox = email["trigger_mailbox"]
     _tidy_dest = tidy_cfg.get("destination", "Archive")
     _tidy_spam_dest = tidy_cfg.get("spam_destination", "Junk Email")
+    _tidy_failure_dest = tidy_cfg.get("failure_destination", "")
     _tidy_marks = 0
     _tidy_moves = 0
+    _tidy_finalizers = 0
 
     def _tidy_mark(run_after: dict) -> dict:
         return {
@@ -1488,6 +2102,10 @@ if tidy_cfg.get("enabled", False):
             "type": "OpenApiConnection",
             "runAfter": run_after,
             "inputs": {
+                # Move is a non-idempotent operation. Do not let the connector replay a
+                # request whose first attempt may already have moved the item and changed
+                # its ordinary Outlook ID. Cleanup failures are handled explicitly below.
+                "retryPolicy": {"type": "none"},
                 "parameters": {
                     "messageId": "@triggerOutputs()?['body/id']",
                     "mailboxAddress": _tidy_mailbox,
@@ -1528,11 +2146,13 @@ if tidy_cfg.get("enabled", False):
         orig_ra = copy.deepcopy(term.get("runAfter", {}))
         if mark_read:
             acts[mark_n] = _tidy_mark(orig_ra)
-            acts[move_n] = _tidy_move({mark_n: ["Succeeded", "Failed"]}, destination)
+            acts[move_n] = _tidy_move(
+                {mark_n: ["Succeeded", "Failed", "TimedOut"]}, destination
+            )
             _tidy_marks += 1
         else:
             acts[move_n] = _tidy_move(orig_ra, destination)
-        term["runAfter"] = {move_n: ["Succeeded", "Failed", "Skipped"]}
+        term["runAfter"] = {move_n: ["Succeeded", "Failed", "Skipped", "TimedOut"]}
         _tidy_moves += 1
 
     # 16a. spam gates (3 Terminates) -> Junk Email, UNREAD (move only, no mark-read)
@@ -1572,30 +2192,298 @@ if tidy_cfg.get("enabled", False):
     # not an auto-retry, the alert is the recovery path). Base-zip leftovers are popped first.
     spam.pop("Mark_as_read", None)
     spam.pop("Move_to_processed", None)
+    spam.pop("Finalize_processed_cleanup", None)
     spam["Mark_as_read"] = _tidy_mark({"HasResume": ["Succeeded"]})
-    spam["Move_to_processed"] = _tidy_move({"Mark_as_read": ["Succeeded", "Failed"]}, _tidy_dest)
+    spam["Move_to_processed"] = _tidy_move(
+        {"Mark_as_read": ["Succeeded", "Failed", "TimedOut"]}, _tidy_dest
+    )
+    spam["Finalize_processed_cleanup"] = {
+        "type": "Compose",
+        "runAfter": {
+            "Move_to_processed": ["Succeeded", "Failed", "TimedOut"],
+        },
+        "inputs": (
+            "Processed-message terminal cleanup handled. Candidate processing is complete; "
+            "inspect Move_to_processed in run history if Outlook rejected the cleanup."
+        ),
+    }
     _tidy_marks += 1
     _tidy_moves += 1
+    _tidy_finalizers += 1
 
-    _tidy_total = _tidy_marks + _tidy_moves
+    # A scheduled unread poll would otherwise select the same permanently failing
+    # message every minute and starve the rest of the queue. After the admin alert,
+    # move that message unread to the configured failure destination. Production uses
+    # Archive: MoveV2 accepts that well-known shared-mailbox folder consistently, while
+    # it rejected the nested Recruiting Review Graph ID at runtime. The move is attempted
+    # even if the alert itself fails; unread status distinguishes failures in Archive.
+    spam.pop("Move_failed_to_recruiting_review", None)
+    spam.pop("Move_failed_to_archive_unread", None)
+    spam.pop("Finalize_failed_cleanup", None)
+    if _tidy_failure_dest:
+        spam["Move_failed_to_archive_unread"] = _tidy_move(
+            # CRITICAL: never include Skipped here. Notify_failure is intentionally
+            # skipped when HasResume succeeds. Including Skipped made this failure move
+            # race Move_to_processed on every successful email; one move won and the
+            # other then failed with ErrorItemNotFound against the now-stale message ID.
+            {"Notify_failure": ["Succeeded", "Failed", "TimedOut"]},
+            _tidy_failure_dest,
+        )
+        spam["Finalize_failed_cleanup"] = {
+            "type": "Compose",
+            "runAfter": {
+                "Move_failed_to_archive_unread": ["Succeeded", "Failed", "TimedOut"],
+            },
+            "inputs": (
+                "Failed-message terminal cleanup handled. The admin alert is authoritative; "
+                "inspect the failed move if the message remains in Inbox."
+            ),
+        }
+        _tidy_moves += 1
+        _tidy_finalizers += 1
+
+    _tidy_total = _tidy_marks + _tidy_moves + _tidy_finalizers
 else:
     _tidy_total = 0
+
+# ── 16d. PATCH-FAILURE ALERTS (added 2026-08-03) ────────────────────────────
+# Notify_failure only watches HasResume. Every PatchItem below is "handled" by whatever
+# runs after it (the runAfter lists include Failed so inbox cleanup is unconditional and a
+# poisoned message can never block the queue). That resilience has a cost: the enclosing
+# If therefore reports Succeeded, the branch ends on a Terminate whose runStatus is
+# Succeeded, and the run goes GREEN. A failed patch means the candidate's Application
+# Updates counter never incremented - and on the dup/update paths, that the row was never
+# re-queued for Phase 2 - with no signal anywhere. That was silent until now.
+#
+# Each alert is a plain SIBLING of the patch it watches, wired on [Failed, TimedOut]. It
+# adds NO nesting: Patch_update_attempts / Patch_followup_attempts already sit at depth 8,
+# the Power Automate ceiling, so a child action there would fail import - a sibling is at
+# the same depth and is fine. Nothing runs after these alerts and nothing depends on them,
+# so they cannot alter any existing path, and a failing alert is inert.
+# value = (human label, is_swallowed). is_swallowed records whether a failure of that patch is
+# absorbed inside its own branch - i.e. some sibling runs after it with Failed in runAfter - which
+# is what makes the enclosing If report Succeeded and the run go GREEN with no other signal.
+# Patch_dup_attempts_noreply is the one exception: it is the LAST action in its scope, so its
+# failure propagates all the way up to HasResume, turning the run RED and firing Notify_failure
+# too. Its alert is therefore belt-and-braces rather than the sole signal, and says so - keeping
+# it means that if a sibling is ever appended to that scope (which would start swallowing the
+# failure, exactly as on the reply-path twin), the coverage is already in place. test_p1.py locks
+# this table against the real wiring so the two can never drift silently.
+_PATCH_ALERTS = {
+    "Patch_mail_sent":                 ("new applicant - acknowledgment stamp",     True),
+    "Patch_dup_attempts":              ("duplicate re-application",                 True),
+    # Swallowed as of 2026-08-27 (was the one PROPAGATING path). Dup_noreply_patch_done
+    # now absorbs it so a row deleted mid-run cannot turn a routine run red - see the
+    # catch comment in the IsUnderReplyCap_dup else-branch.
+    "Patch_dup_attempts_noreply":      ("duplicate re-application (past reply cap)", True),
+    "Patch_update_attempts":           ("resume update",                            True),
+    "Patch_update_attempts_noreply":   ("resume update (past reply cap)",           True),
+    "Patch_followup_attempts":         ("follow-up reply",                          True),
+    "Patch_followup_attempts_noreply": ("follow-up reply (past reply cap)",         True),
+}
+
+
+def _make_patch_alert(patch_name: str, what: str, swallowed: bool = True) -> dict:
+    """Admin alert fired when a candidate-row PATCH fails. Sibling of `patch_name`."""
+    return {
+        "type": "OpenApiConnection",
+        "runAfter": {patch_name: ["Failed", "TimedOut"]},
+        # Unlike the MoveV2/MarkAsRead actions (retries disabled there because a retry
+        # races the mutable Outlook message ID), a send has no such hazard and this is
+        # the only signal that survives a silent patch failure - so let it retry.
+        "runtimeConfiguration": {"retryPolicy": {"type": "exponential", "count": 2,
+                                                 "interval": "PT10S"}},
+        "inputs": {
+            "parameters": {
+                "emailMessage/To": email["admin_email"],
+                "emailMessage/Subject":
+                    "[Hiring Auto-Reply] Candidate row NOT updated - %s (Ref %s)"
+                    % (what, _ref_any),
+                "emailMessage/Body": (
+                    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;'
+                    'color:#222;line-height:1.6;">'
+                    '<p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p>'
+                    '<p>The incoming email was handled and filed normally, but <strong>'
+                    + patch_name + '</strong> (' + what + ') did not commit. The '
+                    'Application Updates counter was NOT incremented'
+                    + (', and the row was NOT re-queued for Phase 2 scoring'
+                       if "dup" in patch_name or "update" in patch_name else '')
+                    + '.</p>'
+                    '<ul>'
+                    '<li>Reference: <strong>' + _ref_any + '</strong></li>'
+                    '<li>From: @{coalesce(outputs(\'CurrentEmail\')?[\'from\'],\'unknown\')}</li>'
+                    '<li>Subject: @{coalesce(outputs(\'CurrentEmail\')?[\'subject\'],\'(none)\')}</li>'
+                    '<li>Received: @{coalesce(outputs(\'CurrentEmail\')?[\'receivedDateTime\'],\'(unknown)\')}</li>'
+                    '</ul>'
+                    + ('<p>The run itself reports Succeeded because inbox cleanup completed '
+                       'as designed - <strong>this alert is the only signal</strong>. Open run '
+                       'history and inspect <strong>' + patch_name + '</strong>, then correct '
+                       'the row by hand.</p>'
+                       if swallowed else
+                       '<p>This patch is the last action in its branch, so the failure also '
+                       'propagates up: the run reports <strong>Failed</strong> and the standard '
+                       'Notify_failure alert fires as well. Expect two emails for this one - '
+                       'this is the belt-and-braces copy. Open run history, inspect '
+                       '<strong>' + patch_name + '</strong>, then correct the row by hand.</p>')
+                    + '</div>'
+                ),
+                "emailMessage/Importance": "High",
+            },
+            "host": {"apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                     "connectionName": "shared_office365",
+                     "operationId": "SendEmailV2"},
+            "authentication": "@parameters('$authentication')",
+        },
+    }
+
+
+_patch_alert_names = []
+for _patch_name, (_what, _swallowed) in _PATCH_ALERTS.items():
+    _owner = _find_owner_actions(actions, _patch_name)
+    if _owner is None:
+        continue
+    _alert_name = "Notify_" + _patch_name.replace("Patch_", "") + "_failed"
+    # POP before re-adding, same as the inbox-tidy section does. The zip is both the output
+    # AND the next build's structural base, and the year/month-separator section re-appends
+    # its own actions to this same map on every run. Plain assignment would keep an existing
+    # alert at its old position while the separators moved past it, so build N and build N+1
+    # produced byte-different (though semantically identical) definitions. Popping first
+    # makes the alert always land last, so repeated builds are byte-stable.
+    _owner.pop(_alert_name, None)
+    _owner[_alert_name] = _make_patch_alert(_patch_name, _what, _swallowed)
+    _patch_alert_names.append(_alert_name)
+
+# ── 16b. INTAKE-WRITE FAILURE ALERTS (Add_row / Create_file) ─────────────────
+# The 7 alerts above cover every PATCH of an EXISTING row. The two writes that CREATE a
+# candidate had no watcher at all, which is a strictly worse failure: a patch that fails
+# leaves a row that is merely stale, but an Add_row that fails leaves NO ROW ANYWHERE.
+#
+# Why it was silent: Mark_as_read/Move_to_processed hang off HasResume, not off Add_row,
+# so inbox cleanup is on a PARALLEL branch and files the mail as handled regardless.
+# Send_acknowledgment is correctly gated on Add_row=Succeeded (test B: a failed Excel write
+# must never acknowledge), so the applicant gets nothing either. Net effect before this
+# section existed: no row, no reply, mail archived as done, run reports Succeeded, silence.
+# The 2026-08-24 audit found 11 candidates lost this way, clustered 2-6 June 2026.
+#
+# Deliberately NOT re-gating the cleanup on Add_row: making Move_to_processed conditional
+# would re-introduce the poisoned-message queue block that fetch_only_unread=false exists
+# to prevent, and re-marking the message unread afterwards races the mutable Outlook
+# message ID (the same hazard that disables retries on MoveV2/MarkAsRead). So the alert is
+# the signal, exactly as it is for the 7 swallowed patch failures.
+_WRITE_ALERTS = {
+    "Add_row": (
+        "the candidate row was never created",
+        "This applicant has <strong>no row on either sheet</strong> and received "
+        "<strong>no acknowledgment</strong> - Send_acknowledgment is gated on Add_row "
+        "succeeding, so it was skipped. Their resume may still have been saved to "
+        "SharePoint, which leaves an orphan file with nothing pointing at it.",
+    ),
+    "Create_file": (
+        "the resume file was never saved",
+        "Add_row still runs when the save fails and always writes Has Resume = 'Yes', so "
+        "the row now <strong>claims a resume that does not exist</strong> in SharePoint. "
+        "Phase 2 cannot score it and will not be able to read the file.",
+    ),
+    # The other TWO resume writes. Create_file above only covers the NEW-applicant path;
+    # a resend (duplicate) and a ref-quoted update each have their own CreateFile, and both
+    # were silent for exactly the same reason the patch failures were: nothing runs after
+    # them inside their Foreach, so the Foreach fails - and the sibling that follows the
+    # Foreach (IsUnderReplyCap_dup / IsUnderReplyCap_update) lists Failed in its runAfter,
+    # which ABSORBS it. The run then continues normally: the reply is sent, Application
+    # Updates increments, Last Updated Date bumps, Status resets to 'New Email Received',
+    # the mail is marked read and archived, and the run reports Succeeded. The candidate is
+    # told their new resume arrived while the old file is still the one on disk - and P2
+    # re-scores the STALE document. Found 2026-08-26 by the pre-import branch audit.
+    "Create_dup_update_file": (
+        "a repeat applicant's NEW resume was never saved",
+        "This was a duplicate/resend, so the row was patched as though the new resume "
+        "landed - <strong>Application Updates was incremented and Status reset to 'New "
+        "Email Received'</strong> - but the file on disk is still the PREVIOUS version. "
+        "Phase 2 will re-score the stale document, and the applicant has already been told "
+        "their update was received.",
+    ),
+    "Create_update_file": (
+        "a ref-quoted update's NEW resume was never saved",
+        "The applicant quoted their Application ID, so the row was patched as an update - "
+        "<strong>Application Updates was incremented and Status reset to 'New Email "
+        "Received'</strong> - but the file on disk is still the PREVIOUS version. Phase 2 "
+        "will re-score the stale document, and the applicant has already been told their "
+        "update was received.",
+    ),
+}
+
+
+def _make_write_alert(action_name: str, what: str, consequence: str) -> dict:
+    """Admin alert for a failed INTAKE write. Sibling of `action_name`."""
+    return {
+        "type": "OpenApiConnection",
+        "runAfter": {action_name: ["Failed", "TimedOut"]},
+        "runtimeConfiguration": {"retryPolicy": {"type": "exponential", "count": 2,
+                                                 "interval": "PT10S"}},
+        "inputs": {
+            "parameters": {
+                "emailMessage/To": email["admin_email"],
+                "emailMessage/Subject":
+                    "[Hiring Auto-Reply] APPLICANT LOST - %s (Ref %s)" % (what, _ref_any),
+                "emailMessage/Body": (
+                    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;'
+                    'color:#222;line-height:1.6;">'
+                    '<p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p>'
+                    '<p><strong>' + action_name + '</strong> failed, so ' + what + '.</p>'
+                    '<p>' + consequence + '</p>'
+                    '<ul>'
+                    '<li>Reference: <strong>' + _ref_any + '</strong></li>'
+                    '<li>From: @{coalesce(outputs(\'CurrentEmail\')?[\'from\'],\'unknown\')}</li>'
+                    '<li>Subject: @{coalesce(outputs(\'CurrentEmail\')?[\'subject\'],\'(none)\')}</li>'
+                    '<li>Received: @{coalesce(outputs(\'CurrentEmail\')?[\'receivedDateTime\'],\'(unknown)\')}</li>'
+                    '</ul>'
+                    '<p>The run reports <strong>Succeeded</strong> because inbox cleanup is '
+                    'deliberately unconditional, and the message has been marked read and '
+                    'moved to Archive as though it were handled - <strong>this alert is the '
+                    'only signal</strong>.</p>'
+                    '<p><strong>To recover:</strong> find the message in Archive by the From '
+                    'and Received values above and move it back to the Inbox as unread, so '
+                    'the next poll re-runs the full intake for it. If applicant mail is '
+                    'currently ON, that will also re-send their acknowledgment - which is '
+                    'correct here, because they never received one.</p>'
+                    '</div>'
+                ),
+                "emailMessage/Importance": "High",
+            },
+            "host": {"apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                     "connectionName": "shared_office365",
+                     "operationId": "SendEmailV2"},
+            "authentication": "@parameters('$authentication')",
+        },
+    }
+
+
+_write_alert_names = []
+for _write_name, (_what, _consequence) in _WRITE_ALERTS.items():
+    _owner = _find_owner_actions(actions, _write_name)
+    if _owner is None:
+        continue
+    _alert_name = "Notify_" + _write_name.lower() + "_failed"
+    # Pop before re-adding, for the same byte-stability reason as the patch alerts.
+    _owner.pop(_alert_name, None)
+    _owner[_alert_name] = _make_write_alert(_write_name, _what, _consequence)
+    _write_alert_names.append(_alert_name)
 
 # ── 17. enable PA-level failure alert as a backup (Notify_failure is primary) ─
 defn["properties"]["flowFailureAlertSubscribed"] = True
 
-# ── 18. TEST MODE: suppress every outbound email (historical-replay testing) ─
-# Replaces the 6 applicant-facing Send_* actions AND Notify_failure (the admin alert -
-# "no mail delivery at all" means this too) with a no-op Compose that keeps the exact same
-# runAfter wiring, so every downstream tidy/patch action still fires exactly as it would
-# live - only the actual mail-connector call is skipped. Must run LAST, after every other
-# step has finished building/wiring the flow, so nothing downstream still expects the
-# original Send_*/Notify_failure action shape.
+# ── 18. OUTBOUND MAIL CONTROLS ──────────────────────────────────────────────
+# Replaces the 6 applicant-facing Send_* actions with no-op Compose steps when applicant
+# mail is disabled. Notify_failure is controlled separately so a silent live intake can
+# still alert the admin on real failures. The no-op steps retain the same runAfter wiring,
+# so downstream tidy/patch actions behave exactly as they do with applicant mail enabled.
+# Must run LAST, after every other step has finished building/wiring the flow.
 _SUPPRESSED_SENDS = ["Send_acknowledgment", "Send_duplicate_notice", "Send_CV_request",
                     "Send_wrong_format", "Send_update_ack", "Send_noted_reply"]
-_TEST_MODE_STAMP = "@{concat('TEST-MODE (suppressed) ', formatDateTime(utcNow(),'yyyy-MM-dd HH:mm'))}"
-if suppress_emails:
-    for _name in _SUPPRESSED_SENDS + ["Notify_failure"]:
+_SUPPRESSED_STAMP = ("@{concat('Suppressed (applicant email disabled) ', "
+                     "formatDateTime(%s,'yyyy-MM-dd HH:mm'))}" % _NOW_LOCAL)
+if not send_applicant_emails:
+    for _name in _SUPPRESSED_SENDS:
         _act = _deep_find(actions, _name)
         if _act is None:
             continue
@@ -1603,7 +2491,7 @@ if suppress_emails:
         _act.clear()
         _act["type"] = "Compose"
         _act["runAfter"] = _run_after
-        _act["inputs"] = f"TEST-MODE: email suppressed ({_name}) - historical replay, no real send"
+        _act["inputs"] = f"Applicant email disabled: suppressed {_name}; intake processing continues"
     # A Compose action always reports status=Succeeded (it can't fail the way a real send
     # can), so the existing conditional 'Mail Sent' stamps would otherwise write a
     # real-looking 'Sent <timestamp>' even though nothing was sent. Force a visibly-distinct
@@ -1614,17 +2502,204 @@ if suppress_emails:
                         "Patch_followup_attempts"):
         _patch = _deep_find(actions, _patch_name)
         if _patch is not None and "Mail Sent" in _patch.get("inputs", {}).get("parameters", {}).get("item", {}):
-            _patch["inputs"]["parameters"]["item"]["Mail Sent"] = _TEST_MODE_STAMP
-    print("  [TEST MODE] All applicant emails + admin failure alert SUPPRESSED - "
-        "remember to flip test_mode.suppress_emails back to false and re-import when done.")
+            _patch["inputs"]["parameters"]["item"]["Mail Sent"] = _SUPPRESSED_STAMP
+    print("  [SILENT INTAKE] Applicant emails SUPPRESSED; processing remains active.")
+
+if not send_admin_failure_alerts:
+    # Notify_failure plus every patch-failure alert from section 16d. Same treatment as the
+    # applicant sends: swapped for a no-op Compose that keeps the runAfter wiring intact, so
+    # the surrounding graph behaves identically whether alerts are on or off.
+    for _alert in ["Notify_failure"] + _patch_alert_names + _write_alert_names:
+        _act = _deep_find(actions, _alert)
+        if _act is None:
+            continue
+        _run_after = _act.get("runAfter", {})
+        _act.clear()
+        _act["type"] = "Compose"
+        _act["runAfter"] = _run_after
+        _act["inputs"] = f"Admin failure alert disabled: {_alert} suppressed"
+    print(f"  [WARNING] Admin failure alerts SUPPRESSED "
+          f"({1 + len(_patch_alert_names) + len(_write_alert_names)} alert actions).")
+
+# -- 19. unread-Inbox production wrapper ------------------------------------
+# Every expression in the historical processing graph reads one message directly from
+# triggerOutputs(). The scheduled poller puts that message in CurrentEmail instead. A
+# mechanical source rewrite is safer than maintaining dozens of hand-edited expressions
+# and is asserted by the tests (zero triggerOutputs message references remain).
+def _use_current_email(node):
+    if isinstance(node, dict):
+        return {k: _use_current_email(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_use_current_email(v) for v in node]
+    if isinstance(node, str):
+        return node.replace(
+            "triggerOutputs()?['body/", "outputs('CurrentEmail')?['"
+        )
+    return node
+
+
+actions = _use_current_email(actions)
+actions["CONFIG"]["runAfter"] = {"CurrentEmail": ["Succeeded"]}
+
+_get_unread = {
+    "type": "OpenApiConnection",
+    "runAfter": {},
+    "inputs": {
+        "parameters": {
+            "folderPath": "Inbox",
+            "fetchOnlyWithAttachment": False,
+            "fetchOnlyUnread": fetch_only_unread,
+            "mailboxAddress": email["trigger_mailbox"],
+            "includeAttachments": True,
+            "top": unread_per_run,
+        },
+        "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+            "connectionName": "shared_office365",
+            "operationId": "GetEmailsV3",
+        },
+        "authentication": "@parameters('$authentication')",
+    },
+}
+
+_current_email = {
+    "type": "Compose",
+    "runAfter": {"Has_unread_email": ["Succeeded"]},
+    "inputs": "@first(body('Get_unread_emails')?['value'])",
+}
+_has_unread = {
+    "type": "If",
+    "runAfter": {"Get_unread_emails": ["Succeeded"]},
+    "expression": {
+        "and": [
+            {
+                "greater": [
+                    "@length(coalesce(body('Get_unread_emails')?['value'], json('[]')))",
+                    0,
+                ]
+            }
+        ]
+    },
+    "actions": {
+        "Unread_email_available": {
+            "type": "Compose",
+            "runAfter": {},
+            "inputs": "Unread Inbox message found; continue with the flat processing graph",
+        }
+    },
+    "else": {
+        "actions": {
+            "Stop_no_unread_email": {
+                "type": "Terminate",
+                "runAfter": {},
+                "inputs": {"runStatus": "Succeeded"},
+            }
+        }
+    },
+}
+
+if send_admin_failure_alerts:
+    _poll_failure = {
+        "type": "OpenApiConnection",
+        "runAfter": {"Get_unread_emails": ["Failed", "TimedOut"]},
+        # Retries ARE wanted here (changed 2026-08-03). The blanket 'no retries' rule exists
+        # for MoveV2/MarkAsRead, where a retry races the mutable Outlook message ID; a send
+        # has no such hazard. With applicant mail suppressed, the admin alerts are the only
+        # live sends in the flow, so a single transient failure would otherwise lose the
+        # only signal that the poll broke. Worst case is a duplicate admin email.
+        "runtimeConfiguration": {"retryPolicy": {"type": "exponential", "count": 2,
+                                                 "interval": "PT10S"}},
+        "inputs": {
+            "parameters": {
+                "emailMessage/To": email["admin_email"],
+                "emailMessage/Subject": "[Hiring Auto-Reply] Unread Inbox poll failed",
+                "emailMessage/Body": (
+                    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;">'
+                    '<p><strong>P1 could not read the shared Inbox.</strong></p>'
+                    '<p>No applicant email was sent. The unread messages remain in Inbox. '
+                    'Open the flow run history and inspect Get_unread_emails.</p></div>'
+                ),
+                "emailMessage/Importance": "High",
+            },
+            "host": {
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                "connectionName": "shared_office365",
+                "operationId": "SendEmailV2",
+            },
+            "authentication": "@parameters('$authentication')",
+        },
+    }
+else:
+    _poll_failure = {
+        "type": "Compose",
+        "runAfter": {"Get_unread_emails": ["Failed", "TimedOut"]},
+        "inputs": "Admin failure alert disabled: unread Inbox poll failure alert suppressed",
+    }
+
+wd["actions"] = {
+    "Get_unread_emails": _get_unread,
+    "Has_unread_email": _has_unread,
+    "CurrentEmail": _current_email,
+    **actions,
+    "Notify_poll_failure": _poll_failure,
+}
 
 # ── validate + repackage (same GUID/maps so it Updates in place) ─────────────
+def _action_depths(action_map: dict, level: int = 0):
+    """Yield (name, level) using Power Automate's control-action nesting count."""
+    for action_name, action in action_map.items():
+        yield action_name, level
+        child_actions = action.get("actions")
+        if isinstance(child_actions, dict):
+            yield from _action_depths(child_actions, level + 1)
+        else_actions = action.get("else", {}).get("actions")
+        if isinstance(else_actions, dict):
+            yield from _action_depths(else_actions, level + 1)
+        for case in action.get("cases", {}).values():
+            case_actions = case.get("actions")
+            if isinstance(case_actions, dict):
+                yield from _action_depths(case_actions, level + 1)
+        default_actions = action.get("default", {}).get("actions")
+        if isinstance(default_actions, dict):
+            yield from _action_depths(default_actions, level + 1)
+
+
+from reliability_flow import apply_reliability
+apply_reliability(wd, cfg)
+
+# Correctness fixes for the four findings of the 2026-09-08 package review. Applied last,
+# over the fully assembled flow, so the whole change set lives in one reviewable file and
+# the depth check below validates the result rather than the pre-fix shape.
+from integrity_fixes import apply_integrity_fixes
+_integrity = apply_integrity_fixes(wd, tidy_cfg.get("failure_destination", "Archive"),
+                                   email["trigger_mailbox"])
+
+_depths = list(_action_depths(wd["actions"]))
+_max_depth = max(level for _, level in _depths)
+if _max_depth > 8:
+    _too_deep = [name for name, level in _depths if level == _max_depth]
+    raise ValueError(
+        f"Power Automate action nesting depth {_max_depth} exceeds limit 8: {_too_deep}"
+    )
+# The flow already sits AT the limit, so the next control action added inside the deepest
+# branch fails the build rather than degrading gracefully. Say so at build time, naming the
+# branch, instead of leaving the next person to decode a raise from a seemingly unrelated
+# edit. Warn only - being at 8 is legal and is the current, shipped state.
+if _max_depth == 8:
+    _at_limit = sorted({name for name, level in _depths if level == 8})
+    print(f"  [!] NESTING AT LIMIT: depth 8/8 (PA max). Zero headroom in: "
+          f"{', '.join(_at_limit[:4])}{' ...' if len(_at_limit) > 4 else ''}")
+    print("      Adding another If/Foreach/Scope inside that branch WILL fail this build. "
+          "Flatten a level there first, or attach new work to a shallower branch.")
+
 final = json.dumps(defn, indent=2, ensure_ascii=False)
 json.loads(final)  # parse check
 
 with zipfile.ZipFile(ZIP, "w", compression=zipfile.ZIP_DEFLATED) as z:
     z.writestr("manifest.json", root_mf)
-    z.writestr("Microsoft.Flow/flows/manifest.json", flow_mf)
+    # assetPaths names the per-flow folder; it must follow the live GUID as well.
+    z.writestr("Microsoft.Flow/flows/manifest.json",
+               flow_mf.replace(_BASE_GUID, GUID))
     z.writestr(BASE + "definition.json", final)
     z.writestr(BASE + "apisMap.json", apis_map)
     z.writestr(BASE + "connectionsMap.json", conns_map)
@@ -1640,26 +2715,40 @@ print("[OK] flow rebuilt from flow_config.json -> ZIP + definition.json synced")
 print(f"  flow / package name : {flow_name}")
 print(f"  trigger mailbox     : {email['trigger_mailbox']}")
 print(f"  poll interval (min) : {interval}")
+print(f"  trigger mode        : scheduled Inbox poll ({unread_per_run} message per run, "
+      f"{'UNREAD ONLY' if fetch_only_unread else 'read OR unread - Inbox is the queue'})")
+print(f"  max action nesting  : {_max_depth} (Power Automate limit: 8)")
 print(f"  admin alert -> to   : {email['admin_email']}")
 print(f"  duplicate window    : {days} day(s)")
 print(f"  caps (shared cnt)   : duplicate {dup_cap} | update {update_cap} | follow-up {followup_cap} "
       f"(no-CV: reply only, no row) | reply_cap {reply_cap} (contacts past this get no email, just counted)")
-print(f"  appref format       : APP-{appref['date_format']}-{_time_fmt}-<{_suffix_len}hex> (unique per email; guid tail avoids same-second collisions)")
+print(f"  timezone            : {_TZ_ID} - all derived dates are LOCAL wall-clock" if _TZ_ID != 'UTC' else " - dates are RAW UTC (pre-2026-08-27 behaviour)")
+print(f"  appref format       : APP-{appref['date_format']}-{_time_fmt}-<{_suffix_len} chars of the "
+      f"message id, offset -{_suffix_len + _tail_skip}> - DETERMINISTIC: a retry of the same email mints the same ref")
 print(f"  bad_senders         : {len(actions['BadSenders']['inputs'])}")
 print(f"  bad_subjects        : {len(bad_subjects)} (config; self-loop guard is sender-based)")
 print(f"  spam/safety gate    : {len(actions['SpamPhrases']['inputs'])} "
       f"({len(filt['spam_phrases'])} scam + {len(filt.get('offensive_phrases', []))} offensive "
-      f"+ {len(filt.get('malware_phrases', []))} malware/exe + {len(filt.get('foreign_scam_phrases', []))} non-EN); "
+      f"+ {len(filt.get('malware_phrases', []))} malware/exe + {len(filt.get('foreign_scam_phrases', []))} non-EN "
+      f"+ {len(filt.get('vendor_solicitation_phrases', []))} vendor-pitch); "
       f"scans subject+body+attachment names")
 print(f"  app_keywords        : {len(kws)} (OR clauses: {len(kw['expression']['and'][1]['or'])}; E3 gated on no-attachment)")
 print(f"  excel table         : {ex['table']}")
 print(f"  resume subfolders   : {'dated Year/Month' if sp.get('dated_resume_subfolders') else 'flat'}")
-print(f"  inbox tidy          : {'ON (%d actions - legit->%s read, spam->%s unread)' % (_tidy_total, tidy_cfg.get('destination','n/a'), tidy_cfg.get('spam_destination','n/a')) if _tidy_total else 'OFF (mail stays unread in Inbox)'}")
+print(f"  inbox tidy          : {'ON (%d actions - legit->%s read, spam->%s unread, failures->%s unread)' % (_tidy_total, tidy_cfg.get('destination','n/a'), tidy_cfg.get('spam_destination','n/a'), tidy_cfg.get('failure_destination','n/a')) if _tidy_total else 'OFF (mail stays unread in Inbox)'}")
 print(f"  row extras          : Subject + body preview (~255 chars, bodyPreview) columns + improved Full Name guess")
 print(f"  workbook self-heal  : OFF (non-destructive) - never auto-creates/overwrites; missing workbook -> Notify_failure alert")
+print(f"  admin alerts        : {'ON' if send_admin_failure_alerts else 'OFF'} - "
+      f"Notify_failure + Notify_poll_failure + {len(_patch_alert_names)} patch-failure alerts "
+      f"+ {len(_write_alert_names)} intake-write alerts ({', '.join(_WRITE_ALERTS)}) "
+      f"(retry: exponential x2)")
 print(f"  resume folder create: ON (Ensure_*_resume_folder, safe no-op if exists) - no delays")
 print(f"  resume overwrite    : update/resend always saves under the legacy <Name>_<AppID> shape "
       f"(true in-place overwrite pre-scoring; post-scoring, P2 reconciles it against the "
       f"renamed file - see sharepoint_scoring.py _download_resume_text)")
-print(f"  year separator      : {'ON - one blank row before the first new-applicant row of each year' if year_sep.get('enabled', True) else 'OFF'}")
+print(f"  integrity fixes     : allow-list exact match | retryPolicy also under inputs on "
+      f"{len(_integrity['retry_policy'])} actions | success copy gated on "
+      f"{len(_integrity['save_gated'])} resume saves | latest-row pick via "
+      f"{', '.join(_integrity['row_pick'])}")
+print(f"  year separator      : {'ON - one blank row before each new year; first-ever applicant uses the header spacer' if year_sep.get('enabled', True) else 'OFF'}")
 print(f"  month separator     : {'ON - one blank row before the first new-applicant row of each month (suppressed at a year boundary so only ONE blank row lands)' if month_sep.get('enabled', True) else 'OFF'}")

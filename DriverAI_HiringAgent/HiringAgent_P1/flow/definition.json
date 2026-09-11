@@ -1,6 +1,6 @@
 {
-  "name": "36d96cc9-25b1-4e7c-952c-378ba087f142",
-  "id": "/providers/Microsoft.Flow/flows/36d96cc9-25b1-4e7c-952c-378ba087f142",
+  "name": "22f1cacc-4e05-41ca-806e-f4baf41de15b",
+  "id": "/providers/Microsoft.Flow/flows/22f1cacc-4e05-41ca-806e-f4baf41de15b",
   "type": "Microsoft.Flow/flows",
   "properties": {
     "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
@@ -38,7 +38,7 @@
         }
       },
       "triggers": {
-        "When_a_new_email_arrives_in_a_shared_mailbox_(V2)": {
+        "Poll_unread_shared_mailbox": {
           "recurrence": {
             "frequency": "Minute",
             "interval": 1
@@ -47,23 +47,7 @@
             "frequency": "Minute",
             "interval": 1
           },
-          "splitOn": "@triggerOutputs()?['body/value']",
-          "type": "OpenApiConnection",
-          "inputs": {
-            "parameters": {
-              "mailboxAddress": "apply@driverai.io",
-              "folderId": "Inbox",
-              "includeAttachments": true,
-              "importance": "Any",
-              "hasAttachments": false
-            },
-            "host": {
-              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
-              "connectionName": "shared_office365",
-              "operationId": "SharedMailboxOnNewEmailV2"
-            },
-            "authentication": "@parameters('$authentication')"
-          },
+          "type": "Recurrence",
           "runtimeConfiguration": {
             "concurrency": {
               "runs": 1
@@ -72,8 +56,77 @@
         }
       },
       "actions": {
-        "CONFIG": {
+        "Get_unread_emails": {
+          "type": "OpenApiConnection",
           "runAfter": {},
+          "inputs": {
+            "parameters": {
+              "folderPath": "Inbox",
+              "fetchOnlyWithAttachment": false,
+              "fetchOnlyUnread": false,
+              "mailboxAddress": "apply@driverai.io",
+              "includeAttachments": true,
+              "top": 1
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+              "connectionName": "shared_office365",
+              "operationId": "GetEmailsV3"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Has_unread_email": {
+          "type": "If",
+          "runAfter": {
+            "Get_unread_emails": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "and": [
+              {
+                "greater": [
+                  "@length(coalesce(body('Get_unread_emails')?['value'], json('[]')))",
+                  0
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "Unread_email_available": {
+              "type": "Compose",
+              "runAfter": {},
+              "inputs": "Unread Inbox message found; continue with the flat processing graph"
+            }
+          },
+          "else": {
+            "actions": {
+              "Stop_no_unread_email": {
+                "type": "Terminate",
+                "runAfter": {},
+                "inputs": {
+                  "runStatus": "Succeeded"
+                }
+              }
+            }
+          }
+        },
+        "CurrentEmail": {
+          "type": "Compose",
+          "runAfter": {
+            "Has_unread_email": [
+              "Succeeded"
+            ]
+          },
+          "inputs": "@first(body('Get_unread_emails')?['value'])"
+        },
+        "CONFIG": {
+          "runAfter": {
+            "CurrentEmail": [
+              "Succeeded"
+            ]
+          },
           "type": "Compose",
           "inputs": {
             "sharepoint_site": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
@@ -87,7 +140,7 @@
             ]
           },
           "type": "Compose",
-          "inputs": "@toLower(coalesce(triggerOutputs()?['body/from'],''))"
+          "inputs": "@toLower(coalesce(outputs('CurrentEmail')?['from'],''))"
         },
         "LowerSubject": {
           "runAfter": {
@@ -96,7 +149,7 @@
             ]
           },
           "type": "Compose",
-          "inputs": "@toLower(coalesce(triggerOutputs()?['body/subject'],''))"
+          "inputs": "@toLower(coalesce(outputs('CurrentEmail')?['subject'],''))"
         },
         "LowerBody": {
           "runAfter": {
@@ -105,7 +158,7 @@
             ]
           },
           "type": "Compose",
-          "inputs": "@toLower(concat(coalesce(triggerOutputs()?['body/body'], triggerOutputs()?['body/bodyPreview'], ''), ' ', join(body('AttachNames'), ' '), ' '))"
+          "inputs": "@toLower(concat(coalesce(outputs('CurrentEmail')?['body'], outputs('CurrentEmail')?['bodyPreview'], ''), ' ', join(body('AttachNames'), ' '), ' '))"
         },
         "BadSenders": {
           "runAfter": {
@@ -121,7 +174,8 @@
             "notifications",
             "mailer-daemon",
             "postmaster",
-            "bounce",
+            "bounce-",
+            "bounces.",
             "newsletter",
             "billing@",
             "teams.mail.microsoft.com",
@@ -145,6 +199,17 @@
             "dropbox.com",
             "notion.so",
             "asana.com",
+            "bacancy.com",
+            "equestsolutions.net",
+            "sigmasolve.com",
+            "logicrays.com",
+            "infilon.com",
+            "quebecsol.com",
+            "synapsetechservice.com",
+            "itidoltechnologies.com",
+            "atgcorp.com",
+            "pushcam-solution.com",
+            "fixelsmedia.com",
             "apply@driverai.io"
           ]
         },
@@ -159,7 +224,10 @@
             "sent a message",
             "notification",
             "security alert",
-            "digest",
+            "daily digest",
+            "weekly digest",
+            "monthly digest",
+            "your digest",
             "invoice attached",
             "your receipt",
             "unsubscribe",
@@ -300,12 +368,24 @@
             "लॉटरी",
             "पैसे ट्रांसफर",
             "لقد فزت",
-            "تحويل الأموال"
+            "تحويل الأموال",
+            "company profile and corporate deck",
+            "capability deck",
+            "engagement models",
+            "consultant details",
+            "we have an excellent",
+            "resume of my developer",
+            "attached their resume",
+            "available for your project",
+            "software development agency",
+            "handful of my contacts",
+            "we work as a",
+            "development partner"
           ]
         },
         "MatchSender": {
           "runAfter": {
-            "LinkShortenerPhrases": [
+            "QuotedRef": [
               "Succeeded"
             ]
           },
@@ -326,7 +406,8 @@
                 "Move_to_processed_spam_sender": [
                   "Succeeded",
                   "Failed",
-                  "Skipped"
+                  "Skipped",
+                  "TimedOut"
                 ]
               }
             },
@@ -334,8 +415,11 @@
               "type": "OpenApiConnection",
               "runAfter": {},
               "inputs": {
+                "retryPolicy": {
+                  "type": "none"
+                },
                 "parameters": {
-                  "messageId": "@triggerOutputs()?['body/id']",
+                  "messageId": "@outputs('CurrentEmail')?['id']",
                   "mailboxAddress": "apply@driverai.io",
                   "folderPath": "Junk Email"
                 },
@@ -373,7 +457,8 @@
                       "Move_to_processed_spam_subject": [
                         "Succeeded",
                         "Failed",
-                        "Skipped"
+                        "Skipped",
+                        "TimedOut"
                       ]
                     }
                   },
@@ -381,8 +466,11 @@
                     "type": "OpenApiConnection",
                     "runAfter": {},
                     "inputs": {
+                      "retryPolicy": {
+                        "type": "none"
+                      },
                       "parameters": {
-                        "messageId": "@triggerOutputs()?['body/id']",
+                        "messageId": "@outputs('CurrentEmail')?['id']",
                         "mailboxAddress": "apply@driverai.io",
                         "folderPath": "Junk Email"
                       },
@@ -420,7 +508,8 @@
                             "Move_to_processed_spam_body": [
                               "Succeeded",
                               "Failed",
-                              "Skipped"
+                              "Skipped",
+                              "TimedOut"
                             ]
                           }
                         },
@@ -428,8 +517,11 @@
                           "type": "OpenApiConnection",
                           "runAfter": {},
                           "inputs": {
+                            "retryPolicy": {
+                              "type": "none"
+                            },
                             "parameters": {
-                              "messageId": "@triggerOutputs()?['body/id']",
+                              "messageId": "@outputs('CurrentEmail')?['id']",
                               "mailboxAddress": "apply@driverai.io",
                               "folderPath": "Junk Email"
                             },
@@ -456,20 +548,24 @@
                       "else": {
                         "actions": {
                           "AppRef": {
-                            "runAfter": {},
-                            "type": "Compose",
-                            "inputs": "@{concat('APP-', formatDateTime(coalesce(triggerOutputs()?['body/receivedDateTime'], utcNow()),'yyyyMMdd'), '-', formatDateTime(coalesce(triggerOutputs()?['body/receivedDateTime'], utcNow()),'HHmm'), '-', toUpper(substring(guid(),0,4)))}"
-                          },
-                          "ResumeFiles": {
                             "runAfter": {
-                              "FileRef": [
+                              "AppRefSeed": [
                                 "Succeeded"
                               ]
                             },
+                            "type": "Compose",
+                            "inputs": "@{concat('APP-', formatDateTime(addHours(coalesce(outputs('CurrentEmail')?['receivedDateTime'], utcNow()),-7,'yyyy-MM-ddTHH:mm:ss'),'yyyyMMdd'), '-', formatDateTime(addHours(coalesce(outputs('CurrentEmail')?['receivedDateTime'], utcNow()),-7,'yyyy-MM-ddTHH:mm:ss'),'HHmm'), '-', toUpper(substring(outputs('AppRefSeed'), sub(length(outputs('AppRefSeed')), 6), 4)))}"
+                          },
+                          "ResumeFiles": {
                             "type": "Query",
+                            "runAfter": {
+                              "ResumeFilesKept": [
+                                "Succeeded"
+                              ]
+                            },
                             "inputs": {
-                              "from": "@coalesce(triggerOutputs()?['body/attachments'], json('[]'))",
-                              "where": "@and(or(endsWith(toLower(item()?['name']), '.pdf'), endsWith(toLower(item()?['name']), '.docx')), not(empty(item()?['contentBytes'])))"
+                              "from": "@if(greater(length(body('ResumeFilesKept')), 0), body('ResumeFilesKept'), body('ResumeFilesAll'))",
+                              "where": "@not(empty(item()?['name']))"
                             }
                           },
                           "HasResume": {
@@ -479,7 +575,7 @@
                                   "FileRef_from_dup": {
                                     "type": "Compose",
                                     "runAfter": {},
-                                    "inputs": "@{replace(first(body('Filter_submitted'))?['Application ID'], '/', '-')}"
+                                    "inputs": "@{replace(first(body('Latest_submitted'))?['Application ID'], '/', '-')}"
                                   },
                                   "IsUnderDupCap": {
                                     "type": "If",
@@ -490,7 +586,7 @@
                                     },
                                     "expression": {
                                       "less": [
-                                        "@int(coalesce(first(body('Filter_submitted'))?['Application Updates'], '0'))",
+                                        "@int(coalesce(first(body('Latest_submitted'))?['Application Updates'], '0'))",
                                         5
                                       ]
                                     },
@@ -502,7 +598,7 @@
                                           "parameters": {
                                             "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
                                             "table": "3600a6b3-142f-45f1-bce0-cfcb285c69e7",
-                                            "parameters/path": "@{concat('Candidate_Resumes', '/', formatDateTime(first(body('Filter_submitted'))?['Received Date'],'yyyy'), '/', formatDateTime(first(body('Filter_submitted'))?['Received Date'],'MMMM'))}"
+                                            "parameters/path": "@concat('Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))"
                                           },
                                           "host": {
                                             "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
@@ -518,9 +614,12 @@
                                           "Ensure_dup_resume_folder": [
                                             "Succeeded",
                                             "Failed"
+                                          ],
+                                          "Manifest_dup": [
+                                            "Succeeded"
                                           ]
                                         },
-                                        "foreach": "@body('ResumeFiles')",
+                                        "foreach": "@body('StoredFiles_dup')",
                                         "actions": {
                                           "Create_dup_update_file": {
                                             "type": "OpenApiConnection",
@@ -533,9 +632,54 @@
                                               },
                                               "parameters": {
                                                 "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
-                                                "folderPath": "@{concat(outputs('CONFIG')['resumes_folder'], '/', formatDateTime(first(body('Filter_submitted'))?['Received Date'],'yyyy'), '/', formatDateTime(first(body('Filter_submitted'))?['Received Date'],'MMMM'))}",
-                                                "name": "@{if(equals(length(trim(replace(replace(replace(replace(coalesce(first(body('Filter_submitted'))?['Full Name'],''),'''',''),'-',''),'.',''),',',''))),0),'Candidate',if(equals(length(split(trim(replace(replace(replace(replace(coalesce(first(body('Filter_submitted'))?['Full Name'],''),'''',''),'-',''),'.',''),',','')),' ')),1),first(split(trim(replace(replace(replace(replace(coalesce(first(body('Filter_submitted'))?['Full Name'],''),'''',''),'-',''),'.',''),',','')),' ')),concat(first(split(trim(replace(replace(replace(replace(coalesce(first(body('Filter_submitted'))?['Full Name'],''),'''',''),'-',''),'.',''),',','')),' ')),last(split(trim(replace(replace(replace(replace(coalesce(first(body('Filter_submitted'))?['Full Name'],''),'''',''),'-',''),'.',''),',','')),' ')))))}_@{outputs('FileRef_from_dup')}.@{last(split(first(body('Filter_submitted'))?['Original Filename'],'.'))}",
+                                                "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
+                                                "name": "@items('Save_dup_update_resume')?['stored_name']",
                                                 "body": "@base64ToBinary(items('Save_dup_update_resume')?['contentBytes'])"
+                                              },
+                                              "authentication": "@parameters('$authentication')"
+                                            }
+                                          },
+                                          "Capture_Create_dup_update_file": {
+                                            "type": "Compose",
+                                            "inputs": {
+                                              "Application ID": "@first(body('Latest_submitted'))?['Application ID']",
+                                              "Received Date": "@first(body('Latest_submitted'))?['Received Date']",
+                                              "Last Updated Date": "@formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy-MM-ddTHH:mm:ss')",
+                                              "Application Updates": "@add(int(coalesce(first(body('Latest_submitted'))?['Application Updates'],'0')),1)",
+                                              "Email": "@toLower(trim(if(contains(outputs('CurrentEmail')?['from'],'<'),replace(last(split(outputs('CurrentEmail')?['from'],'<')),'>',''),outputs('CurrentEmail')?['from'])))",
+                                              "Full Name": "@first(body('Latest_submitted'))?['Full Name']",
+                                              "Original Filename": "@join(body('ResumeNames'), ', ')",
+                                              "Resume URL": "@concat('manifest:',string(body('Manifest_dup')))",
+                                              "Resume Folder Path": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
+                                              "Mail Subject": "@coalesce(outputs('CurrentEmail')?['subject'],'')",
+                                              "Mail Body": "@coalesce(outputs('CurrentEmail')?['bodyPreview'],'')",
+                                              "Status": "New Email Received",
+                                              "Has Resume": "Yes"
+                                            },
+                                            "runAfter": {
+                                              "Create_dup_update_file": [
+                                                "Succeeded"
+                                              ]
+                                            }
+                                          },
+                                          "Preserve_Create_dup_update_file": {
+                                            "type": "OpenApiConnection",
+                                            "runAfter": {
+                                              "Capture_Create_dup_update_file": [
+                                                "Succeeded"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                                "connectionName": "shared_sharepointonline",
+                                                "operationId": "CreateFile"
+                                              },
+                                              "parameters": {
+                                                "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
+                                                "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
+                                                "name": "@concat('intake_',items('Save_dup_update_resume')?['stored_name'],'.json')",
+                                                "body": "@string(outputs('Capture_Create_dup_update_file'))"
                                               },
                                               "authentication": "@parameters('$authentication')"
                                             }
@@ -546,14 +690,12 @@
                                         "type": "If",
                                         "runAfter": {
                                           "Save_dup_update_resume": [
-                                            "Succeeded",
-                                            "Failed",
-                                            "Skipped"
+                                            "Succeeded"
                                           ]
                                         },
                                         "expression": {
                                           "less": [
-                                            "@int(coalesce(first(body('Filter_submitted'))?['Application Updates'], '0'))",
+                                            "@int(coalesce(first(body('Latest_submitted'))?['Application Updates'], '0'))",
                                             3
                                           ]
                                         },
@@ -561,7 +703,7 @@
                                           "Send_duplicate_notice": {
                                             "type": "Compose",
                                             "runAfter": {},
-                                            "inputs": "TEST-MODE: email suppressed (Send_duplicate_notice) - historical replay, no real send"
+                                            "inputs": "Applicant email disabled: suppressed Send_duplicate_notice; intake processing continues"
                                           },
                                           "Patch_dup_attempts": {
                                             "runAfter": {
@@ -579,11 +721,11 @@
                                                 "file": "/Master_Files/Sharepoint_Master_File.xlsx",
                                                 "table": "HiringAgent_P1_Candidates",
                                                 "idColumn": "Application ID",
-                                                "id": "@{first(body('Filter_submitted'))?['Application ID']}",
+                                                "id": "@{first(body('Latest_submitted'))?['Application ID']}",
                                                 "item": {
-                                                  "Application Updates": "@add(int(coalesce(first(body('Filter_submitted'))?['Application Updates'], '0')), 1)",
-                                                  "Mail Sent": "@{concat('TEST-MODE (suppressed) ', formatDateTime(utcNow(),'yyyy-MM-dd HH:mm'))}",
-                                                  "Last Updated Date": "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}",
+                                                  "Application Updates": "@add(int(coalesce(first(body('Latest_submitted'))?['Application Updates'], '0')), 1)",
+                                                  "Mail Sent": "@{concat('Suppressed (applicant email disabled) ', formatDateTime(addHours(utcNow(),-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-dd HH:mm'))}",
+                                                  "Last Updated Date": "@{if(greater(ticks(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss')),ticks(coalesce(first(body('Latest_submitted'))?['Last Updated Date'], first(body('Latest_submitted'))?['Received Date'], '2000-01-01T00:00:00'))),formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-ddTHH:mm:ss'),coalesce(first(body('Latest_submitted'))?['Last Updated Date'], first(body('Latest_submitted'))?['Received Date']))}",
                                                   "Status": "New Email Received"
                                                 }
                                               },
@@ -605,6 +747,41 @@
                                               ]
                                             },
                                             "inputs": "dup-cap patch best-effort"
+                                          },
+                                          "Notify_dup_attempts_failed": {
+                                            "type": "OpenApiConnection",
+                                            "runAfter": {
+                                              "Patch_dup_attempts": [
+                                                "Failed",
+                                                "TimedOut"
+                                              ]
+                                            },
+                                            "runtimeConfiguration": {
+                                              "retryPolicy": {
+                                                "type": "exponential",
+                                                "count": 2,
+                                                "interval": "PT10S"
+                                              }
+                                            },
+                                            "inputs": {
+                                              "parameters": {
+                                                "emailMessage/To": "yashv@driverai.io",
+                                                "emailMessage/Subject": "[Hiring Auto-Reply] Candidate row NOT updated - duplicate re-application (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p><p>The incoming email was handled and filed normally, but <strong>Patch_dup_attempts</strong> (duplicate re-application) did not commit. The Application Updates counter was NOT incremented, and the row was NOT re-queued for Phase 2 scoring.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run itself reports Succeeded because inbox cleanup completed as designed - <strong>this alert is the only signal</strong>. Open run history and inspect <strong>Patch_dup_attempts</strong>, then correct the row by hand.</p></div>",
+                                                "emailMessage/Importance": "High"
+                                              },
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                "connectionName": "shared_office365",
+                                                "operationId": "SendEmailV2"
+                                              },
+                                              "authentication": "@parameters('$authentication')",
+                                              "retryPolicy": {
+                                                "type": "exponential",
+                                                "count": 2,
+                                                "interval": "PT10S"
+                                              }
+                                            }
                                           }
                                         },
                                         "else": {
@@ -619,10 +796,10 @@
                                                   "file": "/Master_Files/Sharepoint_Master_File.xlsx",
                                                   "table": "HiringAgent_P1_Candidates",
                                                   "idColumn": "Application ID",
-                                                  "id": "@{first(body('Filter_submitted'))?['Application ID']}",
+                                                  "id": "@{first(body('Latest_submitted'))?['Application ID']}",
                                                   "item": {
-                                                    "Application Updates": "@add(int(coalesce(first(body('Filter_submitted'))?['Application Updates'], '0')), 1)",
-                                                    "Last Updated Date": "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}",
+                                                    "Application Updates": "@add(int(coalesce(first(body('Latest_submitted'))?['Application Updates'], '0')), 1)",
+                                                    "Last Updated Date": "@{if(greater(ticks(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss')),ticks(coalesce(first(body('Latest_submitted'))?['Last Updated Date'], first(body('Latest_submitted'))?['Received Date'], '2000-01-01T00:00:00'))),formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-ddTHH:mm:ss'),coalesce(first(body('Latest_submitted'))?['Last Updated Date'], first(body('Latest_submitted'))?['Received Date']))}",
                                                     "Status": "New Email Received"
                                                   }
                                                 },
@@ -633,8 +810,169 @@
                                                 },
                                                 "authentication": "@parameters('$authentication')"
                                               }
+                                            },
+                                            "Dup_noreply_patch_done": {
+                                              "type": "Compose",
+                                              "runAfter": {
+                                                "Patch_dup_attempts_noreply": [
+                                                  "Succeeded",
+                                                  "Failed",
+                                                  "Skipped",
+                                                  "TimedOut"
+                                                ]
+                                              },
+                                              "inputs": "dup no-reply patch best-effort (a row deleted mid-run is expected, not a failure)"
+                                            },
+                                            "Notify_dup_attempts_noreply_failed": {
+                                              "type": "OpenApiConnection",
+                                              "runAfter": {
+                                                "Patch_dup_attempts_noreply": [
+                                                  "Failed",
+                                                  "TimedOut"
+                                                ]
+                                              },
+                                              "runtimeConfiguration": {
+                                                "retryPolicy": {
+                                                  "type": "exponential",
+                                                  "count": 2,
+                                                  "interval": "PT10S"
+                                                }
+                                              },
+                                              "inputs": {
+                                                "parameters": {
+                                                  "emailMessage/To": "yashv@driverai.io",
+                                                  "emailMessage/Subject": "[Hiring Auto-Reply] Candidate row NOT updated - duplicate re-application (past reply cap) (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                  "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p><p>The incoming email was handled and filed normally, but <strong>Patch_dup_attempts_noreply</strong> (duplicate re-application (past reply cap)) did not commit. The Application Updates counter was NOT incremented, and the row was NOT re-queued for Phase 2 scoring.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run itself reports Succeeded because inbox cleanup completed as designed - <strong>this alert is the only signal</strong>. Open run history and inspect <strong>Patch_dup_attempts_noreply</strong>, then correct the row by hand.</p></div>",
+                                                  "emailMessage/Importance": "High"
+                                                },
+                                                "host": {
+                                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                  "connectionName": "shared_office365",
+                                                  "operationId": "SendEmailV2"
+                                                },
+                                                "authentication": "@parameters('$authentication')",
+                                                "retryPolicy": {
+                                                  "type": "exponential",
+                                                  "count": 2,
+                                                  "interval": "PT10S"
+                                                }
+                                              }
                                             }
                                           }
+                                        }
+                                      },
+                                      "StoredFiles_dup": {
+                                        "type": "Select",
+                                        "runAfter": {},
+                                        "inputs": {
+                                          "from": "@body('ResumeFiles')",
+                                          "select": {
+                                            "name": "@item()?['name']",
+                                            "contentBytes": "@item()?['contentBytes']",
+                                            "stored_name": "@concat(if(greater(length(if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_'))),60),substring(if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0,60),if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_'))),'_',substring(coalesce(first(body('Latest_submitted'))?['Application ID'],outputs('AppRef')),sub(length(coalesce(first(body('Latest_submitted'))?['Application ID'],outputs('AppRef'))),4),4),if(greater(length(body('ResumeFiles')),1),concat('_',toUpper(substring(concat('000000',replace(replace(replace(coalesce(item()?['id'],''),'-',''),'_',''),'=','')),sub(length(concat('000000',replace(replace(replace(coalesce(item()?['id'],''),'-',''),'_',''),'=',''))),4),4))),''),'.',toLower(last(split(item()?['name'],'.'))))"
+                                          }
+                                        }
+                                      },
+                                      "Manifest_dup": {
+                                        "type": "Select",
+                                        "runAfter": {
+                                          "StoredFiles_dup": [
+                                            "Succeeded"
+                                          ]
+                                        },
+                                        "inputs": {
+                                          "from": "@body('StoredFiles_dup')",
+                                          "select": {
+                                            "name": "@item()?['stored_name']",
+                                            "original_name": "@item()?['name']",
+                                            "folder": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))"
+                                          }
+                                        }
+                                      },
+                                      "Notify_create_dup_update_file_failed": {
+                                        "type": "OpenApiConnection",
+                                        "runAfter": {
+                                          "Save_dup_update_resume": [
+                                            "Failed",
+                                            "TimedOut"
+                                          ]
+                                        },
+                                        "runtimeConfiguration": {
+                                          "retryPolicy": {
+                                            "type": "exponential",
+                                            "count": 2,
+                                            "interval": "PT10S"
+                                          }
+                                        },
+                                        "inputs": {
+                                          "parameters": {
+                                            "emailMessage/To": "yashv@driverai.io",
+                                            "emailMessage/Subject": "[Hiring Auto-Reply] APPLICANT LOST - a repeat applicant's NEW resume was never saved (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                            "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Create_dup_update_file</strong> failed, so a repeat applicant's NEW resume was never saved.</p><p>This was a duplicate/resend, so the row was patched as though the new resume landed - <strong>Application Updates was incremented and Status reset to 'New Email Received'</strong> - but the file on disk is still the PREVIOUS version. Phase 2 will re-score the stale document, and the applicant has already been told their update was received.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The resume was <strong>not saved</strong>, so nothing downstream was allowed to run: no candidate row was created or re-queued, and <strong>no acknowledgment was sent</strong>. The message has been moved to Archive and left <strong>unread</strong>, which is this system's marker for \"failed, needs a replay\".</p><p><strong>To recover:</strong> find it in Archive by the From and Received values above and move it back to the Inbox, still unread. The next poll re-runs the whole intake for it, including the applicant reply if applicant mail is on.</p></div>",
+                                            "emailMessage/Importance": "High"
+                                          },
+                                          "host": {
+                                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                            "connectionName": "shared_office365",
+                                            "operationId": "SendEmailV2"
+                                          },
+                                          "authentication": "@parameters('$authentication')",
+                                          "retryPolicy": {
+                                            "type": "exponential",
+                                            "count": 2,
+                                            "interval": "PT10S"
+                                          }
+                                        }
+                                      },
+                                      "Move_dup_save_failed_unread": {
+                                        "type": "OpenApiConnection",
+                                        "runAfter": {
+                                          "Save_dup_update_resume": [
+                                            "Failed",
+                                            "TimedOut",
+                                            "Skipped"
+                                          ]
+                                        },
+                                        "inputs": {
+                                          "retryPolicy": {
+                                            "type": "none"
+                                          },
+                                          "parameters": {
+                                            "messageId": "@outputs('CurrentEmail')?['id']",
+                                            "mailboxAddress": "apply@driverai.io",
+                                            "folderPath": "Archive"
+                                          },
+                                          "host": {
+                                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                            "connectionName": "shared_office365",
+                                            "operationId": "MoveV2"
+                                          },
+                                          "authentication": "@parameters('$authentication')"
+                                        },
+                                        "runtimeConfiguration": {
+                                          "retryPolicy": {
+                                            "type": "none"
+                                          }
+                                        }
+                                      },
+                                      "Terminate_dup_save_failed": {
+                                        "type": "Terminate",
+                                        "runAfter": {
+                                          "Move_dup_save_failed_unread": [
+                                            "Succeeded",
+                                            "Failed",
+                                            "TimedOut",
+                                            "Skipped"
+                                          ],
+                                          "Notify_create_dup_update_file_failed": [
+                                            "Succeeded",
+                                            "Failed",
+                                            "TimedOut",
+                                            "Skipped"
+                                          ]
+                                        },
+                                        "inputs": {
+                                          "runStatus": "Succeeded"
                                         }
                                       }
                                     },
@@ -646,20 +984,26 @@
                                 "runAfter": {
                                   "Filter_submitted": [
                                     "Succeeded"
+                                  ],
+                                  "Submitted_ticks": [
+                                    "Succeeded"
+                                  ],
+                                  "Latest_submitted": [
+                                    "Succeeded"
                                   ]
                                 },
                                 "else": {
                                   "actions": {
                                     "Save_resumes_to_SharePoint": {
-                                      "foreach": "@body('ResumeFiles')",
+                                      "foreach": "@body('StoredFiles_new')",
                                       "actions": {
                                         "Create_file": {
                                           "type": "OpenApiConnection",
                                           "inputs": {
                                             "parameters": {
                                               "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
-                                              "folderPath": "@{concat(outputs('CONFIG')['resumes_folder'], '/', formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy'), '/', formatDateTime(triggerOutputs()?['body/receivedDateTime'],'MMMM'))}",
-                                              "name": "@{if(equals(length(trim(replace(replace(replace(replace(trim(if(and(contains(triggerOutputs()?['body/from'],'<'),greater(length(trim(first(split(triggerOutputs()?['body/from'],'<')))),0)),first(split(triggerOutputs()?['body/from'],'<')),replace(replace(first(split(coalesce(triggerOutputs()?['body/from'],''),'@')),'.',' '),'_',' '))),'''',''),'-',''),'.',''),',',''))),0),'Candidate',if(equals(length(split(trim(replace(replace(replace(replace(trim(if(and(contains(triggerOutputs()?['body/from'],'<'),greater(length(trim(first(split(triggerOutputs()?['body/from'],'<')))),0)),first(split(triggerOutputs()?['body/from'],'<')),replace(replace(first(split(coalesce(triggerOutputs()?['body/from'],''),'@')),'.',' '),'_',' '))),'''',''),'-',''),'.',''),',','')),' ')),1),first(split(trim(replace(replace(replace(replace(trim(if(and(contains(triggerOutputs()?['body/from'],'<'),greater(length(trim(first(split(triggerOutputs()?['body/from'],'<')))),0)),first(split(triggerOutputs()?['body/from'],'<')),replace(replace(first(split(coalesce(triggerOutputs()?['body/from'],''),'@')),'.',' '),'_',' '))),'''',''),'-',''),'.',''),',','')),' ')),concat(first(split(trim(replace(replace(replace(replace(trim(if(and(contains(triggerOutputs()?['body/from'],'<'),greater(length(trim(first(split(triggerOutputs()?['body/from'],'<')))),0)),first(split(triggerOutputs()?['body/from'],'<')),replace(replace(first(split(coalesce(triggerOutputs()?['body/from'],''),'@')),'.',' '),'_',' '))),'''',''),'-',''),'.',''),',','')),' ')),last(split(trim(replace(replace(replace(replace(trim(if(and(contains(triggerOutputs()?['body/from'],'<'),greater(length(trim(first(split(triggerOutputs()?['body/from'],'<')))),0)),first(split(triggerOutputs()?['body/from'],'<')),replace(replace(first(split(coalesce(triggerOutputs()?['body/from'],''),'@')),'.',' '),'_',' '))),'''',''),'-',''),'.',''),',','')),' ')))))}_@{outputs('FileRef')}.@{last(split(items('Save_resumes_to_SharePoint')?['name'],'.'))}",
+                                              "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
+                                              "name": "@items('Save_resumes_to_SharePoint')?['stored_name']",
                                               "body": "@base64ToBinary(items('Save_resumes_to_SharePoint')?['contentBytes'])"
                                             },
                                             "host": {
@@ -669,6 +1013,51 @@
                                             },
                                             "authentication": "@parameters('$authentication')"
                                           }
+                                        },
+                                        "Capture_Create_file": {
+                                          "type": "Compose",
+                                          "inputs": {
+                                            "Application ID": "@outputs('AppRef')",
+                                            "Received Date": "@formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy-MM-ddTHH:mm:ss')",
+                                            "Last Updated Date": "@formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy-MM-ddTHH:mm:ss')",
+                                            "Application Updates": 0,
+                                            "Email": "@toLower(trim(if(contains(outputs('CurrentEmail')?['from'],'<'),replace(last(split(outputs('CurrentEmail')?['from'],'<')),'>',''),outputs('CurrentEmail')?['from'])))",
+                                            "Full Name": "",
+                                            "Original Filename": "@join(body('ResumeNames'), ', ')",
+                                            "Resume URL": "@concat('manifest:',string(body('Manifest_new')))",
+                                            "Resume Folder Path": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
+                                            "Mail Subject": "@coalesce(outputs('CurrentEmail')?['subject'],'')",
+                                            "Mail Body": "@coalesce(outputs('CurrentEmail')?['bodyPreview'],'')",
+                                            "Status": "New Email Received",
+                                            "Has Resume": "Yes"
+                                          },
+                                          "runAfter": {
+                                            "Create_file": [
+                                              "Succeeded"
+                                            ]
+                                          }
+                                        },
+                                        "Preserve_Create_file": {
+                                          "type": "OpenApiConnection",
+                                          "inputs": {
+                                            "parameters": {
+                                              "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
+                                              "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
+                                              "name": "@concat('intake_',items('Save_resumes_to_SharePoint')?['stored_name'],'.json')",
+                                              "body": "@string(outputs('Capture_Create_file'))"
+                                            },
+                                            "host": {
+                                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                              "connectionName": "shared_sharepointonline",
+                                              "operationId": "CreateFile"
+                                            },
+                                            "authentication": "@parameters('$authentication')"
+                                          },
+                                          "runAfter": {
+                                            "Capture_Create_file": [
+                                              "Succeeded"
+                                            ]
+                                          }
                                         }
                                       },
                                       "type": "Foreach",
@@ -676,6 +1065,9 @@
                                         "Ensure_resume_folder": [
                                           "Succeeded",
                                           "Failed"
+                                        ],
+                                        "Manifest_new": [
+                                          "Succeeded"
                                         ]
                                       }
                                     },
@@ -683,29 +1075,15 @@
                                       "type": "Compose",
                                       "runAfter": {
                                         "Add_row": [
-                                          "Succeeded",
-                                          "Failed",
-                                          "Skipped"
+                                          "Succeeded"
                                         ]
                                       },
-                                      "inputs": "TEST-MODE: email suppressed (Send_acknowledgment) - historical replay, no real send"
+                                      "inputs": "Applicant email disabled: suppressed Send_acknowledgment; intake processing continues"
                                     },
                                     "Add_row": {
                                       "runAfter": {
                                         "Save_resumes_to_SharePoint": [
-                                          "Succeeded",
-                                          "Failed",
-                                          "Skipped"
-                                        ],
-                                        "IsFirstOfNewYear": [
-                                          "Succeeded",
-                                          "Failed",
-                                          "Skipped"
-                                        ],
-                                        "IsFirstOfNewMonth": [
-                                          "Succeeded",
-                                          "Failed",
-                                          "Skipped"
+                                          "Succeeded"
                                         ]
                                       },
                                       "type": "OpenApiConnection",
@@ -717,12 +1095,12 @@
                                           "table": "HiringAgent_P1_Candidates",
                                           "item": {
                                             "Application ID": "@outputs('AppRef')",
-                                            "Received Date": "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}",
-                                            "Last Updated Date": "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}",
-                                            "Full Name": "@{trim(if(and(contains(triggerOutputs()?['body/from'],'<'),greater(length(trim(first(split(triggerOutputs()?['body/from'],'<')))),0)),first(split(triggerOutputs()?['body/from'],'<')),replace(replace(first(split(coalesce(triggerOutputs()?['body/from'],''),'@')),'.',' '),'_',' ')))}",
-                                            "Email": "@toLower(trim(if(contains(triggerOutputs()?['body/from'],'<'),replace(last(split(triggerOutputs()?['body/from'],'<')),'>',''),triggerOutputs()?['body/from'])))",
-                                            "Mail Subject": "@coalesce(triggerOutputs()?['body/subject'],'')",
-                                            "Mail Body": "@replace(replace(coalesce(triggerOutputs()?['body/bodyPreview'],''),decodeUriComponent('%0A'),' | '),decodeUriComponent('%0D'),'')",
+                                            "Received Date": "@{formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-ddTHH:mm:ss')}",
+                                            "Last Updated Date": "@{formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-ddTHH:mm:ss')}",
+                                            "Full Name": "@{trim(if(and(contains(outputs('CurrentEmail')?['from'],'<'),greater(length(trim(first(split(outputs('CurrentEmail')?['from'],'<')))),0)),first(split(outputs('CurrentEmail')?['from'],'<')),replace(replace(first(split(coalesce(outputs('CurrentEmail')?['from'],''),'@')),'.',' '),'_',' ')))}",
+                                            "Email": "@toLower(trim(if(contains(outputs('CurrentEmail')?['from'],'<'),replace(last(split(outputs('CurrentEmail')?['from'],'<')),'>',''),outputs('CurrentEmail')?['from'])))",
+                                            "Mail Subject": "@coalesce(outputs('CurrentEmail')?['subject'],'')",
+                                            "Mail Body": "@replace(replace(coalesce(outputs('CurrentEmail')?['bodyPreview'],''),decodeUriComponent('%0A'),' | '),decodeUriComponent('%0D'),'')",
                                             "Status": "New Email Received",
                                             "Has Resume": "Yes",
                                             "Original Filename": "@join(body('ResumeNames'), ', ')",
@@ -744,7 +1122,7 @@
                                         "parameters": {
                                           "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
                                           "table": "3600a6b3-142f-45f1-bce0-cfcb285c69e7",
-                                          "parameters/path": "@{concat('Candidate_Resumes', '/', formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy'), '/', formatDateTime(triggerOutputs()?['body/receivedDateTime'],'MMMM'))}"
+                                          "parameters/path": "@concat('Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))"
                                         },
                                         "host": {
                                           "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
@@ -770,7 +1148,7 @@
                                           "idColumn": "Application ID",
                                           "id": "@{outputs('AppRef')}",
                                           "item": {
-                                            "Mail Sent": "@{concat('TEST-MODE (suppressed) ', formatDateTime(utcNow(),'yyyy-MM-dd HH:mm'))}"
+                                            "Mail Sent": "@{concat('Suppressed (applicant email disabled) ', formatDateTime(addHours(utcNow(),-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-dd HH:mm'))}"
                                           }
                                         },
                                         "host": {
@@ -792,132 +1170,188 @@
                                       },
                                       "inputs": "ack mail-sent stamp best-effort"
                                     },
-                                    "Get_rows_this_year": {
-                                      "type": "OpenApiConnection",
+                                    "StoredFiles_new": {
+                                      "type": "Select",
                                       "runAfter": {},
                                       "inputs": {
-                                        "parameters": {
-                                          "source": "led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e",
-                                          "drive": "b!MbaWiB4Pe0aZhiVbjfQPA7nxqxvdmdpFv4-je9qw216zpgA2LxTxRbzgz8soXGnn",
-                                          "file": "/Master_Files/Sharepoint_Master_File.xlsx",
-                                          "table": "HiringAgent_P1_Candidates",
-                                          "$filter": "@{concat('Received Date ge ''', formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy'), '-01-01T00:00:00''')}"
-                                        },
-                                        "host": {
-                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
-                                          "connectionName": "shared_excelonlinebusiness",
-                                          "operationId": "GetItems"
-                                        },
-                                        "authentication": "@parameters('$authentication')"
-                                      }
-                                    },
-                                    "IsFirstOfNewYear": {
-                                      "type": "If",
-                                      "runAfter": {
-                                        "Get_rows_this_year": [
-                                          "Succeeded"
-                                        ]
-                                      },
-                                      "expression": {
-                                        "equals": [
-                                          "@length(body('Get_rows_this_year')?['value'])",
-                                          0
-                                        ]
-                                      },
-                                      "actions": {
-                                        "Add_row_year_separator": {
-                                          "type": "OpenApiConnection",
-                                          "runAfter": {},
-                                          "inputs": {
-                                            "parameters": {
-                                              "source": "led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e",
-                                              "drive": "b!MbaWiB4Pe0aZhiVbjfQPA7nxqxvdmdpFv4-je9qw216zpgA2LxTxRbzgz8soXGnn",
-                                              "file": "/Master_Files/Sharepoint_Master_File.xlsx",
-                                              "table": "HiringAgent_P1_Candidates",
-                                              "item": {}
-                                            },
-                                            "host": {
-                                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
-                                              "connectionName": "shared_excelonlinebusiness",
-                                              "operationId": "AddRowV2"
-                                            },
-                                            "authentication": "@parameters('$authentication')"
-                                          }
+                                        "from": "@body('ResumeFiles')",
+                                        "select": {
+                                          "name": "@item()?['name']",
+                                          "contentBytes": "@item()?['contentBytes']",
+                                          "stored_name": "@concat(if(greater(length(if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_'))),60),substring(if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0,60),if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_'))),'_',substring(outputs('AppRef'),sub(length(outputs('AppRef')),4),4),if(greater(length(body('ResumeFiles')),1),concat('_',toUpper(substring(concat('000000',replace(replace(replace(coalesce(item()?['id'],''),'-',''),'_',''),'=','')),sub(length(concat('000000',replace(replace(replace(coalesce(item()?['id'],''),'-',''),'_',''),'=',''))),4),4))),''),'.',toLower(last(split(item()?['name'],'.'))))"
                                         }
-                                      },
-                                      "else": {
-                                        "actions": {}
                                       }
                                     },
-                                    "Get_rows_this_month": {
-                                      "type": "OpenApiConnection",
+                                    "Manifest_new": {
+                                      "type": "Select",
                                       "runAfter": {
-                                        "Get_rows_this_year": [
+                                        "StoredFiles_new": [
                                           "Succeeded"
                                         ]
                                       },
                                       "inputs": {
-                                        "parameters": {
-                                          "source": "led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e",
-                                          "drive": "b!MbaWiB4Pe0aZhiVbjfQPA7nxqxvdmdpFv4-je9qw216zpgA2LxTxRbzgz8soXGnn",
-                                          "file": "/Master_Files/Sharepoint_Master_File.xlsx",
-                                          "table": "HiringAgent_P1_Candidates",
-                                          "$filter": "@{concat('Received Date ge ''', formatDateTime(startOfMonth(triggerOutputs()?['body/receivedDateTime']),'yyyy-MM-dd'), 'T00:00:00'' and Received Date lt ''', formatDateTime(addToTime(startOfMonth(triggerOutputs()?['body/receivedDateTime']),1,'Month'),'yyyy-MM-dd'), 'T00:00:00''')}"
-                                        },
-                                        "host": {
-                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
-                                          "connectionName": "shared_excelonlinebusiness",
-                                          "operationId": "GetItems"
-                                        },
-                                        "authentication": "@parameters('$authentication')"
+                                        "from": "@body('StoredFiles_new')",
+                                        "select": {
+                                          "name": "@item()?['stored_name']",
+                                          "original_name": "@item()?['name']",
+                                          "folder": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))"
+                                        }
                                       }
                                     },
-                                    "IsFirstOfNewMonth": {
-                                      "type": "If",
+                                    "Notify_mail_sent_failed": {
+                                      "type": "OpenApiConnection",
                                       "runAfter": {
-                                        "Get_rows_this_month": [
-                                          "Succeeded"
+                                        "Patch_mail_sent": [
+                                          "Failed",
+                                          "TimedOut"
                                         ]
                                       },
-                                      "expression": {
-                                        "and": [
-                                          {
-                                            "equals": [
-                                              "@length(body('Get_rows_this_month')?['value'])",
-                                              0
-                                            ]
-                                          },
-                                          {
-                                            "greater": [
-                                              "@length(body('Get_rows_this_year')?['value'])",
-                                              0
-                                            ]
-                                          }
-                                        ]
-                                      },
-                                      "actions": {
-                                        "Add_row_month_separator": {
-                                          "type": "OpenApiConnection",
-                                          "runAfter": {},
-                                          "inputs": {
-                                            "parameters": {
-                                              "source": "led1234567.sharepoint.com,8896b631-0f1e-467b-9986-255b8df40f03,1babf1b9-99dd-45da-bf8f-a37bdab0db5e",
-                                              "drive": "b!MbaWiB4Pe0aZhiVbjfQPA7nxqxvdmdpFv4-je9qw216zpgA2LxTxRbzgz8soXGnn",
-                                              "file": "/Master_Files/Sharepoint_Master_File.xlsx",
-                                              "table": "HiringAgent_P1_Candidates",
-                                              "item": {}
-                                            },
-                                            "host": {
-                                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
-                                              "connectionName": "shared_excelonlinebusiness",
-                                              "operationId": "AddRowV2"
-                                            },
-                                            "authentication": "@parameters('$authentication')"
-                                          }
+                                      "runtimeConfiguration": {
+                                        "retryPolicy": {
+                                          "type": "exponential",
+                                          "count": 2,
+                                          "interval": "PT10S"
                                         }
                                       },
-                                      "else": {
-                                        "actions": {}
+                                      "inputs": {
+                                        "parameters": {
+                                          "emailMessage/To": "yashv@driverai.io",
+                                          "emailMessage/Subject": "[Hiring Auto-Reply] Candidate row NOT updated - new applicant - acknowledgment stamp (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                          "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p><p>The incoming email was handled and filed normally, but <strong>Patch_mail_sent</strong> (new applicant - acknowledgment stamp) did not commit. The Application Updates counter was NOT incremented.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run itself reports Succeeded because inbox cleanup completed as designed - <strong>this alert is the only signal</strong>. Open run history and inspect <strong>Patch_mail_sent</strong>, then correct the row by hand.</p></div>",
+                                          "emailMessage/Importance": "High"
+                                        },
+                                        "host": {
+                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                          "connectionName": "shared_office365",
+                                          "operationId": "SendEmailV2"
+                                        },
+                                        "authentication": "@parameters('$authentication')",
+                                        "retryPolicy": {
+                                          "type": "exponential",
+                                          "count": 2,
+                                          "interval": "PT10S"
+                                        }
+                                      }
+                                    },
+                                    "Notify_add_row_failed": {
+                                      "type": "OpenApiConnection",
+                                      "runAfter": {
+                                        "Add_row": [
+                                          "Failed",
+                                          "TimedOut"
+                                        ]
+                                      },
+                                      "runtimeConfiguration": {
+                                        "retryPolicy": {
+                                          "type": "exponential",
+                                          "count": 2,
+                                          "interval": "PT10S"
+                                        }
+                                      },
+                                      "inputs": {
+                                        "parameters": {
+                                          "emailMessage/To": "yashv@driverai.io",
+                                          "emailMessage/Subject": "[Hiring Auto-Reply] APPLICANT LOST - the candidate row was never created (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                          "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Add_row</strong> failed, so the candidate row was never created.</p><p>This applicant has <strong>no row on either sheet</strong> and received <strong>no acknowledgment</strong> - Send_acknowledgment is gated on Add_row succeeding, so it was skipped. Their resume may still have been saved to SharePoint, which leaves an orphan file with nothing pointing at it.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run reports <strong>Succeeded</strong> because inbox cleanup is deliberately unconditional, and the message has been marked read and moved to Archive as though it were handled - <strong>this alert is the only signal</strong>.</p><p><strong>To recover:</strong> find the message in Archive by the From and Received values above and move it back to the Inbox as unread, so the next poll re-runs the full intake for it. If applicant mail is currently ON, that will also re-send their acknowledgment - which is correct here, because they never received one.</p></div>",
+                                          "emailMessage/Importance": "High"
+                                        },
+                                        "host": {
+                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                          "connectionName": "shared_office365",
+                                          "operationId": "SendEmailV2"
+                                        },
+                                        "authentication": "@parameters('$authentication')",
+                                        "retryPolicy": {
+                                          "type": "exponential",
+                                          "count": 2,
+                                          "interval": "PT10S"
+                                        }
+                                      }
+                                    },
+                                    "Notify_create_file_failed": {
+                                      "type": "OpenApiConnection",
+                                      "runAfter": {
+                                        "Save_resumes_to_SharePoint": [
+                                          "Failed",
+                                          "TimedOut"
+                                        ]
+                                      },
+                                      "runtimeConfiguration": {
+                                        "retryPolicy": {
+                                          "type": "exponential",
+                                          "count": 2,
+                                          "interval": "PT10S"
+                                        }
+                                      },
+                                      "inputs": {
+                                        "parameters": {
+                                          "emailMessage/To": "yashv@driverai.io",
+                                          "emailMessage/Subject": "[Hiring Auto-Reply] APPLICANT LOST - the resume file was never saved (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                          "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Create_file</strong> failed, so the resume file was never saved.</p><p>Add_row still runs when the save fails and always writes Has Resume = 'Yes', so the row now <strong>claims a resume that does not exist</strong> in SharePoint. Phase 2 cannot score it and will not be able to read the file.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The resume was <strong>not saved</strong>, so nothing downstream was allowed to run: no candidate row was created or re-queued, and <strong>no acknowledgment was sent</strong>. The message has been moved to Archive and left <strong>unread</strong>, which is this system's marker for \"failed, needs a replay\".</p><p><strong>To recover:</strong> find it in Archive by the From and Received values above and move it back to the Inbox, still unread. The next poll re-runs the whole intake for it, including the applicant reply if applicant mail is on.</p></div>",
+                                          "emailMessage/Importance": "High"
+                                        },
+                                        "host": {
+                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                          "connectionName": "shared_office365",
+                                          "operationId": "SendEmailV2"
+                                        },
+                                        "authentication": "@parameters('$authentication')",
+                                        "retryPolicy": {
+                                          "type": "exponential",
+                                          "count": 2,
+                                          "interval": "PT10S"
+                                        }
+                                      }
+                                    },
+                                    "Move_new_save_failed_unread": {
+                                      "type": "OpenApiConnection",
+                                      "runAfter": {
+                                        "Save_resumes_to_SharePoint": [
+                                          "Failed",
+                                          "TimedOut",
+                                          "Skipped"
+                                        ]
+                                      },
+                                      "inputs": {
+                                        "retryPolicy": {
+                                          "type": "none"
+                                        },
+                                        "parameters": {
+                                          "messageId": "@outputs('CurrentEmail')?['id']",
+                                          "mailboxAddress": "apply@driverai.io",
+                                          "folderPath": "Archive"
+                                        },
+                                        "host": {
+                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                          "connectionName": "shared_office365",
+                                          "operationId": "MoveV2"
+                                        },
+                                        "authentication": "@parameters('$authentication')"
+                                      },
+                                      "runtimeConfiguration": {
+                                        "retryPolicy": {
+                                          "type": "none"
+                                        }
+                                      }
+                                    },
+                                    "Terminate_new_save_failed": {
+                                      "type": "Terminate",
+                                      "runAfter": {
+                                        "Move_new_save_failed_unread": [
+                                          "Succeeded",
+                                          "Failed",
+                                          "TimedOut",
+                                          "Skipped"
+                                        ],
+                                        "Notify_create_file_failed": [
+                                          "Succeeded",
+                                          "Failed",
+                                          "TimedOut",
+                                          "Skipped"
+                                        ]
+                                      },
+                                      "inputs": {
+                                        "runStatus": "Succeeded"
                                       }
                                     }
                                   }
@@ -931,9 +1365,31 @@
                                       ]
                                     },
                                     {
-                                      "greaterOrEquals": [
-                                        "@ticks(coalesce(last(body('Filter_submitted'))?['Received Date'], '2000-01-01T00:00:00Z'))",
-                                        "@ticks(addDays(utcNow(), -90))"
+                                      "or": [
+                                        {
+                                          "and": [
+                                            {
+                                              "greater": [
+                                                "@length(body('MatchAllowSender'))",
+                                                0
+                                              ]
+                                            },
+                                            {
+                                              "not": {
+                                                "equals": [
+                                                  "@outputs('QuotedRef')",
+                                                  ""
+                                                ]
+                                              }
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "greaterOrEquals": [
+                                            "@max(union(body('Submitted_ticks'), json('[0]')))",
+                                            "@ticks(addDays(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss'), -90))"
+                                          ]
+                                        }
                                       ]
                                     }
                                   ]
@@ -948,7 +1404,7 @@
                                     "drive": "b!MbaWiB4Pe0aZhiVbjfQPA7nxqxvdmdpFv4-je9qw216zpgA2LxTxRbzgz8soXGnn",
                                     "file": "/Master_Files/Sharepoint_Master_File.xlsx",
                                     "table": "HiringAgent_P1_Candidates",
-                                    "$filter": "@concat('Email eq ''', replace(toLower(trim(if(contains(triggerOutputs()?['body/from'],'<'),replace(last(split(triggerOutputs()?['body/from'],'<')),'>',''),triggerOutputs()?['body/from']))), '''', ''''''), '''')"
+                                    "$filter": "@if(and(greater(length(body('MatchAllowSender')), 0), not(equals(outputs('QuotedRef'), ''))), concat('Application ID eq ''', outputs('QuotedRef'), ''''), concat('Email eq ''', replace(toLower(trim(if(contains(outputs('CurrentEmail')?['from'],'<'),replace(last(split(outputs('CurrentEmail')?['from'],'<')),'>',''),outputs('CurrentEmail')?['from']))), '''', ''''''), ''''))"
                                   },
                                   "host": {
                                     "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
@@ -972,6 +1428,30 @@
                                   "from": "@coalesce(outputs('Get_rows')?['body/value'], json('[]'))",
                                   "where": "@equals(item()?['Has Resume'], 'Yes')"
                                 }
+                              },
+                              "Submitted_ticks": {
+                                "type": "Select",
+                                "runAfter": {
+                                  "Filter_submitted": [
+                                    "Succeeded"
+                                  ]
+                                },
+                                "inputs": {
+                                  "from": "@body('Filter_submitted')",
+                                  "select": "@ticks(coalesce(item()?['Received Date'], '2000-01-01T00:00:00Z'))"
+                                }
+                              },
+                              "Latest_submitted": {
+                                "type": "Query",
+                                "runAfter": {
+                                  "Submitted_ticks": [
+                                    "Succeeded"
+                                  ]
+                                },
+                                "inputs": {
+                                  "from": "@body('Filter_submitted')",
+                                  "where": "@equals(ticks(coalesce(item()?['Received Date'], '2000-01-01T00:00:00Z')), max(union(body('Submitted_ticks'), json('[0]'))))"
+                                }
                               }
                             },
                             "runAfter": {
@@ -987,17 +1467,60 @@
                                     "Send_CV_request": {
                                       "type": "Compose",
                                       "runAfter": {},
-                                      "inputs": "TEST-MODE: email suppressed (Send_CV_request) - historical replay, no real send"
+                                      "inputs": "Applicant email disabled: suppressed Send_CV_request; intake processing continues"
                                     }
                                   },
                                   "else": {
-                                    "actions": {}
+                                    "actions": {
+                                      "Notify_ignored_mail": {
+                                        "type": "OpenApiConnection",
+                                        "runAfter": {},
+                                        "runtimeConfiguration": {
+                                          "retryPolicy": {
+                                            "type": "exponential",
+                                            "count": 2,
+                                            "interval": "PT10S"
+                                          }
+                                        },
+                                        "inputs": {
+                                          "parameters": {
+                                            "emailMessage/To": "yashv@driverai.io",
+                                            "emailMessage/Subject": "[Hiring Auto-Reply] Non-application mail archived: @{coalesce(outputs('CurrentEmail')?['subject'],'(no subject)')}",
+                                            "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;\"><p><strong>An email reached the hiring mailbox that is not an application.</strong> It passed every spam screen, but carried no resume, no application keyword and no application reference, so P1 created no row and sent no reply.</p><p><strong>From:</strong> @{coalesce(outputs('CurrentEmail')?['from'],'(unknown)')}<br><strong>Subject:</strong> @{coalesce(outputs('CurrentEmail')?['subject'],'(no subject)')}<br><strong>Received:</strong> @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</p><p><strong>Preview:</strong><br>@{coalesce(outputs('CurrentEmail')?['bodyPreview'],'(empty)')}</p><p>The message has been marked read and moved to <strong>Archive</strong> - nothing was lost. Reply from the mailbox directly if it needs a human answer. This alert is informational, not a failure.</p></div>",
+                                            "emailMessage/Importance": "Low"
+                                          },
+                                          "host": {
+                                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                            "connectionName": "shared_office365",
+                                            "operationId": "SendEmailV2"
+                                          },
+                                          "authentication": "@parameters('$authentication')",
+                                          "retryPolicy": {
+                                            "type": "exponential",
+                                            "count": 2,
+                                            "interval": "PT10S"
+                                          }
+                                        }
+                                      },
+                                      "Ignored_alert_done": {
+                                        "type": "Compose",
+                                        "runAfter": {
+                                          "Notify_ignored_mail": [
+                                            "Succeeded",
+                                            "Failed",
+                                            "Skipped",
+                                            "TimedOut"
+                                          ]
+                                        },
+                                        "inputs": "non-application mail alert best-effort"
+                                      }
+                                    }
                                   },
                                   "expression": {
                                     "and": [
                                       {
                                         "equals": [
-                                          "@length(coalesce(triggerOutputs()?['body/attachments'], json('[]')))",
+                                          "@length(coalesce(outputs('CurrentEmail')?['attachments'], json('[]')))",
                                           0
                                         ]
                                       },
@@ -1274,7 +1797,7 @@
                                     "and": [
                                       {
                                         "greater": [
-                                          "@length(triggerOutputs()?['body/attachments'])",
+                                          "@length(outputs('CurrentEmail')?['attachments'])",
                                           0
                                         ]
                                       },
@@ -1290,7 +1813,7 @@
                                     "Send_wrong_format": {
                                       "type": "Compose",
                                       "runAfter": {},
-                                      "inputs": "TEST-MODE: email suppressed (Send_wrong_format) - historical replay, no real send"
+                                      "inputs": "Applicant email disabled: suppressed Send_wrong_format; intake processing continues"
                                     }
                                   },
                                   "else": {
@@ -1313,7 +1836,7 @@
                           },
                           "ResumeNames": {
                             "runAfter": {
-                              "ResumeFiles": [
+                              "ResumeManifest": [
                                 "Succeeded"
                               ]
                             },
@@ -1324,14 +1847,39 @@
                             }
                           },
                           "Notify_failure": {
-                            "type": "Compose",
                             "runAfter": {
                               "HasResume": [
                                 "Failed",
                                 "TimedOut"
                               ]
                             },
-                            "inputs": "TEST-MODE: email suppressed (Notify_failure) - historical replay, no real send"
+                            "type": "OpenApiConnection",
+                            "inputs": {
+                              "parameters": {
+                                "emailMessage/To": "yashv@driverai.io",
+                                "emailMessage/Subject": "[Hiring Auto-Reply] A run needs attention (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a run did not complete.</strong></p><p>Something went wrong while handling an incoming email, so the applicant may not have received a reply and the candidate row or resume file may not have been saved.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>Open the flow run history for the exact step and error. The failed email is moved unread to Archive so it cannot block the Inbox queue.</p></div>",
+                                "emailMessage/Importance": "High"
+                              },
+                              "host": {
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                "connectionName": "shared_office365",
+                                "operationId": "SendEmailV2"
+                              },
+                              "authentication": "@parameters('$authentication')",
+                              "retryPolicy": {
+                                "type": "exponential",
+                                "count": 2,
+                                "interval": "PT10S"
+                              }
+                            },
+                            "runtimeConfiguration": {
+                              "retryPolicy": {
+                                "type": "exponential",
+                                "count": 2,
+                                "interval": "PT10S"
+                              }
+                            }
                           },
                           "HasAppRefGate": {
                             "type": "If",
@@ -1366,7 +1914,7 @@
                                     "drive": "b!MbaWiB4Pe0aZhiVbjfQPA7nxqxvdmdpFv4-je9qw216zpgA2LxTxRbzgz8soXGnn",
                                     "file": "/Master_Files/Sharepoint_Master_File.xlsx",
                                     "table": "HiringAgent_P1_Candidates",
-                                    "$filter": "@concat('Email eq ''', replace(toLower(trim(if(contains(triggerOutputs()?['body/from'],'<'),replace(last(split(triggerOutputs()?['body/from'],'<')),'>',''),triggerOutputs()?['body/from']))), '''', ''''''), '''')"
+                                    "$filter": "@if(and(greater(length(body('MatchAllowSender')), 0), not(equals(outputs('QuotedRef'), ''))), concat('Application ID eq ''', outputs('QuotedRef'), ''''), concat('Email eq ''', replace(toLower(trim(if(contains(outputs('CurrentEmail')?['from'],'<'),replace(last(split(outputs('CurrentEmail')?['from'],'<')),'>',''),outputs('CurrentEmail')?['from']))), '''', ''''''), ''''))"
                                   },
                                   "host": {
                                     "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
@@ -1380,7 +1928,14 @@
                                 "type": "If",
                                 "runAfter": {
                                   "Get_rows_ref": [
-                                    "Succeeded"
+                                    "Succeeded",
+                                    "Failed",
+                                    "Skipped"
+                                  ],
+                                  "Latest_ref": [
+                                    "Succeeded",
+                                    "Failed",
+                                    "Skipped"
                                   ]
                                 },
                                 "expression": {
@@ -1390,28 +1945,19 @@
                                   ]
                                 },
                                 "actions": {
-                                  "RefSrc": {
+                                  "AppRef_current": {
                                     "type": "Compose",
                                     "runAfter": {},
-                                    "inputs": "@{if(contains(toLower(coalesce(triggerOutputs()?['body/subject'],'')),'app-20'),coalesce(triggerOutputs()?['body/subject'],''),coalesce(triggerOutputs()?['body/body'],triggerOutputs()?['body/bodyPreview'],''))}"
-                                  },
-                                  "AppRef_from_subject": {
-                                    "type": "Compose",
-                                    "runAfter": {
-                                      "RefSrc": [
-                                        "Succeeded"
-                                      ]
-                                    },
-                                    "inputs": "@{if(greaterOrEquals(indexOf(toLower(outputs('RefSrc')),'app-20'),0),toUpper(substring(outputs('RefSrc'),indexOf(toLower(outputs('RefSrc')),'app-20'),min(22,sub(length(outputs('RefSrc')),indexOf(toLower(outputs('RefSrc')),'app-20'))))),coalesce(triggerOutputs()?['body/subject'],''))}"
+                                    "inputs": "@{first(body('Latest_ref'))?['Application ID']}"
                                   },
                                   "FileRef_from_subject": {
                                     "type": "Compose",
                                     "runAfter": {
-                                      "AppRef_from_subject": [
+                                      "AppRef_current": [
                                         "Succeeded"
                                       ]
                                     },
-                                    "inputs": "@{replace(outputs('AppRef_from_subject'), '/', '-')}"
+                                    "inputs": "@{replace(outputs('AppRef_current'), '/', '-')}"
                                   },
                                   "Has_resume_in_update": {
                                     "type": "If",
@@ -1432,7 +1978,7 @@
                                         "runAfter": {},
                                         "expression": {
                                           "less": [
-                                            "@int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'], '0'))",
+                                            "@int(coalesce(first(body('Latest_ref'))?['Application Updates'], '0'))",
                                             5
                                           ]
                                         },
@@ -1444,7 +1990,7 @@
                                               "parameters": {
                                                 "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
                                                 "table": "3600a6b3-142f-45f1-bce0-cfcb285c69e7",
-                                                "parameters/path": "@{concat('Candidate_Resumes', '/', formatDateTime(first(body('Get_rows_ref')?['value'])?['Received Date'],'yyyy'), '/', formatDateTime(first(body('Get_rows_ref')?['value'])?['Received Date'],'MMMM'))}"
+                                                "parameters/path": "@concat('Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))"
                                               },
                                               "host": {
                                                 "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
@@ -1460,9 +2006,12 @@
                                               "Ensure_update_resume_folder": [
                                                 "Succeeded",
                                                 "Failed"
+                                              ],
+                                              "Manifest_update": [
+                                                "Succeeded"
                                               ]
                                             },
-                                            "foreach": "@body('ResumeFiles')",
+                                            "foreach": "@body('StoredFiles_update')",
                                             "actions": {
                                               "Create_update_file": {
                                                 "type": "OpenApiConnection",
@@ -1475,9 +2024,54 @@
                                                   },
                                                   "parameters": {
                                                     "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
-                                                    "folderPath": "@{concat(outputs('CONFIG')['resumes_folder'], '/', formatDateTime(first(body('Get_rows_ref')?['value'])?['Received Date'],'yyyy'), '/', formatDateTime(first(body('Get_rows_ref')?['value'])?['Received Date'],'MMMM'))}",
-                                                    "name": "@{if(equals(length(trim(replace(replace(replace(replace(coalesce(first(body('Get_rows_ref')?['value'])?['Full Name'],''),'''',''),'-',''),'.',''),',',''))),0),'Candidate',if(equals(length(split(trim(replace(replace(replace(replace(coalesce(first(body('Get_rows_ref')?['value'])?['Full Name'],''),'''',''),'-',''),'.',''),',','')),' ')),1),first(split(trim(replace(replace(replace(replace(coalesce(first(body('Get_rows_ref')?['value'])?['Full Name'],''),'''',''),'-',''),'.',''),',','')),' ')),concat(first(split(trim(replace(replace(replace(replace(coalesce(first(body('Get_rows_ref')?['value'])?['Full Name'],''),'''',''),'-',''),'.',''),',','')),' ')),last(split(trim(replace(replace(replace(replace(coalesce(first(body('Get_rows_ref')?['value'])?['Full Name'],''),'''',''),'-',''),'.',''),',','')),' ')))))}_@{outputs('FileRef_from_subject')}.@{last(split(first(body('Get_rows_ref')?['value'])?['Original Filename'],'.'))}",
+                                                    "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
+                                                    "name": "@items('Save_update_resume')?['stored_name']",
                                                     "body": "@base64ToBinary(items('Save_update_resume')?['contentBytes'])"
+                                                  },
+                                                  "authentication": "@parameters('$authentication')"
+                                                }
+                                              },
+                                              "Capture_Create_update_file": {
+                                                "type": "Compose",
+                                                "inputs": {
+                                                  "Application ID": "@first(body('Latest_ref'))?['Application ID']",
+                                                  "Received Date": "@first(body('Latest_ref'))?['Received Date']",
+                                                  "Last Updated Date": "@formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy-MM-ddTHH:mm:ss')",
+                                                  "Application Updates": "@add(int(coalesce(first(body('Latest_ref'))?['Application Updates'],'0')),1)",
+                                                  "Email": "@toLower(trim(if(contains(outputs('CurrentEmail')?['from'],'<'),replace(last(split(outputs('CurrentEmail')?['from'],'<')),'>',''),outputs('CurrentEmail')?['from'])))",
+                                                  "Full Name": "@first(body('Latest_ref'))?['Full Name']",
+                                                  "Original Filename": "@join(body('ResumeNames'), ', ')",
+                                                  "Resume URL": "@concat('manifest:',string(body('Manifest_update')))",
+                                                  "Resume Folder Path": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
+                                                  "Mail Subject": "@coalesce(outputs('CurrentEmail')?['subject'],'')",
+                                                  "Mail Body": "@coalesce(outputs('CurrentEmail')?['bodyPreview'],'')",
+                                                  "Status": "New Email Received",
+                                                  "Has Resume": "Yes"
+                                                },
+                                                "runAfter": {
+                                                  "Create_update_file": [
+                                                    "Succeeded"
+                                                  ]
+                                                }
+                                              },
+                                              "Preserve_Create_update_file": {
+                                                "type": "OpenApiConnection",
+                                                "runAfter": {
+                                                  "Capture_Create_update_file": [
+                                                    "Succeeded"
+                                                  ]
+                                                },
+                                                "inputs": {
+                                                  "host": {
+                                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                                    "connectionName": "shared_sharepointonline",
+                                                    "operationId": "CreateFile"
+                                                  },
+                                                  "parameters": {
+                                                    "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
+                                                    "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
+                                                    "name": "@concat('intake_',items('Save_update_resume')?['stored_name'],'.json')",
+                                                    "body": "@string(outputs('Capture_Create_update_file'))"
                                                   },
                                                   "authentication": "@parameters('$authentication')"
                                                 }
@@ -1488,14 +2082,12 @@
                                             "type": "If",
                                             "runAfter": {
                                               "Save_update_resume": [
-                                                "Succeeded",
-                                                "Failed",
-                                                "Skipped"
+                                                "Succeeded"
                                               ]
                                             },
                                             "expression": {
                                               "less": [
-                                                "@int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'], '0'))",
+                                                "@int(coalesce(first(body('Latest_ref'))?['Application Updates'], '0'))",
                                                 3
                                               ]
                                             },
@@ -1503,7 +2095,7 @@
                                               "Send_update_ack": {
                                                 "type": "Compose",
                                                 "runAfter": {},
-                                                "inputs": "TEST-MODE: email suppressed (Send_update_ack) - historical replay, no real send"
+                                                "inputs": "Applicant email disabled: suppressed Send_update_ack; intake processing continues"
                                               },
                                               "Patch_update_attempts": {
                                                 "runAfter": {
@@ -1521,11 +2113,11 @@
                                                     "file": "/Master_Files/Sharepoint_Master_File.xlsx",
                                                     "table": "HiringAgent_P1_Candidates",
                                                     "idColumn": "Application ID",
-                                                    "id": "@{first(body('Get_rows_ref')?['value'])?['Application ID']}",
+                                                    "id": "@{first(body('Latest_ref'))?['Application ID']}",
                                                     "item": {
-                                                      "Application Updates": "@add(int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'], '0')), 1)",
-                                                      "Mail Sent": "@{concat('TEST-MODE (suppressed) ', formatDateTime(utcNow(),'yyyy-MM-dd HH:mm'))}",
-                                                      "Last Updated Date": "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}",
+                                                      "Application Updates": "@add(int(coalesce(first(body('Latest_ref'))?['Application Updates'], '0')), 1)",
+                                                      "Mail Sent": "@{concat('Suppressed (applicant email disabled) ', formatDateTime(addHours(utcNow(),-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-dd HH:mm'))}",
+                                                      "Last Updated Date": "@{if(greater(ticks(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss')),ticks(coalesce(first(body('Latest_ref'))?['Last Updated Date'], first(body('Latest_ref'))?['Received Date'], '2000-01-01T00:00:00'))),formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-ddTHH:mm:ss'),coalesce(first(body('Latest_ref'))?['Last Updated Date'], first(body('Latest_ref'))?['Received Date']))}",
                                                       "Status": "New Email Received"
                                                     }
                                                   },
@@ -1543,7 +2135,8 @@
                                                   "Move_to_processed_update": [
                                                     "Succeeded",
                                                     "Failed",
-                                                    "Skipped"
+                                                    "Skipped",
+                                                    "TimedOut"
                                                   ]
                                                 },
                                                 "inputs": {
@@ -1560,7 +2153,7 @@
                                                 },
                                                 "inputs": {
                                                   "parameters": {
-                                                    "messageId": "@triggerOutputs()?['body/id']",
+                                                    "messageId": "@outputs('CurrentEmail')?['id']",
                                                     "mailboxAddress": "apply@driverai.io",
                                                     "body/isRead": true
                                                   },
@@ -1577,12 +2170,16 @@
                                                 "runAfter": {
                                                   "Mark_as_read_update": [
                                                     "Succeeded",
-                                                    "Failed"
+                                                    "Failed",
+                                                    "TimedOut"
                                                   ]
                                                 },
                                                 "inputs": {
+                                                  "retryPolicy": {
+                                                    "type": "none"
+                                                  },
                                                   "parameters": {
-                                                    "messageId": "@triggerOutputs()?['body/id']",
+                                                    "messageId": "@outputs('CurrentEmail')?['id']",
                                                     "mailboxAddress": "apply@driverai.io",
                                                     "folderPath": "Archive"
                                                   },
@@ -1592,6 +2189,41 @@
                                                     "operationId": "MoveV2"
                                                   },
                                                   "authentication": "@parameters('$authentication')"
+                                                }
+                                              },
+                                              "Notify_update_attempts_failed": {
+                                                "type": "OpenApiConnection",
+                                                "runAfter": {
+                                                  "Patch_update_attempts": [
+                                                    "Failed",
+                                                    "TimedOut"
+                                                  ]
+                                                },
+                                                "runtimeConfiguration": {
+                                                  "retryPolicy": {
+                                                    "type": "exponential",
+                                                    "count": 2,
+                                                    "interval": "PT10S"
+                                                  }
+                                                },
+                                                "inputs": {
+                                                  "parameters": {
+                                                    "emailMessage/To": "yashv@driverai.io",
+                                                    "emailMessage/Subject": "[Hiring Auto-Reply] Candidate row NOT updated - resume update (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p><p>The incoming email was handled and filed normally, but <strong>Patch_update_attempts</strong> (resume update) did not commit. The Application Updates counter was NOT incremented, and the row was NOT re-queued for Phase 2 scoring.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run itself reports Succeeded because inbox cleanup completed as designed - <strong>this alert is the only signal</strong>. Open run history and inspect <strong>Patch_update_attempts</strong>, then correct the row by hand.</p></div>",
+                                                    "emailMessage/Importance": "High"
+                                                  },
+                                                  "host": {
+                                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                    "connectionName": "shared_office365",
+                                                    "operationId": "SendEmailV2"
+                                                  },
+                                                  "authentication": "@parameters('$authentication')",
+                                                  "retryPolicy": {
+                                                    "type": "exponential",
+                                                    "count": 2,
+                                                    "interval": "PT10S"
+                                                  }
                                                 }
                                               }
                                             },
@@ -1607,10 +2239,10 @@
                                                       "file": "/Master_Files/Sharepoint_Master_File.xlsx",
                                                       "table": "HiringAgent_P1_Candidates",
                                                       "idColumn": "Application ID",
-                                                      "id": "@{first(body('Get_rows_ref')?['value'])?['Application ID']}",
+                                                      "id": "@{first(body('Latest_ref'))?['Application ID']}",
                                                       "item": {
-                                                        "Application Updates": "@add(int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'], '0')), 1)",
-                                                        "Last Updated Date": "@{formatDateTime(triggerOutputs()?['body/receivedDateTime'],'yyyy-MM-ddTHH:mm:ss')}",
+                                                        "Application Updates": "@add(int(coalesce(first(body('Latest_ref'))?['Application Updates'], '0')), 1)",
+                                                        "Last Updated Date": "@{if(greater(ticks(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss')),ticks(coalesce(first(body('Latest_ref'))?['Last Updated Date'], first(body('Latest_ref'))?['Received Date'], '2000-01-01T00:00:00'))),formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-ddTHH:mm:ss'),coalesce(first(body('Latest_ref'))?['Last Updated Date'], first(body('Latest_ref'))?['Received Date']))}",
                                                         "Status": "New Email Received"
                                                       }
                                                     },
@@ -1628,7 +2260,8 @@
                                                     "Move_to_processed_update_noreply": [
                                                       "Succeeded",
                                                       "Failed",
-                                                      "Skipped"
+                                                      "Skipped",
+                                                      "TimedOut"
                                                     ]
                                                   },
                                                   "inputs": {
@@ -1645,7 +2278,7 @@
                                                   },
                                                   "inputs": {
                                                     "parameters": {
-                                                      "messageId": "@triggerOutputs()?['body/id']",
+                                                      "messageId": "@outputs('CurrentEmail')?['id']",
                                                       "mailboxAddress": "apply@driverai.io",
                                                       "body/isRead": true
                                                     },
@@ -1662,12 +2295,16 @@
                                                   "runAfter": {
                                                     "Mark_as_read_update_noreply": [
                                                       "Succeeded",
-                                                      "Failed"
+                                                      "Failed",
+                                                      "TimedOut"
                                                     ]
                                                   },
                                                   "inputs": {
+                                                    "retryPolicy": {
+                                                      "type": "none"
+                                                    },
                                                     "parameters": {
-                                                      "messageId": "@triggerOutputs()?['body/id']",
+                                                      "messageId": "@outputs('CurrentEmail')?['id']",
                                                       "mailboxAddress": "apply@driverai.io",
                                                       "folderPath": "Archive"
                                                     },
@@ -1678,8 +2315,157 @@
                                                     },
                                                     "authentication": "@parameters('$authentication')"
                                                   }
+                                                },
+                                                "Notify_update_attempts_noreply_failed": {
+                                                  "type": "OpenApiConnection",
+                                                  "runAfter": {
+                                                    "Patch_update_attempts_noreply": [
+                                                      "Failed",
+                                                      "TimedOut"
+                                                    ]
+                                                  },
+                                                  "runtimeConfiguration": {
+                                                    "retryPolicy": {
+                                                      "type": "exponential",
+                                                      "count": 2,
+                                                      "interval": "PT10S"
+                                                    }
+                                                  },
+                                                  "inputs": {
+                                                    "parameters": {
+                                                      "emailMessage/To": "yashv@driverai.io",
+                                                      "emailMessage/Subject": "[Hiring Auto-Reply] Candidate row NOT updated - resume update (past reply cap) (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                      "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p><p>The incoming email was handled and filed normally, but <strong>Patch_update_attempts_noreply</strong> (resume update (past reply cap)) did not commit. The Application Updates counter was NOT incremented, and the row was NOT re-queued for Phase 2 scoring.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run itself reports Succeeded because inbox cleanup completed as designed - <strong>this alert is the only signal</strong>. Open run history and inspect <strong>Patch_update_attempts_noreply</strong>, then correct the row by hand.</p></div>",
+                                                      "emailMessage/Importance": "High"
+                                                    },
+                                                    "host": {
+                                                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                      "connectionName": "shared_office365",
+                                                      "operationId": "SendEmailV2"
+                                                    },
+                                                    "authentication": "@parameters('$authentication')",
+                                                    "retryPolicy": {
+                                                      "type": "exponential",
+                                                      "count": 2,
+                                                      "interval": "PT10S"
+                                                    }
+                                                  }
                                                 }
                                               }
+                                            }
+                                          },
+                                          "StoredFiles_update": {
+                                            "type": "Select",
+                                            "runAfter": {},
+                                            "inputs": {
+                                              "from": "@body('ResumeFiles')",
+                                              "select": {
+                                                "name": "@item()?['name']",
+                                                "contentBytes": "@item()?['contentBytes']",
+                                                "stored_name": "@concat(if(greater(length(if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_'))),60),substring(if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0,60),if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_'))),'_',substring(coalesce(first(body('Latest_ref'))?['Application ID'],outputs('AppRef')),sub(length(coalesce(first(body('Latest_ref'))?['Application ID'],outputs('AppRef'))),4),4),if(greater(length(body('ResumeFiles')),1),concat('_',toUpper(substring(concat('000000',replace(replace(replace(coalesce(item()?['id'],''),'-',''),'_',''),'=','')),sub(length(concat('000000',replace(replace(replace(coalesce(item()?['id'],''),'-',''),'_',''),'=',''))),4),4))),''),'.',toLower(last(split(item()?['name'],'.'))))"
+                                              }
+                                            }
+                                          },
+                                          "Manifest_update": {
+                                            "type": "Select",
+                                            "runAfter": {
+                                              "StoredFiles_update": [
+                                                "Succeeded"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "from": "@body('StoredFiles_update')",
+                                              "select": {
+                                                "name": "@item()?['stored_name']",
+                                                "original_name": "@item()?['name']",
+                                                "folder": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))"
+                                              }
+                                            }
+                                          },
+                                          "Notify_create_update_file_failed": {
+                                            "type": "OpenApiConnection",
+                                            "runAfter": {
+                                              "Save_update_resume": [
+                                                "Failed",
+                                                "TimedOut"
+                                              ]
+                                            },
+                                            "runtimeConfiguration": {
+                                              "retryPolicy": {
+                                                "type": "exponential",
+                                                "count": 2,
+                                                "interval": "PT10S"
+                                              }
+                                            },
+                                            "inputs": {
+                                              "parameters": {
+                                                "emailMessage/To": "yashv@driverai.io",
+                                                "emailMessage/Subject": "[Hiring Auto-Reply] APPLICANT LOST - a ref-quoted update's NEW resume was never saved (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Create_update_file</strong> failed, so a ref-quoted update's NEW resume was never saved.</p><p>The applicant quoted their Application ID, so the row was patched as an update - <strong>Application Updates was incremented and Status reset to 'New Email Received'</strong> - but the file on disk is still the PREVIOUS version. Phase 2 will re-score the stale document, and the applicant has already been told their update was received.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The resume was <strong>not saved</strong>, so nothing downstream was allowed to run: no candidate row was created or re-queued, and <strong>no acknowledgment was sent</strong>. The message has been moved to Archive and left <strong>unread</strong>, which is this system's marker for \"failed, needs a replay\".</p><p><strong>To recover:</strong> find it in Archive by the From and Received values above and move it back to the Inbox, still unread. The next poll re-runs the whole intake for it, including the applicant reply if applicant mail is on.</p></div>",
+                                                "emailMessage/Importance": "High"
+                                              },
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                "connectionName": "shared_office365",
+                                                "operationId": "SendEmailV2"
+                                              },
+                                              "authentication": "@parameters('$authentication')",
+                                              "retryPolicy": {
+                                                "type": "exponential",
+                                                "count": 2,
+                                                "interval": "PT10S"
+                                              }
+                                            }
+                                          },
+                                          "Move_update_save_failed_unread": {
+                                            "type": "OpenApiConnection",
+                                            "runAfter": {
+                                              "Save_update_resume": [
+                                                "Failed",
+                                                "TimedOut",
+                                                "Skipped"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "retryPolicy": {
+                                                "type": "none"
+                                              },
+                                              "parameters": {
+                                                "messageId": "@outputs('CurrentEmail')?['id']",
+                                                "mailboxAddress": "apply@driverai.io",
+                                                "folderPath": "Archive"
+                                              },
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                "connectionName": "shared_office365",
+                                                "operationId": "MoveV2"
+                                              },
+                                              "authentication": "@parameters('$authentication')"
+                                            },
+                                            "runtimeConfiguration": {
+                                              "retryPolicy": {
+                                                "type": "none"
+                                              }
+                                            }
+                                          },
+                                          "Terminate_update_save_failed": {
+                                            "type": "Terminate",
+                                            "runAfter": {
+                                              "Move_update_save_failed_unread": [
+                                                "Succeeded",
+                                                "Failed",
+                                                "TimedOut",
+                                                "Skipped"
+                                              ],
+                                              "Notify_create_update_file_failed": [
+                                                "Succeeded",
+                                                "Failed",
+                                                "TimedOut",
+                                                "Skipped"
+                                              ]
+                                            },
+                                            "inputs": {
+                                              "runStatus": "Succeeded"
                                             }
                                           }
                                         },
@@ -1691,7 +2477,8 @@
                                                 "Move_to_processed_update_cap": [
                                                   "Succeeded",
                                                   "Failed",
-                                                  "Skipped"
+                                                  "Skipped",
+                                                  "TimedOut"
                                                 ]
                                               },
                                               "inputs": {
@@ -1703,7 +2490,7 @@
                                               "runAfter": {},
                                               "inputs": {
                                                 "parameters": {
-                                                  "messageId": "@triggerOutputs()?['body/id']",
+                                                  "messageId": "@outputs('CurrentEmail')?['id']",
                                                   "mailboxAddress": "apply@driverai.io",
                                                   "body/isRead": true
                                                 },
@@ -1720,12 +2507,16 @@
                                               "runAfter": {
                                                 "Mark_as_read_update_cap": [
                                                   "Succeeded",
-                                                  "Failed"
+                                                  "Failed",
+                                                  "TimedOut"
                                                 ]
                                               },
                                               "inputs": {
+                                                "retryPolicy": {
+                                                  "type": "none"
+                                                },
                                                 "parameters": {
-                                                  "messageId": "@triggerOutputs()?['body/id']",
+                                                  "messageId": "@outputs('CurrentEmail')?['id']",
                                                   "mailboxAddress": "apply@driverai.io",
                                                   "folderPath": "Archive"
                                                 },
@@ -1748,7 +2539,7 @@
                                           "runAfter": {},
                                           "expression": {
                                             "less": [
-                                              "@int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'], '0'))",
+                                              "@int(coalesce(first(body('Latest_ref'))?['Application Updates'], '0'))",
                                               5
                                             ]
                                           },
@@ -1758,7 +2549,7 @@
                                               "runAfter": {},
                                               "expression": {
                                                 "less": [
-                                                  "@int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'], '0'))",
+                                                  "@int(coalesce(first(body('Latest_ref'))?['Application Updates'], '0'))",
                                                   3
                                                 ]
                                               },
@@ -1766,7 +2557,7 @@
                                                 "Send_noted_reply": {
                                                   "type": "Compose",
                                                   "runAfter": {},
-                                                  "inputs": "TEST-MODE: email suppressed (Send_noted_reply) - historical replay, no real send"
+                                                  "inputs": "Applicant email disabled: suppressed Send_noted_reply; intake processing continues"
                                                 },
                                                 "Patch_followup_attempts": {
                                                   "runAfter": {
@@ -1784,10 +2575,11 @@
                                                       "file": "/Master_Files/Sharepoint_Master_File.xlsx",
                                                       "table": "HiringAgent_P1_Candidates",
                                                       "idColumn": "Application ID",
-                                                      "id": "@{first(body('Get_rows_ref')?['value'])?['Application ID']}",
+                                                      "id": "@{first(body('Latest_ref'))?['Application ID']}",
                                                       "item": {
-                                                        "Application Updates": "@add(int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'], '0')), 1)",
-                                                        "Mail Sent": "@{concat('TEST-MODE (suppressed) ', formatDateTime(utcNow(),'yyyy-MM-dd HH:mm'))}"
+                                                        "Application Updates": "@add(int(coalesce(first(body('Latest_ref'))?['Application Updates'], '0')), 1)",
+                                                        "Mail Sent": "@{concat('Suppressed (applicant email disabled) ', formatDateTime(addHours(utcNow(),-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-dd HH:mm'))}",
+                                                        "Last Updated Date": "@{if(greater(ticks(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss')),ticks(coalesce(first(body('Latest_ref'))?['Last Updated Date'], first(body('Latest_ref'))?['Received Date'], '2000-01-01T00:00:00'))),formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-ddTHH:mm:ss'),coalesce(first(body('Latest_ref'))?['Last Updated Date'], first(body('Latest_ref'))?['Received Date']))}"
                                                       }
                                                     },
                                                     "host": {
@@ -1804,7 +2596,8 @@
                                                     "Move_to_processed_followup": [
                                                       "Succeeded",
                                                       "Failed",
-                                                      "Skipped"
+                                                      "Skipped",
+                                                      "TimedOut"
                                                     ]
                                                   },
                                                   "inputs": {
@@ -1821,7 +2614,7 @@
                                                   },
                                                   "inputs": {
                                                     "parameters": {
-                                                      "messageId": "@triggerOutputs()?['body/id']",
+                                                      "messageId": "@outputs('CurrentEmail')?['id']",
                                                       "mailboxAddress": "apply@driverai.io",
                                                       "body/isRead": true
                                                     },
@@ -1838,12 +2631,16 @@
                                                   "runAfter": {
                                                     "Mark_as_read_followup": [
                                                       "Succeeded",
-                                                      "Failed"
+                                                      "Failed",
+                                                      "TimedOut"
                                                     ]
                                                   },
                                                   "inputs": {
+                                                    "retryPolicy": {
+                                                      "type": "none"
+                                                    },
                                                     "parameters": {
-                                                      "messageId": "@triggerOutputs()?['body/id']",
+                                                      "messageId": "@outputs('CurrentEmail')?['id']",
                                                       "mailboxAddress": "apply@driverai.io",
                                                       "folderPath": "Archive"
                                                     },
@@ -1853,6 +2650,41 @@
                                                       "operationId": "MoveV2"
                                                     },
                                                     "authentication": "@parameters('$authentication')"
+                                                  }
+                                                },
+                                                "Notify_followup_attempts_failed": {
+                                                  "type": "OpenApiConnection",
+                                                  "runAfter": {
+                                                    "Patch_followup_attempts": [
+                                                      "Failed",
+                                                      "TimedOut"
+                                                    ]
+                                                  },
+                                                  "runtimeConfiguration": {
+                                                    "retryPolicy": {
+                                                      "type": "exponential",
+                                                      "count": 2,
+                                                      "interval": "PT10S"
+                                                    }
+                                                  },
+                                                  "inputs": {
+                                                    "parameters": {
+                                                      "emailMessage/To": "yashv@driverai.io",
+                                                      "emailMessage/Subject": "[Hiring Auto-Reply] Candidate row NOT updated - follow-up reply (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                      "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p><p>The incoming email was handled and filed normally, but <strong>Patch_followup_attempts</strong> (follow-up reply) did not commit. The Application Updates counter was NOT incremented.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run itself reports Succeeded because inbox cleanup completed as designed - <strong>this alert is the only signal</strong>. Open run history and inspect <strong>Patch_followup_attempts</strong>, then correct the row by hand.</p></div>",
+                                                      "emailMessage/Importance": "High"
+                                                    },
+                                                    "host": {
+                                                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                      "connectionName": "shared_office365",
+                                                      "operationId": "SendEmailV2"
+                                                    },
+                                                    "authentication": "@parameters('$authentication')",
+                                                    "retryPolicy": {
+                                                      "type": "exponential",
+                                                      "count": 2,
+                                                      "interval": "PT10S"
+                                                    }
                                                   }
                                                 }
                                               },
@@ -1868,9 +2700,10 @@
                                                         "file": "/Master_Files/Sharepoint_Master_File.xlsx",
                                                         "table": "HiringAgent_P1_Candidates",
                                                         "idColumn": "Application ID",
-                                                        "id": "@{first(body('Get_rows_ref')?['value'])?['Application ID']}",
+                                                        "id": "@{first(body('Latest_ref'))?['Application ID']}",
                                                         "item": {
-                                                          "Application Updates": "@add(int(coalesce(first(body('Get_rows_ref')?['value'])?['Application Updates'], '0')), 1)"
+                                                          "Application Updates": "@add(int(coalesce(first(body('Latest_ref'))?['Application Updates'], '0')), 1)",
+                                                          "Last Updated Date": "@{if(greater(ticks(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss')),ticks(coalesce(first(body('Latest_ref'))?['Last Updated Date'], first(body('Latest_ref'))?['Received Date'], '2000-01-01T00:00:00'))),formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7,'yyyy-MM-ddTHH:mm:ss'),'yyyy-MM-ddTHH:mm:ss'),coalesce(first(body('Latest_ref'))?['Last Updated Date'], first(body('Latest_ref'))?['Received Date']))}"
                                                         }
                                                       },
                                                       "host": {
@@ -1887,7 +2720,8 @@
                                                       "Move_to_processed_followup_noreply": [
                                                         "Succeeded",
                                                         "Failed",
-                                                        "Skipped"
+                                                        "Skipped",
+                                                        "TimedOut"
                                                       ]
                                                     },
                                                     "inputs": {
@@ -1904,7 +2738,7 @@
                                                     },
                                                     "inputs": {
                                                       "parameters": {
-                                                        "messageId": "@triggerOutputs()?['body/id']",
+                                                        "messageId": "@outputs('CurrentEmail')?['id']",
                                                         "mailboxAddress": "apply@driverai.io",
                                                         "body/isRead": true
                                                       },
@@ -1921,12 +2755,16 @@
                                                     "runAfter": {
                                                       "Mark_as_read_followup_noreply": [
                                                         "Succeeded",
-                                                        "Failed"
+                                                        "Failed",
+                                                        "TimedOut"
                                                       ]
                                                     },
                                                     "inputs": {
+                                                      "retryPolicy": {
+                                                        "type": "none"
+                                                      },
                                                       "parameters": {
-                                                        "messageId": "@triggerOutputs()?['body/id']",
+                                                        "messageId": "@outputs('CurrentEmail')?['id']",
                                                         "mailboxAddress": "apply@driverai.io",
                                                         "folderPath": "Archive"
                                                       },
@@ -1936,6 +2774,41 @@
                                                         "operationId": "MoveV2"
                                                       },
                                                       "authentication": "@parameters('$authentication')"
+                                                    }
+                                                  },
+                                                  "Notify_followup_attempts_noreply_failed": {
+                                                    "type": "OpenApiConnection",
+                                                    "runAfter": {
+                                                      "Patch_followup_attempts_noreply": [
+                                                        "Failed",
+                                                        "TimedOut"
+                                                      ]
+                                                    },
+                                                    "runtimeConfiguration": {
+                                                      "retryPolicy": {
+                                                        "type": "exponential",
+                                                        "count": 2,
+                                                        "interval": "PT10S"
+                                                      }
+                                                    },
+                                                    "inputs": {
+                                                      "parameters": {
+                                                        "emailMessage/To": "yashv@driverai.io",
+                                                        "emailMessage/Subject": "[Hiring Auto-Reply] Candidate row NOT updated - follow-up reply (past reply cap) (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p><p>The incoming email was handled and filed normally, but <strong>Patch_followup_attempts_noreply</strong> (follow-up reply (past reply cap)) did not commit. The Application Updates counter was NOT incremented.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run itself reports Succeeded because inbox cleanup completed as designed - <strong>this alert is the only signal</strong>. Open run history and inspect <strong>Patch_followup_attempts_noreply</strong>, then correct the row by hand.</p></div>",
+                                                        "emailMessage/Importance": "High"
+                                                      },
+                                                      "host": {
+                                                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                        "connectionName": "shared_office365",
+                                                        "operationId": "SendEmailV2"
+                                                      },
+                                                      "authentication": "@parameters('$authentication')",
+                                                      "retryPolicy": {
+                                                        "type": "exponential",
+                                                        "count": 2,
+                                                        "interval": "PT10S"
+                                                      }
                                                     }
                                                   }
                                                 }
@@ -1950,7 +2823,8 @@
                                                   "Move_to_processed_followup_cap": [
                                                     "Succeeded",
                                                     "Failed",
-                                                    "Skipped"
+                                                    "Skipped",
+                                                    "TimedOut"
                                                   ]
                                                 },
                                                 "inputs": {
@@ -1962,7 +2836,7 @@
                                                 "runAfter": {},
                                                 "inputs": {
                                                   "parameters": {
-                                                    "messageId": "@triggerOutputs()?['body/id']",
+                                                    "messageId": "@outputs('CurrentEmail')?['id']",
                                                     "mailboxAddress": "apply@driverai.io",
                                                     "body/isRead": true
                                                   },
@@ -1979,12 +2853,16 @@
                                                 "runAfter": {
                                                   "Mark_as_read_followup_cap": [
                                                     "Succeeded",
-                                                    "Failed"
+                                                    "Failed",
+                                                    "TimedOut"
                                                   ]
                                                 },
                                                 "inputs": {
+                                                  "retryPolicy": {
+                                                    "type": "none"
+                                                  },
                                                   "parameters": {
-                                                    "messageId": "@triggerOutputs()?['body/id']",
+                                                    "messageId": "@outputs('CurrentEmail')?['id']",
                                                     "mailboxAddress": "apply@driverai.io",
                                                     "folderPath": "Archive"
                                                   },
@@ -2006,6 +2884,30 @@
                                 "else": {
                                   "actions": {}
                                 }
+                              },
+                              "Ref_ticks": {
+                                "type": "Select",
+                                "runAfter": {
+                                  "Get_rows_ref": [
+                                    "Succeeded"
+                                  ]
+                                },
+                                "inputs": {
+                                  "from": "@coalesce(outputs('Get_rows_ref')?['body/value'], json('[]'))",
+                                  "select": "@ticks(coalesce(item()?['Received Date'], '2000-01-01T00:00:00Z'))"
+                                }
+                              },
+                              "Latest_ref": {
+                                "type": "Query",
+                                "runAfter": {
+                                  "Ref_ticks": [
+                                    "Succeeded"
+                                  ]
+                                },
+                                "inputs": {
+                                  "from": "@coalesce(outputs('Get_rows_ref')?['body/value'], json('[]'))",
+                                  "where": "@equals(ticks(coalesce(item()?['Received Date'], '2000-01-01T00:00:00Z')), max(union(body('Ref_ticks'), json('[0]'))))"
+                                }
                               }
                             },
                             "else": {
@@ -2021,6 +2923,67 @@
                             "type": "Compose",
                             "inputs": "@{replace(outputs('AppRef'), '/', '-')}"
                           },
+                          "AppRefSeed": {
+                            "runAfter": {},
+                            "type": "Compose",
+                            "inputs": "@{concat('000000', replace(replace(replace(coalesce(outputs('CurrentEmail')?['id'],''),'-',''),'_',''),'=',''))}"
+                          },
+                          "ResumeFilesAll": {
+                            "type": "Query",
+                            "runAfter": {
+                              "FileRef": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "from": "@coalesce(outputs('CurrentEmail')?['attachments'], json('[]'))",
+                              "where": "@and(or(endsWith(toLower(item()?['name']), '.pdf'), endsWith(toLower(item()?['name']), '.docx')), not(empty(item()?['contentBytes'])))"
+                            }
+                          },
+                          "ResumeFilesKept": {
+                            "type": "Query",
+                            "runAfter": {
+                              "ResumeFilesAll": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "from": "@body('ResumeFilesAll')",
+                              "where": "@not(or(contains(toLower(item()?['name']), 'portfolio'), or(contains(toLower(item()?['name']), 'cover letter'), or(contains(toLower(item()?['name']), 'coverletter'), or(contains(toLower(item()?['name']), 'cover_letter'), or(contains(toLower(item()?['name']), '-cl.'), or(contains(toLower(item()?['name']), '_cl.'), or(contains(toLower(item()?['name']), 'cl.'), or(contains(toLower(item()?['name']), 'transcript'), contains(toLower(item()?['name']), 'certificate'))))))))))"
+                            }
+                          },
+                          "StoredResumeFiles": {
+                            "type": "Select",
+                            "runAfter": {
+                              "ResumeFiles": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "from": "@body('ResumeFiles')",
+                              "select": {
+                                "name": "@item()?['name']",
+                                "contentBytes": "@item()?['contentBytes']",
+                                "stored_name": "@concat(if(greater(length(if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_'))),60),substring(if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0,60),if(equals(length(replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_')),0),'resume',replace(trim(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substring(item()?['name'],0,sub(length(item()?['name']),add(length(last(split(item()?['name'],'.'))),1))),'\"',''),'*',''),':',''),'<',''),'>',''),'?',''),'/',''),'\\',''),'|',''),'#',''),'%',''),',',''),'''','')),' ','_'))),'_',substring(outputs('AppRef'),sub(length(outputs('AppRef')),4),4),if(greater(length(body('ResumeFiles')),1),concat('_',toUpper(substring(concat('000000',replace(replace(replace(coalesce(item()?['id'],''),'-',''),'_',''),'=','')),sub(length(concat('000000',replace(replace(replace(coalesce(item()?['id'],''),'-',''),'_',''),'=',''))),4),4))),''),'.',toLower(last(split(item()?['name'],'.'))))"
+                              }
+                            }
+                          },
+                          "ResumeManifest": {
+                            "type": "Select",
+                            "runAfter": {
+                              "StoredResumeFiles": [
+                                "Succeeded"
+                              ]
+                            },
+                            "inputs": {
+                              "from": "@body('StoredResumeFiles')",
+                              "select": {
+                                "name": "@item()?['stored_name']",
+                                "original_name": "@item()?['name']",
+                                "folder": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))"
+                              }
+                            }
+                          },
                           "Mark_as_read": {
                             "type": "OpenApiConnection",
                             "runAfter": {
@@ -2030,7 +2993,7 @@
                             },
                             "inputs": {
                               "parameters": {
-                                "messageId": "@triggerOutputs()?['body/id']",
+                                "messageId": "@outputs('CurrentEmail')?['id']",
                                 "mailboxAddress": "apply@driverai.io",
                                 "body/isRead": true
                               },
@@ -2047,12 +3010,16 @@
                             "runAfter": {
                               "Mark_as_read": [
                                 "Succeeded",
-                                "Failed"
+                                "Failed",
+                                "TimedOut"
                               ]
                             },
                             "inputs": {
+                              "retryPolicy": {
+                                "type": "none"
+                              },
                               "parameters": {
-                                "messageId": "@triggerOutputs()?['body/id']",
+                                "messageId": "@outputs('CurrentEmail')?['id']",
                                 "mailboxAddress": "apply@driverai.io",
                                 "folderPath": "Archive"
                               },
@@ -2063,31 +3030,89 @@
                               },
                               "authentication": "@parameters('$authentication')"
                             }
+                          },
+                          "Finalize_processed_cleanup": {
+                            "type": "Compose",
+                            "runAfter": {
+                              "Move_to_processed": [
+                                "Succeeded",
+                                "Failed",
+                                "TimedOut"
+                              ]
+                            },
+                            "inputs": "Processed-message terminal cleanup handled. Candidate processing is complete; inspect Move_to_processed in run history if Outlook rejected the cleanup."
+                          },
+                          "Move_failed_to_archive_unread": {
+                            "type": "OpenApiConnection",
+                            "runAfter": {
+                              "Notify_failure": [
+                                "Succeeded",
+                                "Failed",
+                                "TimedOut"
+                              ]
+                            },
+                            "inputs": {
+                              "retryPolicy": {
+                                "type": "none"
+                              },
+                              "parameters": {
+                                "messageId": "@outputs('CurrentEmail')?['id']",
+                                "mailboxAddress": "apply@driverai.io",
+                                "folderPath": "Archive"
+                              },
+                              "host": {
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                "connectionName": "shared_office365",
+                                "operationId": "MoveV2"
+                              },
+                              "authentication": "@parameters('$authentication')"
+                            }
+                          },
+                          "Finalize_failed_cleanup": {
+                            "type": "Compose",
+                            "runAfter": {
+                              "Move_failed_to_archive_unread": [
+                                "Succeeded",
+                                "Failed",
+                                "TimedOut"
+                              ]
+                            },
+                            "inputs": "Failed-message terminal cleanup handled. The admin alert is authoritative; inspect the failed move if the message remains in Inbox."
                           }
                         }
                       },
                       "expression": {
-                        "or": [
+                        "and": [
                           {
-                            "greater": [
-                              "@length(body('MatchSpam'))",
-                              0
-                            ]
-                          },
-                          {
-                            "and": [
+                            "or": [
                               {
                                 "greater": [
-                                  "@length(body('MatchLinkShortener'))",
+                                  "@length(body('MatchSpam'))",
                                   0
                                 ]
                               },
                               {
-                                "equals": [
-                                  "@outputs('HasValidResumeEarly')",
-                                  false
+                                "and": [
+                                  {
+                                    "greater": [
+                                      "@length(body('MatchLinkShortener'))",
+                                      0
+                                    ]
+                                  },
+                                  {
+                                    "equals": [
+                                      "@outputs('HasValidResumeEarly')",
+                                      false
+                                    ]
+                                  }
                                 ]
                               }
+                            ]
+                          },
+                          {
+                            "equals": [
+                              "@length(body('MatchAllowSender'))",
+                              0
                             ]
                           }
                         ]
@@ -2106,7 +3131,7 @@
                       "runAfter": {},
                       "type": "Query",
                       "inputs": {
-                        "from": "@coalesce(triggerOutputs()?['body/attachments'], json('[]'))",
+                        "from": "@coalesce(outputs('CurrentEmail')?['attachments'], json('[]'))",
                         "where": "@and(or(endsWith(toLower(item()?['name']), '.pdf'), endsWith(toLower(item()?['name']), '.docx')), not(empty(item()?['contentBytes'])))"
                       }
                     },
@@ -2128,6 +3153,12 @@
                         "@length(body('MatchSubject'))",
                         0
                       ]
+                    },
+                    {
+                      "equals": [
+                        "@length(body('MatchAllowSender'))",
+                        0
+                      ]
                     }
                   ]
                 },
@@ -2140,6 +3171,12 @@
               {
                 "greater": [
                   "@length(body('MatchSender'))",
+                  0
+                ]
+              },
+              {
+                "equals": [
+                  "@length(body('MatchAllowSender'))",
                   0
                 ]
               }
@@ -2155,7 +3192,7 @@
           },
           "type": "Select",
           "inputs": {
-            "from": "@coalesce(triggerOutputs()?['body/attachments'], json('[]'))",
+            "from": "@coalesce(outputs('CurrentEmail')?['attachments'], json('[]'))",
             "select": "@item()?['name']"
           }
         },
@@ -2180,6 +3217,76 @@
             "s.id/",
             "urlzs.com/"
           ]
+        },
+        "AllowSenders": {
+          "runAfter": {
+            "LinkShortenerPhrases": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": [
+            "yashv@driverai.io",
+            "tracys@driverai.io",
+            "akhilb@driverai.io",
+            "samruddhac@driverai.io"
+          ]
+        },
+        "MatchAllowSender": {
+          "runAfter": {
+            "AllowSenders": [
+              "Succeeded"
+            ]
+          },
+          "type": "Query",
+          "inputs": {
+            "from": "@outputs('AllowSenders')",
+            "where": "@equals(toLower(trim(if(contains(outputs('LowerFrom'),'<'),replace(last(split(outputs('LowerFrom'),'<')),'>',''),outputs('LowerFrom')))), item())"
+          }
+        },
+        "QuotedRef": {
+          "runAfter": {
+            "MatchAllowSender": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": "@toUpper(if(not(equals(if(and(contains(outputs('LowerSubject'),'app-20'), greaterOrEquals(length(outputs('LowerSubject')), add(indexOf(outputs('LowerSubject'),'app-20'),22))), substring(outputs('LowerSubject'), indexOf(outputs('LowerSubject'),'app-20'), 22), ''),'')), if(and(contains(outputs('LowerSubject'),'app-20'), greaterOrEquals(length(outputs('LowerSubject')), add(indexOf(outputs('LowerSubject'),'app-20'),22))), substring(outputs('LowerSubject'), indexOf(outputs('LowerSubject'),'app-20'), 22), ''), if(and(contains(outputs('LowerBody'),'app-20'), greaterOrEquals(length(outputs('LowerBody')), add(indexOf(outputs('LowerBody'),'app-20'),22))), substring(outputs('LowerBody'), indexOf(outputs('LowerBody'),'app-20'), 22), '')))"
+        },
+        "Notify_poll_failure": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Get_unread_emails": [
+              "Failed",
+              "TimedOut"
+            ]
+          },
+          "runtimeConfiguration": {
+            "retryPolicy": {
+              "type": "exponential",
+              "count": 2,
+              "interval": "PT10S"
+            }
+          },
+          "inputs": {
+            "parameters": {
+              "emailMessage/To": "yashv@driverai.io",
+              "emailMessage/Subject": "[Hiring Auto-Reply] Unread Inbox poll failed",
+              "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;\"><p><strong>P1 could not read the shared Inbox.</strong></p><p>No applicant email was sent. The unread messages remain in Inbox. Open the flow run history and inspect Get_unread_emails.</p></div>",
+              "emailMessage/Importance": "High"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2"
+            },
+            "authentication": "@parameters('$authentication')",
+            "retryPolicy": {
+              "type": "exponential",
+              "count": 2,
+              "interval": "PT10S"
+            }
+          }
         }
       }
     },

@@ -1,20 +1,22 @@
 {
   "_comment": "DriverAI Hiring Auto-Reply - the SINGLE SOURCE OF TRUTH for the PA flow. Edit values here, run 'python build_zip.py', then re-import the .zip in Power Automate. Do NOT hand-edit definition.json - build_zip.py regenerates it from this file. Keys starting with '_' are comments and are ignored by the builder.",
-  "_comment_interval": "trigger.interval_min sets how often the inbox is polled. It only takes effect after re-importing the rebuilt zip - Power Automate cannot change a trigger interval at runtime.",
+  "_comment_interval": "P1 is a scheduled unread-Inbox poller so it handles both existing unread backlog and future unread mail. trigger.interval_min sets the schedule; unread_per_run is deliberately 1 so Excel/SharePoint writes stay sequential and every completed email is marked/moved before the next poll. It only takes effect after re-importing the rebuilt zip.",
   "_comment_loopguard": "Self-loop protection is SENDER-based: apply@driverai.io (plus mailer-daemon/postmaster/bounce) is in bad_senders, so the flow never answers itself or a bounce. Outbound subjects are NOT added to bad_subjects - that would drop applicants' 'Re: <our subject>' replies before the reference gate. Per-applicant caps stop any runaway loop. List only the junk subjects you want blocked in bad_subjects.",
   "_comment_flowname": "flow_name sets the package display name (shown when importing) AND the flow display name. build_zip.py writes it into the package manifest + definition. For a brand-new import it names the flow; for an Update import PA keeps the existing flow's name but the package name is fixed.",
   "flow_name": "DriverAI_HiringAgent_P1_AutoReply",
   "email": {
     "trigger_mailbox": "apply@driverai.io",
-    "admin_email": "yashv@driverai.io"
+    "admin_email": "yashv@driverai.io",
+    "send_applicant_emails": false,
+    "send_admin_failure_alerts": true
   },
+  "_comment_fetch_only_unread": "fetch_only_unread=false (changed 2026-08-04) makes the INBOX ITSELF the queue instead of the read flag. Every terminal path already moves the message OUT of the Inbox - legitimate mail is marked read and moved to Archive, spam to Junk Email, a hard failure unread to Archive after its alert - so 'still in Inbox' is the accurate definition of 'not yet handled'. The read flag is not: anyone who merely OPENS a message in apply@driverai.io silently removes it from the queue forever, with no error and no alert, and the flow keeps reporting Succeeded. That is a real live case - a real applicant (redacted-applicant@example.edu, a clean application with a PDF attached that matched zero spam terms) got no reply and no SharePoint row purely because the mailbox was opened to read it. Trade-off of false: if MoveV2 ever fails, the message stays in the Inbox and is re-processed on the next poll rather than being silently stranded. That is the safer failure - the duplicate/update caps (reply_cap, duplicate_notice_max) bound how many emails a repeat can ever send, and the 7 patch-failure alerts make a stuck row visible. Set true to restore the old unread-only behaviour.",
   "trigger": {
-    "interval_min": 1
+    "interval_min": 1,
+    "unread_per_run": 1,
+    "fetch_only_unread": false
   },
-  "_comment_testmode": "test_mode.suppress_emails=true replaces every applicant-facing Send_* action AND Notify_failure with a no-op Compose (same runAfter wiring, so tidy/patch sequencing is untouched) - used for a historical-replay test so reprocessing old mail never actually emails anyone. Mail Sent/Decline Sent stamps also switch to a 'TEST-MODE (suppressed) <timestamp>' marker instead of 'Sent <timestamp>' so replayed rows are visibly distinguishable later. MUST be set back to false, rebuilt, and re-imported to restore live behavior when the test is done.",
-  "test_mode": {
-    "suppress_emails": true
-  },
+  "_comment_outbound_mail": "APPLICANT MAIL IS OFF as of 2026-09-05 (send_applicant_emails=false), set on user instruction for silent live intake - process everything, contact nobody. This matches P2's posture (config.yaml test_mode.suppress_emails=true, set 2026-09-04 for the back-catalogue replay). All six applicant-facing Send_* actions are no-op Compose steps while the trigger, filtering, SharePoint/Excel writes, and inbox tidy continue normally; suppressed contacts are stamped 'Suppressed (applicant email disabled) <timestamp>' instead of falsely claiming Sent. The six lifecycle emails withheld are acknowledgment, duplicate notice, CV request, wrong-format, update ack and follow-up. To go live again set this to true, re-run build_zip.py and RE-IMPORT the package - that path is fully preserved and was the posture from 2026-08-04 to 2026-09-05. test_p1.py O2 pins whichever value is committed and asserts the built ZIP agrees, so a drift in either direction fails the suite. email.send_admin_failure_alerts=true keeps all NINE admin alerts live - Notify_failure (watches HasResume), Notify_poll_failure (watches the Inbox read), and the 7 patch-failure alerts added 2026-08-03 (one sibling per candidate-row PatchItem, on [Failed,TimedOut] only). The patch alerts exist because inbox cleanup is deliberately unconditional (every action after a patch lists Failed in runAfter so a poisoned message never blocks the queue), which made a failed patch fully silent: the run reported Succeeded while the Application Updates counter had not incremented. All nine now retry exponential x2 - the no-retry rule is for MoveV2/MarkAsRead, where a replay races the mutable Outlook message ID, not for sends. Setting this false swaps all nine for no-op Compose steps. Notify_failure still alert the admin.",
   "_comment_rules": "Caps share ONE 'Application Updates' column on the candidate's row. A no-CV application is replied to (Email 3) but NOT written to SharePoint, so it has no row and no cap. duplicate_check_days = the resubmit window; the *_max values are the OVERALL cap (Application Updates keeps counting up to this, then the row goes fully silent forever within the 90-day window). reply_cap is a SEPARATE, smaller threshold: contacts up to reply_cap still get an actual reply email (the last one, at reply_cap, is the final-notice); contacts between reply_cap and *_max still update the row/resume (re-queued for P2) but get NO email at all - 'no other reminders'.",
   "business_rules": {
     "duplicate_check_days": 90,
@@ -39,29 +41,61 @@
     "file": "/Master_Files/Sharepoint_Master_File.xlsx",
     "table": "HiringAgent_P1_Candidates"
   },
-  "_comment_tidy": "inbox_tidy: after the flow finishes handling an email it is moved out of the Inbox (MoveV2). TWO destinations by category: (1) LEGITIMATE application mail (new CV, non-CV request, duplicate, wrong-format, update, follow-up, ignored) is marked READ (MarkAsRead_V3) and moved to `destination` (Archive) - so Archive holds only real application traffic. (2) SPAM/JUNK caught by the 3 gates (bad sender, bad subject, scam/malware/phishing/offensive/foreign) is moved to `spam_destination` (Junk Email) and left UNREAD (just moved, not marked read) so it stands out as junk. For built-in well-known folders use the connector's CAPITALIZED friendly name ('Archive', 'Junk Email', 'Deleted Items') - casing matters. For a custom folder use its mail-folder ID from Graph Explorer. Set enabled=false to leave everything unread in the Inbox (safe - the trigger watermark prevents reprocessing).",
+  "_comment_tidy": "inbox_tidy: after the flow finishes handling an email it is moved out of the Inbox (MoveV2). LEGITIMATE application mail is marked READ and moved to Archive; SPAM/JUNK is moved to Junk Email and left UNREAD; a core-processing failure is moved UNREAD to Archive only after an actual Notify_failure attempt. The failure move must never run when Notify_failure is Skipped, because that is the normal success path and would race the normal move against the same mutable Outlook message ID. MoveV2 automatic retries are disabled and terminal cleanup outcomes are explicitly finalized. Archive is deliberately reused for failures because the Outlook connector rejected the nested shared-mailbox Recruiting Review folder ID after import. Failed mail is distinguishable by remaining unread and by the admin alert. Keep enabled=true in unread-poll production mode.",
   "inbox_tidy": {
     "enabled": true,
     "destination": "Archive",
-    "spam_destination": "Junk Email"
+    "spam_destination": "Junk Email",
+    "failure_destination": "Archive"
   },
-  "_comment_year_separator": "When enabled, the FIRST new-applicant row of each calendar year gets one blank row inserted into CandidateList immediately before it (only on the brand-new-applicant path - never on duplicate/update/follow-up, which only PATCH an existing row). Detected via a cheap server-side Excel $filter for 'any row with Received Date >= <thisYear>-01-01' - bounded to just this year's volume, never a full-table scan, so it stays cheap as the table grows across years. Purely visual/organizational (lets a human scrolling the sheet see where one year's entries end and the next begin) - does not affect duplicate detection, scoring, or any other logic, since P1/P2 both already skip fully-blank rows when reading. Best-effort: if P1 is ever down across the exact New Year's boundary, whichever new-applicant row happens to trigger the check first still inserts the separator right before itself, just not necessarily before the very first 2027 row if others already landed. Set enabled=false to turn this off entirely.",
+  "_comment_year_separator": "When enabled, the FIRST new-applicant row of each calendar year gets one blank row inserted into CandidateList immediately before it. Excel Filter Query supports only alphanumeric column names, so the visible 'Received Date' header cannot be used in OData; P1 performs one paginated row scan (up to 5000) and filters the returned ISO dates with a built-in Query action. Purely visual/organizational and only on the new-applicant path; duplicate/update/follow-up paths only PATCH existing rows. Set enabled=false to turn this off entirely.",
+  "_comment_separators_off": "TURNED OFF 2026-08-27. The design assumed rows arrive in date order, because Excel's AddRowV2 can only APPEND - so 'insert a blank before the first row of a new month' is really 'append a blank, then append the row'. The Inbox does not drain chronologically (and a backlog replay especially does not), so months interleave and the blanks land at arbitrary positions. Measured on the live master: BLANK | 2026-07x18 | BLANK | 2026-06x1 | BLANK | 2026-06x31 | BLANK | 2026-08x1 | 2026-06x6 | 2026-08x4 - four blanks, none of them at a real month boundary. Grouping rows by month requires REORDERING the sheet, which an append-only action cannot do. HiringAgent_App_P2/resort_candidate_sheets.py already produces exactly the wanted layout (header, one blank, then month groups newest-first separated by blanks, with a labelled '-- <year> --' row at a year boundary), so the sheet's layout is owned there and P1 no longer adds blanks the resort would only have to clean up. Set either back to true to restore the old append-time behaviour.",
   "year_separator": {
-    "enabled": true
+    "enabled": false
   },
-  "_comment_month_separator": "Same idea as year_separator but per calendar MONTH: the FIRST new-applicant row of each month gets one blank row inserted before it. Detected with a bounded server-side $filter over that month only (Received Date ge <first of month> and lt <first of next month>), so it never scans the whole table. IMPORTANT: at a January boundary the year separator already fires, and two blank rows in a row would look like a mistake - so the month check deliberately requires 'no rows this month AND at least one row already this year', which makes the year separator win and keeps exactly ONE blank row at any boundary. Same best-effort caveat as year_separator if P1 is down across a month boundary. Purely visual: P1 and P2 both skip fully-blank rows when reading. Set enabled=false to turn off.",
+  "_comment_month_separator": "Same paginated-scan/in-memory-Query mechanism as year_separator, but per calendar MONTH. The FIRST new-applicant row of each month gets one blank row inserted before it. At a January boundary the year separator wins, keeping exactly ONE blank row. Purely visual: P1 and P2 skip fully blank rows. Set enabled=false to turn off.",
   "month_separator": {
-    "enabled": true
+    "enabled": false
+  },
+  "_comment_resume_attachments": "An application email often carries more than the resume - a portfolio, a cover letter, a transcript. P1 used to save EVERY .pdf/.docx attachment, and because the saved name is <FirstLast>_<AppRef>.<ext> the extension was the only per-attachment difference. Two attachments with DIFFERENT extensions therefore both landed in the folder (live: sathishsravanakumar_APP-20260414-0041-9D05.pdf AND .docx), and two with the SAME extension resolved to one identical filename so the second SILENTLY OVERWROTE the first - whichever Outlook enumerated last won (live: 'Gayuh Nurul Huda - CV - 2026.pdf' vs '... - Portfolio - 2026.pdf', and 'Qazafi .Sheikh.pdf' vs 'Qazafi Sheikh - CL.pdf'). P2 then concatenated the text of every surviving file before scoring, so a portfolio polluted the skills, role suggestions and AI recheck of the resume it shipped with. exclude_name_phrases is an unanchored case-insensitive contains() over the ATTACHMENT FILENAME, same matching rule as every spam list. Replayed over all 123 attachment names on the live sheets it matched exactly 2, both genuinely not resumes, and zero real resumes. The opposite design - a whitelist requiring 'resume' or 'cv' in the name - was rejected: 51 of those 123 real resumes contain neither. SAFETY: the exclusion is skipped entirely when it would leave NO attachment at all, so a candidate whose only file happens to be called portfolio.pdf is still processed normally instead of being turned into a no-CV reply. Empty list = the old keep-everything behaviour.",
+  "resume_attachments": {
+    "exclude_name_phrases": [
+      "portfolio",
+      "cover letter",
+      "coverletter",
+      "cover_letter",
+      "-cl.",
+      "_cl.",
+      " cl.",
+      "transcript",
+      "certificate"
+    ]
+  },
+  "_comment_flow_id": "flow_id is the GUID Power Automate uses to bind an 'Update' import to an EXISTING flow. It is NOT cosmetic: the package's resource id must equal the live flow's id or the Update has nothing to land on - PA silently offers 'Create as new' instead and the existing flow keeps running the OLD definition. That is exactly what happened on 2026-08-27: the repo's base zip carried a stale GUID (36d96cc9-25b1-4e7c-952c-378ba087f142) from an earlier flow, so three consecutive imports appeared to succeed and changed nothing - every run kept executing the pre-import definition. The value below was read out of a real export of the live flow (P1CODE_AUG27, manifest resource id + the Microsoft.Flow/flows/<id>/ folder name). If the flow is ever deleted and recreated, export it once and update this value.",
+  "flow_id": "22f1cacc-4e05-41ca-806e-f4baf41de15b",
+  "_comment_timezone_offset": "utc_offset_hours is what the build ACTUALLY uses to shift timestamps; timezone.id is kept for documentation. convertFromUtc() was tried first and is unusable here: it rejects the Outlook connector's value outright - 'The template language function convertFromUtc expects its first parameter to be a string that contains a UTC date time. The value was 2026-05-01T06:41:25.0000000' - and normalising through formatDateTime() only made it worse, because that STRIPS the Z/offset that convertFromUtc needs in order to recognise the value as UTC at all. addHours() has no such restriction: it parses anything the connector emits, with or without an offset. THIS IS ONLY CORRECT FOR A ZONE THAT NEVER OBSERVES DST. Arizona qualifies - it is UTC-7 every day of the year - which is why a fixed offset is exact here and why 'Mountain Standard Time' (Denver, UTC-6 in summer) must NOT be used with this approach. Moving to a DST zone means going back to a real timezone function and solving the parameter format properly.",
+  "_comment_timezone": "timezone.id is the Windows time-zone ID every date in the flow is expressed in. Outlook hands P1 receivedDateTime in UTC, and until 2026-08-27 P1 used it raw - so the Application ID date, the Received Date / Last Updated Date columns, the Year/Month resume folder and the year/month separator rows were all UTC wall-clock, not local. Arizona is UTC-7, so any mail received in the first 7 hours of a UTC day belongs to the PREVIOUS local day, and on the 1st of a month it lands in the wrong MONTH FOLDER entirely: a real applicant (APP-20260501-0641-7C95, 2026-05-01T06:41 UTC) is 2026-04-30 23:41 local and was filed under Candidate_Resumes/2026/May instead of .../April. USE THE ARIZONA ID: 'US Mountain Standard Time' is Arizona and never observes DST (UTC-7 year round). 'Mountain Standard Time' is DENVER and shifts to UTC-6 from March to November - under that ID a real applicant is still 2026-05-01 00:41 and stays in May, so it does NOT fix this. Set id to 'UTC' to restore the pre-2026-08-27 behaviour exactly (every conversion is skipped, not merely a no-op). Changing this only affects rows written AFTER the rebuilt zip is imported - existing rows keep their stored UTC value, and because Phase 2 rebuilds each resume path from that row's own Received Date, historical rows and their files stay consistent with each other. Correcting history is a separate backfill that must move the resume FILES in the same pass.",
+  "timezone": {
+    "id": "US Mountain Standard Time",
+    "utc_offset_hours": -7
   },
   "_comment_appref": "Each application reference is APP-<date>-<time>-<hex> built from the email's received timestamp plus a random guid() tail (e.g. APP-20260626-1430-A1B2, minute precision) - UNIQUE per email even if two arrive in the same minute, and never reused even after rows are deleted or the table is cleared. detect_pattern is the case-insensitive substring that flags a reply quoting a ref; it is matched anywhere in subject OR body and the APP-... token is extracted from there. Keep it specific but decade-proof: 'app-20' covers 2000-2099. The IsKnownSender guard ignores refs from senders not already in the table. date_format sets the date portion (PA formatDateTime token); time_format is also a PA formatDateTime token (HHmm = minute precision, shorter refs; HHmmss for second precision); hex_length is how many uppercase hex chars are taken from guid() for the collision-avoidance tail. _ref_len (used to extract a quoted ref out of a reply) is computed from these same two values, so minting and extraction can never drift apart - changing either here and rebuilding keeps both in sync automatically.",
   "appref": {
     "date_format": "yyyyMMdd",
     "time_format": "HHmm",
     "hex_length": 4,
-    "detect_pattern": "app-20"
+    "detect_pattern": "app-20",
+    "id_tail_skip": 2
   },
   "_comment_spam_filters": "EVERY term in every list below is matched with an UNANCHORED, case-insensitive contains() - there is no word-boundary or regex support in Power Automate. A term is therefore only safe if it cannot occur inside ordinary applicant text. bad_senders is matched against the raw From header (which may be 'Display Name <addr>'), bad_subjects against the subject, and the four content lists against subject + body + attachment filenames. Audit on 2026-07-31 replayed all 167 terms over 278 real messages: only 'marketing@' had ever fired, and all 3 hits were a genuine Chief Marketing Officer applicant (redactedmarketing@example.com) whose emails were silently junked. Removed it, and narrowed five bare bad_subjects tokens that collide with real job titles ('alert' -> Alert Systems Engineer, 'invoice' -> Invoice Processing Specialist, 'receipt' -> Receipt Reconciliation Analyst, 'payment' -> Payments Platform, 'survey' -> Land Surveyor). RULE FOR NEW TERMS: prefer multi-word phrases or distinctive domains; never a bare common noun, and never a short local-part like 'marketing@'. test_p1.py locks in the specific terms already found unsafe.",
   "spam_filters": {
+    "_comment_allow_senders": "allow_senders is an ALWAYS-ACCEPT list checked before all three spam screens (sender, subject, content). A match means the message skips every screen and goes straight into normal processing, so an internal tester can send anything - odd subjects, bare bodies, shortened links - without being silently junked. Matching is EXACT EQUALITY against the address extracted from the lowercased From header - NOT substring, and deliberately unlike bad_senders. It was substring until 2026-09-08, which meant 'yashv@driverai.io.example.net', or any display name merely containing an allow-listed address, matched and switched off all three screening gates plus the self-loop guard. See flow/integrity_fixes.py exact_allow_list. A new entry must therefore be a complete address; a bare domain or local-part now matches nothing. Keep it to real internal addresses only: anything listed here can never be filtered, so a compromised or mistyped entry becomes a hole in the spam wall. apply@driverai.io must NEVER be added - it stays in bad_senders as the self-loop guard, and allow-listing it would let the flow answer its own mail forever. An empty list restores the original behaviour exactly.",
+    "allow_senders": [
+      "yashv@driverai.io",
+      "tracys@driverai.io",
+      "akhilb@driverai.io",
+      "samruddhac@driverai.io"
+    ],
     "bad_senders": [
       "noreply",
       "no-reply",
@@ -69,7 +103,8 @@
       "notifications",
       "mailer-daemon",
       "postmaster",
-      "bounce",
+      "bounce-",
+      "bounces.",
       "newsletter",
       "billing@",
       "teams.mail.microsoft.com",
@@ -93,13 +128,27 @@
       "dropbox.com",
       "notion.so",
       "asana.com",
+      "bacancy.com",
+      "equestsolutions.net",
+      "sigmasolve.com",
+      "logicrays.com",
+      "infilon.com",
+      "quebecsol.com",
+      "synapsetechservice.com",
+      "itidoltechnologies.com",
+      "atgcorp.com",
+      "pushcam-solution.com",
+      "fixelsmedia.com",
       "apply@driverai.io"
     ],
     "bad_subjects": [
       "sent a message",
       "notification",
       "security alert",
-      "digest",
+      "daily digest",
+      "weekly digest",
+      "monthly digest",
+      "your digest",
       "invoice attached",
       "your receipt",
       "unsubscribe",
@@ -152,6 +201,22 @@
       "you have a pending delivery",
       "we could not deliver",
       "track your shipment"
+    ],
+    "_comment_vendor": "Added 2026-08-01, live case: 'Futurism Technologies' (a dev/marketing/security outsourcing vendor) emailed apply@driverai.io three times pitching THEIR services to sell to us, never applying for a job. None of these phrases are malicious, so the scam/offensive/malware lists never touched them - P1 created a full candidate record and sent real candidate-lifecycle auto-replies ('Please Resend Your Resume', 'we noticed we don't have your location on file') to a sales rep for weeks. These phrases are B2B sales-deck language that essentially never appears in a genuine job application; kept short and specific to minimize the risk of ever matching a real candidate's resume or cover email.",
+    "_comment_vendor_2026_08_24": "Audit on 2026-08-24 read all 401 Archive messages INCLUDING extracted PDF/DOCX text. The 3 phrases above had never fired: 21 messages from 16 senders (outsourcing pitches + bench-sales agencies marketing a third party's resume) had been filed as legitimate applications, and P1+P2 sent them 55 candidate-lifecycle auto-replies. Root cause: the only reliable signal is WHOSE resume is attached (sender name vs resume name), which Power Automate cannot express - hence the domain blocklist above does the real work and these phrases are the generalizing backstop. Every phrase below was replayed over all 401 messages and matched ZERO genuine applicants. Terms REJECTED by that replay, do not re-add: 'collaborat' (185 real applicants - 'collaborative'), 'bench' (44 - 'benchmarking'), 'our team' (27 - 'your team' CONTAINS 'our team'), 'agency' (10), 'partner with' (4), 'our company' (3 - same 'your company' trap), 'we provide' (3), 'case study' (2). RULE: never add a phrase starting with 'our ' - the word 'your' ends in 'our'. Also rejected as things real candidates say: 'ready for relocation', 'for your review and consideration', 'professional development team'.",
+    "vendor_solicitation_phrases": [
+      "company profile and corporate deck",
+      "capability deck",
+      "engagement models",
+      "consultant details",
+      "we have an excellent",
+      "resume of my developer",
+      "attached their resume",
+      "available for your project",
+      "software development agency",
+      "handful of my contacts",
+      "we work as a",
+      "development partner"
     ],
     "offensive_phrases": [
       "send nudes",
@@ -215,31 +280,31 @@
       "disable your antivirus"
     ],
     "foreign_scam_phrases": [
-      "lotería",
+      "loter\u00eda",
       "has ganado",
       "transferencia de dinero",
       "herencia",
-      "vous avez gagné",
+      "vous avez gagn\u00e9",
       "transfert d'argent",
-      "héritage",
+      "h\u00e9ritage",
       "loterie",
       "sie haben gewonnen",
-      "geld überweisen",
+      "geld \u00fcberweisen",
       "erbschaft",
-      "você ganhou",
-      "transferência de dinheiro",
-      "вы выиграли",
-      "перевод денег",
-      "наследство",
-      "中奖",
-      "转账",
-      "彩票",
-      "当選しました",
-      "送金",
-      "लॉटरी",
-      "पैसे ट्रांसफर",
-      "لقد فزت",
-      "تحويل الأموال"
+      "voc\u00ea ganhou",
+      "transfer\u00eancia de dinheiro",
+      "\u0432\u044b \u0432\u044b\u0438\u0433\u0440\u0430\u043b\u0438",
+      "\u043f\u0435\u0440\u0435\u0432\u043e\u0434 \u0434\u0435\u043d\u0435\u0433",
+      "\u043d\u0430\u0441\u043b\u0435\u0434\u0441\u0442\u0432\u043e",
+      "\u4e2d\u5956",
+      "\u8f6c\u8d26",
+      "\u5f69\u7968",
+      "\u5f53\u9078\u3057\u307e\u3057\u305f",
+      "\u9001\u91d1",
+      "\u0932\u0949\u091f\u0930\u0940",
+      "\u092a\u0948\u0938\u0947 \u091f\u094d\u0930\u093e\u0902\u0938\u092b\u0930",
+      "\u0644\u0642\u062f \u0641\u0632\u062a",
+      "\u062a\u062d\u0648\u064a\u0644 \u0627\u0644\u0623\u0645\u0648\u0627\u0644"
     ],
     "link_shortener_phrases": [
       "bit.ly/",

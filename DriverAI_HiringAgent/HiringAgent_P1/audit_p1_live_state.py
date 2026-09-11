@@ -16,14 +16,15 @@ import zipfile
 from pathlib import Path
 from urllib.parse import quote
 
-
 ROOT = Path(__file__).resolve().parent
-P2 = ROOT.parent / "HiringAgent_App_P2"
+P2 = next((base / "HiringAgent_App_P2" for base in ROOT.parents
+           if (base / "HiringAgent_App_P2").is_dir()), None)
+if P2 is None:
+    raise SystemExit("Could not locate HiringAgent_App_P2 next to the P1 project")
 sys.path.insert(0, str(P2))
 
-from hiring_agent.config import COLUMNS, REJECTED_COLUMNS  # noqa: E402
-from sharepoint_client import GRAPH, SharePointClient  # noqa: E402
-
+from hiring_agent.config import COLUMNS, REJECTED_COLUMNS
+from sharepoint_client import GRAPH, SharePointClient
 
 APP_RE = re.compile(r"APP-\d{8}-\d{4}-[A-F0-9]{4}", re.I)
 EMAIL_RE = re.compile(r"[\w.+%-]+@[\w.-]+\.[A-Za-z]{2,}")
@@ -96,12 +97,11 @@ def row_empty(vals: dict) -> bool:
 
 
 def list_messages(client: SharePointClient, folder: str, *, order_field: str) -> list[dict]:
-    select = "id,subject,receivedDateTime,sentDateTime,from,toRecipients,isRead,hasAttachments,bodyPreview,parentFolderId"
-    url = (
-        f"{GRAPH}/users/{client.sender_mailbox}/mailFolders/{quote(folder)}/messages"
-        f"?$select={select}&$top=100&$orderby={order_field} desc"
-    )
-    out: list[dict] = []
+    select = ("id,subject,receivedDateTime,sentDateTime,from,toRecipients,isRead,"
+              "hasAttachments,bodyPreview,parentFolderId")
+    url = (f"{GRAPH}/users/{client.sender_mailbox}/mailFolders/{quote(folder)}"
+           f"/messages?$select={select}&$top=100&$orderby={order_field} desc")
+    out = []
     while url:
         data = client._req("GET", url).json()
         out.extend(data.get("value", []))
@@ -111,7 +111,7 @@ def list_messages(client: SharePointClient, folder: str, *, order_field: str) ->
 
 def list_folders(client: SharePointClient) -> list[dict]:
     url = f"{GRAPH}/users/{client.sender_mailbox}/mailFolders?$top=200"
-    folders: list[dict] = []
+    folders = []
     while url:
         data = client._req("GET", url).json()
         folders.extend(data.get("value", []))
@@ -120,10 +120,11 @@ def list_folders(client: SharePointClient) -> list[dict]:
 
 
 def sent_index(sent: list[dict]) -> dict[tuple[str, str], list[dict]]:
-    idx: dict[tuple[str, str], list[dict]] = {}
+    idx = {}
     for msg in sent:
         subject = str(msg.get("subject", "") or "")
-        refs = {m.group(0).upper() for m in APP_RE.finditer(subject + " " + str(msg.get("bodyPreview", "") or ""))}
+        refs = {m.group(0).upper()
+                for m in APP_RE.finditer(subject + " " + str(msg.get("bodyPreview", "") or ""))}
         recipients = []
         for rec in msg.get("toRecipients", []) or []:
             addr = ((rec.get("emailAddress") or {}).get("address") or "").strip().lower()
@@ -171,7 +172,8 @@ def package_ok() -> tuple[bool, str]:
     live = json.loads(def_path.read_text(encoding="utf-8"))
     if zipped != live:
         return False, "zip definition differs from flow/definition.json"
-    return True, f"zip synced; LastWriteTime={dt.datetime.fromtimestamp(zip_path.stat().st_mtime).isoformat(timespec='seconds')}"
+    return True, (f"zip synced; LastWriteTime="
+                  f"{dt.datetime.fromtimestamp(zip_path.stat().st_mtime).isoformat(timespec='seconds')}")
 
 
 def main() -> None:
@@ -209,13 +211,14 @@ def main() -> None:
         }
         for f in folders
     }
+
     archive = list_messages(client, "archive", order_field="receivedDateTime")
     inbox = list_messages(client, "inbox", order_field="receivedDateTime")
     junk = list_messages(client, "junkemail", order_field="receivedDateTime")
     sent = list_messages(client, "sentitems", order_field="sentDateTime")
     sent_by_ref_to = sent_index([m for m in sent if is_p1_sent(m)])
 
-    row_reports: list[dict] = []
+    row_reports = []
     for rec in records:
         vals = rec["values"]
         app_id = str(vals.get("Application ID", "") or "").strip()
@@ -223,15 +226,17 @@ def main() -> None:
         received = parse_dt(vals.get("Received Date"))
         last_updated = parse_dt(vals.get("Last Updated Date"))
         status = str(vals.get("Status", "") or "").strip()
-        issues: list[str] = []
-        warnings: list[str] = []
+        issues = []
+        warnings = []
 
         if not APP_RE.fullmatch(app_id):
             issues.append("bad/missing Application ID")
+
         for col in P1_OWNED:
             if col not in vals:
                 issues.append(f"missing P1-owned column {col}")
-            elif col in REQUIRED_P1_VALUES and str(vals.get(col, "") or "").strip() == "":
+                continue
+            if col in REQUIRED_P1_VALUES and str(vals.get(col, "") or "").strip() == "":
                 issues.append(f"blank P1-owned value {col}")
         if vals.get("Has Resume") != "Yes":
             issues.append("Has Resume is not Yes")
@@ -248,7 +253,8 @@ def main() -> None:
 
         archive_matches = [
             m for m in archive
-            if msg_from(m) == email and (near(msg_date(m), received) or near(msg_date(m), last_updated))
+            if msg_from(m) == email
+            and (near(msg_date(m), received) or near(msg_date(m), last_updated))
         ]
         if not archive_matches:
             warnings.append("no Archive inbound match by sender near Received/Last Updated Date")
@@ -277,38 +283,44 @@ def main() -> None:
         })
 
     p1_sent = [m for m in sent if is_p1_sent(m)]
-    no_cv_sent = [m for m in sent if str(m.get("subject", "") or "").strip().lower().startswith("please attach your resume")]
-    wrong_format_sent = [m for m in sent if str(m.get("subject", "") or "").strip().lower().startswith("please resend your resume")]
+    no_cv_sent = [m for m in sent
+                  if str(m.get("subject", "") or "").strip().lower()
+                  .startswith("please attach your resume")]
+    wrong_format_sent = [m for m in sent
+                         if str(m.get("subject", "") or "").strip().lower()
+                         .startswith("please resend your resume")]
     p1_ref_sent = [m for m in p1_sent if app_refs_in_msg(m)]
-    p1_refs_in_rows = {str(r["values"].get("Application ID", "") or "").strip().upper() for r in records}
-    sent_refs_without_row = sorted({
-        ref for msg in p1_ref_sent for ref in app_refs_in_msg(msg)
-        if ref not in p1_refs_in_rows
-    })
+    p1_refs_in_rows = {str(r["values"].get("Application ID", "") or "").strip().upper()
+                       for r in records}
+    sent_refs_without_row = sorted(
+        {ref for m in p1_ref_sent for ref in app_refs_in_msg(m)} - p1_refs_in_rows
+    )
+
     archive_unread = [m for m in archive if not bool(m.get("isRead"))]
     inbox_unread = [m for m in inbox if not bool(m.get("isRead"))]
     junk_unread = [m for m in junk if not bool(m.get("isRead"))]
 
-    fields = [
-        "severity", "sheet", "row_index", "application_id", "email", "status",
-        "received_date", "last_updated_date", "mail_sent", "sent_matches",
-        "archive_matches", "issues", "warnings",
-    ]
-    with csv_path.open("w", newline="", encoding="utf-8") as f:
+    fields = ("severity", "sheet", "row_index", "application_id", "email", "status",
+              "received_date", "last_updated_date", "mail_sent", "sent_matches",
+              "archive_matches", "issues", "warnings")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         for row in row_reports:
             writer.writerow(row)
 
-    counts = {name: sum(1 for r in row_reports if r["severity"] == name) for name in ("PASS", "WARN", "FAIL")}
-    with md_path.open("w", encoding="utf-8") as f:
+    counts = {name: sum(1 for r in row_reports if r["severity"] == name)
+              for name in ("PASS", "WARN", "FAIL")}
+
+    with open(md_path, "w", encoding="utf-8") as f:
         f.write("# P1 Live State Audit\n\n")
         f.write(f"Generated: {dt.datetime.now().isoformat(timespec='seconds')}\n\n")
         f.write("## Package\n\n")
         f.write(f"- package synced: {package_pass}\n")
         f.write(f"- package note: {package_note}\n")
         f.write(f"- main column order matches P2 COLUMNS: {main_cols == COLUMNS}\n")
-        f.write(f"- rejected column order matches P2 REJECTED_COLUMNS: {rejected_cols == REJECTED_COLUMNS}\n\n")
+        f.write("- rejected column order matches P2 REJECTED_COLUMNS: "
+                f"{rejected_cols == REJECTED_COLUMNS}\n\n")
         f.write("## SharePoint Rows\n\n")
         f.write(f"- main rows: {len(main_rows)}\n")
         f.write(f"- rejected rows: {len(rejected_rows)}\n")
@@ -317,8 +329,9 @@ def main() -> None:
         f.write(f"- warn: {counts['WARN']}\n")
         f.write(f"- fail: {counts['FAIL']}\n\n")
         f.write("## Mailbox Folders\n\n")
-        for name in sorted(folder_summary):
-            if name in {"Archive", "Inbox", "Junk Email", "Sent Items", "Recruiting Review", "Out of US"}:
+        for name in folder_summary:
+            if name in {"Archive", "Inbox", "Junk Email", "Sent Items",
+                        "Recruiting Review", "Out of US"}:
                 fs = folder_summary[name]
                 f.write(f"- {name}: total={fs['total']} unread={fs['unread']}\n")
         f.write("\n")
@@ -328,41 +341,47 @@ def main() -> None:
         f.write(f"- P1 no-CV request messages: {len(no_cv_sent)}\n")
         f.write(f"- P1 wrong-format messages: {len(wrong_format_sent)}\n")
         f.write(f"- P1 sent refs without current SharePoint row: {len(sent_refs_without_row)}\n")
-        f.write(f"- Archive messages read: {len(archive)}; unread in Archive: {len(archive_unread)}\n")
+        f.write(f"- Archive messages read: {len(archive)}; "
+                f"unread in Archive: {len(archive_unread)}\n")
         f.write(f"- Inbox messages read: {len(inbox)}; unread in Inbox: {len(inbox_unread)}\n")
         f.write(f"- Junk messages read: {len(junk)}; unread in Junk: {len(junk_unread)}\n\n")
+
         for title, items in (("Failures", [r for r in row_reports if r["severity"] == "FAIL"]),
                              ("Warnings", [r for r in row_reports if r["severity"] == "WARN"])):
-            if not items:
-                continue
             f.write(f"## {title}\n\n")
             for row in items:
-                note = row["issues"] or row["warnings"]
-                f.write(f"- {row['application_id']} [{row['sheet']} row {row['row_index']}] {row['email']} | {note}\n")
+                note = row["issues"] if title == "Failures" else row["warnings"]
+                f.write(f"- {row['application_id']} [{row['sheet']} row {row['row_index']}] "
+                        f"{row['email']} | {note}\n")
             f.write("\n")
-        if sent_refs_without_row:
-            f.write("## Sent Refs Without Current Row\n\n")
-            for ref in sent_refs_without_row[:100]:
-                f.write(f"- {ref}\n")
-            if len(sent_refs_without_row) > 100:
-                f.write(f"- ... {len(sent_refs_without_row) - 100} more\n")
-            f.write("\n")
+
+        f.write("## Sent Refs Without Current Row\n\n")
+        for ref in sent_refs_without_row[:100]:
+            f.write(f"- {ref}\n")
+        if len(sent_refs_without_row) > 100:
+            f.write(f"- ... {len(sent_refs_without_row) - 100} more\n")
 
     print(f"AUDIT_MD={md_path}")
     print(f"AUDIT_CSV={csv_path}")
     print(f"PACKAGE_SYNCED={package_pass}")
     print(f"MAIN_COLUMNS_MATCH={main_cols == COLUMNS}")
     print(f"REJECTED_COLUMNS_MATCH={rejected_cols == REJECTED_COLUMNS}")
-    print(f"ROWS={len(row_reports)} MAIN={len(main_rows)} REJECTED={len(rejected_rows)} PASS={counts['PASS']} WARN={counts['WARN']} FAIL={counts['FAIL']}")
-    print(f"MAIL_SENT_TOTAL={len(sent)} P1_REF_SENT={len(p1_ref_sent)} NO_CV_SENT={len(no_cv_sent)} WRONG_FORMAT_SENT={len(wrong_format_sent)}")
-    print(f"ARCHIVE_TOTAL={len(archive)} ARCHIVE_UNREAD={len(archive_unread)} INBOX_TOTAL={len(inbox)} INBOX_UNREAD={len(inbox_unread)} JUNK_TOTAL={len(junk)} JUNK_UNREAD={len(junk_unread)}")
-    for name in ("Archive", "Inbox", "Junk Email", "Sent Items", "Recruiting Review", "Out of US"):
+    print(f"ROWS={len(row_reports)} MAIN={len(main_rows)} REJECTED={len(rejected_rows)} "
+          f"PASS={counts['PASS']} WARN={counts['WARN']} FAIL={counts['FAIL']}")
+    print(f"MAIL_SENT_TOTAL={len(sent)} P1_REF_SENT={len(p1_ref_sent)} "
+          f"NO_CV_SENT={len(no_cv_sent)} WRONG_FORMAT_SENT={len(wrong_format_sent)}")
+    print(f"ARCHIVE_TOTAL={len(archive)} ARCHIVE_UNREAD={len(archive_unread)} "
+          f"INBOX_TOTAL={len(inbox)} INBOX_UNREAD={len(inbox_unread)} "
+          f"JUNK_TOTAL={len(junk)} JUNK_UNREAD={len(junk_unread)}")
+    for name in ("Archive", "Inbox", "Junk Email", "Sent Items",
+                 "Recruiting Review", "Out of US"):
         if name in folder_summary:
             fs = folder_summary[name]
             print(f"FOLDER {name}: total={fs['total']} unread={fs['unread']}")
     for row in row_reports:
         if row["severity"] != "PASS":
-            print(f"{row['severity']} {row['application_id']} {row['email']} {row['issues'] or row['warnings']}")
+            print(f"{row['severity']} {row['application_id']} {row['email']} "
+                  f"{row['issues']}{row['warnings']}")
 
 
 if __name__ == "__main__":

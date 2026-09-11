@@ -9,24 +9,6 @@
     "sourceEnvironment": ""
   },
   "resources": {
-    "36d96cc9-25b1-4e7c-952c-378ba087f142": {
-      "type": "Microsoft.Flow/flows",
-      "suggestedCreationType": "Update",
-      "creationType": "Existing, New, Update",
-      "details": {
-        "displayName": "DriverAI_HiringAgent_P1_AutoReply"
-      },
-      "configurableBy": "User",
-      "hierarchy": "Root",
-      "dependsOn": [
-        "63c6de14-bd1e-49d4-aff5-30f4231202e4",
-        "58aab763-2e9c-4e41-8bdc-de85cf6394ce",
-        "2c45e03a-a4f3-46c6-a825-e7bf0efaeb4c",
-        "512bb262-d6cb-46bc-a75b-3f4fb3e0faea",
-        "6b30fadf-dfdd-41b4-81a4-6ad68dad4691",
-        "f70f3118-a0c4-4211-8f47-55af5fc4ad45"
-      ]
-    },
     "63c6de14-bd1e-49d4-aff5-30f4231202e4": {
       "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
       "name": "shared_office365",
@@ -106,6 +88,24 @@
       "hierarchy": "Child",
       "dependsOn": [
         "6b30fadf-dfdd-41b4-81a4-6ad68dad4691"
+      ]
+    },
+    "22f1cacc-4e05-41ca-806e-f4baf41de15b": {
+      "type": "Microsoft.Flow/flows",
+      "suggestedCreationType": "Update",
+      "creationType": "Existing, New, Update",
+      "details": {
+        "displayName": "DriverAI_HiringAgent_P1_AutoReply"
+      },
+      "configurableBy": "User",
+      "hierarchy": "Root",
+      "dependsOn": [
+        "63c6de14-bd1e-49d4-aff5-30f4231202e4",
+        "58aab763-2e9c-4e41-8bdc-de85cf6394ce",
+        "2c45e03a-a4f3-46c6-a825-e7bf0efaeb4c",
+        "512bb262-d6cb-46bc-a75b-3f4fb3e0faea",
+        "6b30fadf-dfdd-41b4-81a4-6ad68dad4691",
+        "f70f3118-a0c4-4211-8f47-55af5fc4ad45"
       ]
     }
   }

@@ -1,0 +1,27 @@
+  [!] NESTING AT LIMIT: depth 8/8 (PA max). Zero headroom in: Capture_Create_update_file, Create_update_file, Mark_as_read_followup, Mark_as_read_followup_noreply ...
+      Adding another If/Foreach/Scope inside that branch WILL fail this build. Flatten a level there first, or attach new work to a shallower branch.
+[OK] flow rebuilt from flow_config.json -> ZIP + definition.json synced
+  flow / package name : DriverAI_HiringAgent_P1_AutoReply
+  trigger mailbox     : apply@driverai.io
+  poll interval (min) : 1
+  trigger mode        : scheduled Inbox poll (1 message per run, read OR unread - Inbox is the queue)
+  max action nesting  : 8 (Power Automate limit: 8)
+  admin alert -> to   : yashv@driverai.io
+  duplicate window    : 90 day(s)
+  caps (shared cnt)   : duplicate 5 | update 5 | follow-up 5 (no-CV: reply only, no row) | reply_cap 3 (contacts past this get no email, just counted)
+  timezone            : US Mountain Standard Time - all derived dates are LOCAL wall-clock
+  appref format       : APP-yyyyMMdd-HHmm-<4 chars of the message id, offset -6> - DETERMINISTIC: a retry of the same email mints the same ref
+  bad_senders         : 43
+  bad_subjects        : 27 (config; self-loop guard is sender-based)
+  spam/safety gate    : 123 (30 scam + 36 offensive + 20 malware/exe + 25 non-EN + 12 vendor-pitch); scans subject+body+attachment names
+  app_keywords        : 21 (OR clauses: 42; E3 gated on no-attachment)
+  excel table         : HiringAgent_P1_Candidates
+  resume subfolders   : dated Year/Month
+  inbox tidy          : ON (20 actions - legit->Archive read, spam->Junk Email unread, failures->Archive unread)
+  row extras          : Subject + body preview (~255 chars, bodyPreview) columns + improved Full Name guess
+  workbook self-heal  : OFF (non-destructive) - never auto-creates/overwrites; missing workbook -> Notify_failure alert
+  admin alerts        : ON - Notify_failure + Notify_poll_failure + 7 patch-failure alerts + 4 intake-write alerts (Add_row, Create_file, Create_dup_update_file, Create_update_file) (retry: exponential x2)
+  resume folder create: ON (Ensure_*_resume_folder, safe no-op if exists) - no delays
+  resume overwrite    : update/resend always saves under the legacy <Name>_<AppID> shape (true in-place overwrite pre-scoring; post-scoring, P2 reconciles it against the renamed file - see sharepoint_scoring.py _download_resume_text)
+  year separator      : OFF
+  month separator     : OFF

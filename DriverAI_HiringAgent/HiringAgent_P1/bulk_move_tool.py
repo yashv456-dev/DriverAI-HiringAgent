@@ -2,11 +2,24 @@
 bulk_move_tool.py  —  Helper utility to move emails between Inbox, Junk, and Archive folders.
 Use this script to bypass Outlook Web App (OWA) batch selection limits.
 
+SAFETY (added 2026-08-25)
+  --to-inbox re-injects the ENTIRE Archive with no date window, so P1 re-runs its full
+  intake on every message and re-sends all six applicant emails. It is therefore gated on
+  the same replay posture as trigger_reset.py and refuses to run while
+  email.send_applicant_emails is true. A dry run is always allowed; --force-send overrides.
+
+  --to-archive no longer moves Junk Email by default. Junk holds screened spam and vendor
+  mail; re-filing it to Archive re-presents it as legitimate applicant mail. Pass
+  --include-junk if that is genuinely what you want.
+
 USAGE:
-  # Move all messages in Inbox and Junk Email folders into Archive (No changes to read/unread status):
+  # Move Inbox into Archive (Junk is left alone; no read/unread changes):
   python bulk_move_tool.py --to-archive
 
-  # Move all messages in Archive into Inbox AND mark them all UNREAD:
+  # ...and Junk too (re-files screened spam as legitimate mail):
+  python bulk_move_tool.py --to-archive --include-junk
+
+  # Move all messages in Archive into Inbox AND mark them all UNREAD (gated):
   python bulk_move_tool.py --to-inbox
 
   # Dry-run (Preview counts without moving anything):
@@ -58,7 +71,7 @@ def _list_messages(session, mailbox: str, folder: str) -> list:
     """Enumerate all messages in a specific well-known folder."""
     url = f"{GRAPH}/users/{mailbox}/mailFolders/{folder}/messages"
     params = {
-        "$select": "id,subject,receivedDateTime,isRead",
+        "$select": "id,subject,receivedDateTime,isRead,from",
         "$top": _PAGE_SIZE
     }
     messages = []
@@ -74,6 +87,24 @@ def _list_messages(session, mailbox: str, folder: str) -> list:
     return messages
 
 
+def _only_from(messages: list, sender: str) -> list:
+    """Messages whose From address matches `sender` (case-insensitive, exact address).
+
+    Exists so ONE candidate can be requeued without re-injecting the whole Archive. The
+    bulk --to-inbox path re-runs P1's full intake on every message it moves, which is how
+    498 duplicate applicant emails were sent across three replay runs; requeueing a single
+    person is a different operation with a blast radius of one, and needs to be expressible
+    as such rather than approximated by moving everything.
+    """
+    want = sender.strip().lower()
+    out = []
+    for m in messages:
+        addr = (((m.get("from") or {}).get("emailAddress") or {}).get("address") or "").lower()
+        if addr == want:
+            out.append(m)
+    return out
+
+
 def _move_message(session, mailbox: str, message_id: str, dest_folder: str):
     url = f"{GRAPH}/users/{mailbox}/messages/{message_id}/move"
     resp = session.post(url, json={"destinationId": dest_folder}, timeout=_TIMEOUT)
@@ -86,14 +117,61 @@ def _mark_unread(session, mailbox: str, message_id: str):
     resp.raise_for_status()
 
 
+# ── shared replay gate ───────────────────────────────────────────────────────
+# --to-inbox is trigger_reset.py with no date window: it re-injects the ENTIRE
+# Archive, so P1 re-runs its full intake - including all six applicant sends -
+# on every message. That is the same failure that produced 498 duplicate sends
+# (of 1048 total) up to 2026-08-24. The gate lives in trigger_reset.py; import
+# it rather than copy it, so the two tools can never drift apart.
+def _replay_gate(force: bool) -> None:
+    import importlib.util
+    _p = Path(__file__).resolve().parent / "trigger_reset.py"
+    try:
+        _spec = importlib.util.spec_from_file_location("_tr", _p)
+        _tr = importlib.util.module_from_spec(_spec)
+        _argv, sys.argv = sys.argv, [str(_p)]      # its module body parses no args, but be safe
+        try:
+            _spec.loader.exec_module(_tr)
+        finally:
+            sys.argv = _argv
+        _tr._enforce_replay_posture(force)
+    except SystemExit:
+        raise
+    except Exception as e:
+        # Never fail OPEN: if the gate cannot be evaluated, refuse the replay.
+        print(f"\n[BLOCKED] could not evaluate the replay posture ({e}).")
+        print("          Run trigger_reset.py --dry-run to check, or pass --force-send.\n")
+        if not force:
+            sys.exit(2)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Bulk Move Utility for hiring mailbox")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--to-archive", action="store_true", help="Move Inbox + Junk into Archive")
+    group.add_argument("--to-archive", action="store_true", help="Move Inbox into Archive (add --include-junk for Junk too)")
     group.add_argument("--to-inbox", action="store_true", help="Move Archive to Inbox and mark unread")
     parser.add_argument("--mailbox", default="apply@driverai.io", help="Target mailbox address")
     parser.add_argument("--dry-run", action="store_true", help="Preview counts without applying changes")
+    parser.add_argument("--include-junk", action="store_true",
+                        help="With --to-archive, ALSO move Junk Email into Archive. Off by default: "
+                             "Junk holds screened spam and vendor mail, and re-filing it to Archive "
+                             "re-presents it as legitimate applicant mail.")
+    parser.add_argument("--sender", metavar="ADDRESS",
+                        help="Only act on messages from this exact address. With --to-inbox "
+                             "this requeues ONE candidate instead of the whole Archive - the "
+                             "right way to re-run a single person. Note P1 keys the row's "
+                             "Full Name and Email off the From header, so requeue the "
+                             "candidate's OWN message; forwarding it files the row under YOU.")
+    parser.add_argument("--force-send", action="store_true",
+                        help="With --to-inbox, replay even though P1 will re-email real candidates.")
     args = parser.parse_args()
+
+    # A dry run changes nothing, so it never needs the gate. Neither does a --sender move:
+    # the gate exists to stop a WHOLE-ARCHIVE replay re-emailing hundreds of real candidates,
+    # and requeueing one named person is a deliberate act with a blast radius of one - which
+    # is usually done precisely BECAUSE the acknowledgment should go out again.
+    if args.to_inbox and not args.dry_run and not args.sender:
+        _replay_gate(args.force_send)
 
     tenant = os.environ.get("TENANT_ID")
     client_id = os.environ.get("CLIENT_ID")
@@ -112,10 +190,17 @@ def main():
     if args.to_archive:
         print("\n--- Scanning folders for Archive move ---")
         inbox_messages = _list_messages(session, args.mailbox, "inbox")
-        junk_messages = _list_messages(session, args.mailbox, "junkemail")
-        
+        junk_messages = (_list_messages(session, args.mailbox, "junkemail")
+                         if args.include_junk else [])
+
         print(f"Found {len(inbox_messages)} emails in Inbox.")
-        print(f"Found {len(junk_messages)} emails in Junk Email.")
+        if args.include_junk:
+            print(f"Found {len(junk_messages)} emails in Junk Email.")
+            print("  [--include-junk] screened spam WILL be re-filed to Archive, where it")
+            print("  reads as legitimate applicant mail. Only do this if you mean to.")
+        else:
+            _junk_n = len(_list_messages(session, args.mailbox, "junkemail"))
+            print(f"Skipping Junk Email ({_junk_n} messages) - pass --include-junk to move those too.")
         
         total = len(inbox_messages) + len(junk_messages)
         if total == 0:
@@ -151,6 +236,15 @@ def main():
     elif args.to_inbox:
         print("\n--- Scanning Archive for Inbox restoration ---")
         archive_messages = _list_messages(session, args.mailbox, "archive")
+        if args.sender:
+            _before = len(archive_messages)
+            archive_messages = _only_from(archive_messages, args.sender)
+            print(f"[--sender {args.sender}] {len(archive_messages)} of {_before} Archive "
+                  f"message(s) match; the rest are left untouched.")
+            if len(archive_messages) == 0:
+                print("Nothing to requeue - check the address is exactly as it appears in the "
+                      "From header.")
+                return
         
         print(f"Found {len(archive_messages)} emails in Archive.")
         if len(archive_messages) == 0:

@@ -1,0 +1,781 @@
+
+=== ZIP PACKAGE SOURCE ===
+  [PASS] upload ZIP definition matches flow/definition.json exactly
+
+=== A0. RUNAFTER WIRING INTEGRITY ===
+  [PASS] no dangling runAfter references (every runAfter target exists)
+  [PASS] every runAfter target is a same-level sibling (0 cross-level violations found)
+  [PASS] every action reference is on a guaranteed runAfter path (0 unreachable found)
+  [PASS] every Wait interval is within PA's 5s..30d Consumption limit (0 out of range)
+  [PASS] maximum action nesting is 8, within Power Automate's level-8 limit
+  [PASS] unread guard and existing processing graph are flat top-level siblings
+
+=== A. TRIGGER / SCHEDULE ===
+  [PASS] exactly one trigger
+  [PASS] poll interval = 1 min (config 1)
+  [PASS] scheduled Recurrence trigger polls existing unread mail
+  [PASS] no new-arrival splitOn watermark remains
+  [PASS] concurrency = 1 (sequential, no parallel runs)
+  [PASS] Get_unread_emails uses the supported Outlook Get emails (V3) action
+  [PASS] unread poll targets the configured shared mailbox
+  [PASS] the poll reads the Inbox
+  [PASS] the read-flag filter follows trigger.fetch_only_unread
+  [PASS] a message that was merely OPENED is still picked up - reading mail cannot strand it
+  [PASS] unread poll includes attachment content for resume saves
+  [PASS] exactly one unread message is claimed per sequential run
+  [PASS] processing starts only after the unread poll succeeds
+  [PASS] CurrentEmail selects the single polled message
+  [PASS] the existing P1 graph starts after CurrentEmail is selected
+  [PASS] all processing expressions read CurrentEmail, not a new-arrival trigger payload
+
+=== B. COLUMN CONTRACT (11-col write, 33-col table) ===
+  [PASS] Add_row writes exactly the 11 P1-owned columns (got 11)
+  [PASS] Add_row's 11 keys == the P1-owned set
+  [PASS] P2 config.yaml COLUMNS = 33 (adds Years Exp, got 33)
+  [PASS] resume URL + link columns present in schema
+  [PASS] Add_row writes Received Date via formatDateTime ISO (no +00:00 offset)
+  [PASS] Received Date no longer carries the raw '+00:00' offset
+  [PASS] Add_row initializes Last Updated Date equal to Received Date
+  [PASS] Last Updated Date at table position #3
+  [PASS] Every Add_row column exists in the 33-col table schema (no orphan write)
+  [PASS] All 16 P2-owned scoring/profile columns exist in the table
+  [PASS] 'Mail Sent' audit column present in the table schema
+  [PASS] Add_row does NOT list 'Mail Sent' (stamped by Patch_mail_sent after the ack sends)
+  [PASS] Send_acknowledgment action exists
+  [PASS] Send_acknowledgment depends on Add_row only
+  [PASS] the acknowledgment is sent ONLY when the candidate row was actually written
+  [PASS] a failed Excel row write can never still acknowledge the applicant
+  [PASS] a skipped Add_row (upstream save timed out) cannot acknowledge either
+  [PASS] Patch_mail_sent action exists (ack-path 'Mail Sent' stamp)
+  [PASS] Patch_mail_sent runs after Send_acknowledgment only
+  [PASS] Patch_mail_sent runs ONLY on ack Succeeded (a failed send is never stamped)
+  [PASS] Patch_mail_sent writes the 'Mail Sent' column
+  [PASS] Patch_mail_sent records that applicant email was suppressed
+  [PASS] Patch_dup_attempts records that applicant email was suppressed
+  [PASS] Patch_update_attempts records that applicant email was suppressed
+  [PASS] Patch_followup_attempts records that applicant email was suppressed
+  [PASS] Patch_dup_attempts stamps Last Updated Date on every contact
+  [PASS] Patch_dup_attempts's Last Updated Date never moves backward (max-guard against the row's existing value)
+  [PASS] Patch_update_attempts stamps Last Updated Date on every contact
+  [PASS] Patch_update_attempts's Last Updated Date never moves backward (max-guard against the row's existing value)
+  [PASS] Patch_followup_attempts stamps Last Updated Date on every contact
+  [PASS] Patch_followup_attempts's Last Updated Date never moves backward (max-guard against the row's existing value)
+  [PASS] AppRef_current exists (the matched row's live Application ID)
+  [PASS] AppRef_current is sourced from Get_rows_ref (matched by sender email), not the quoted text
+  [PASS] FileRef_from_subject (the saved update-resume filename) is built from AppRef_current, not the text-quoted ref
+  [PASS] Category at table position #4 (got 'Category')
+  [PASS] Resume Link at table position #5 (moved 2026-07-24; got 'Resume Link')
+  [PASS] Application ID at position #1
+  [PASS] Status at position #22 (shifted +2 by Education Start/End Date, +1 more by Years Exp; got 'Status')
+  [PASS] Country at position #10 (got 'Country')
+  [PASS] Years Exp directly after Country, position #11 (added 2026-09-04; got 'Years Exp')
+  [PASS] Current Skills at position #12 (got 'Current Skills')
+  [PASS] Education at position #13 (got 'Education')
+  [PASS] Education Start Date directly after Education, position #14 (got 'Education Start Date')
+  [PASS] Education End Date at position #15 (got 'Education End Date')
+  [PASS] Add_row writes Status='New Email Received'
+  [PASS] Add_row writes Has Resume='Yes' (invariant)
+  [PASS] Add_row writes Application Updates=0
+  [PASS] Add_row does NOT list P2 column 'Category' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Phone' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Location' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Country' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Years Exp' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Current Skills' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Education' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Education Start Date' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Education End Date' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Looking For Role' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Suggested Role 1' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Suggested Role 2' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Suggested Role 3' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Portfolio 1' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Portfolio 2' (left as blank cell for P2)
+  [PASS] Add_row does NOT list P2 column 'Portfolio 3' (left as blank cell for P2)
+  [PASS] retired column absent: 'Is Categorized'
+  [PASS] retired column absent: 'ATS Score'
+  [PASS] retired column absent: 'Score Reason'
+  [PASS] retired column absent: 'Sentiment'
+  [PASS] retired columns absent from the 33-col table too
+
+=== C. APPREF (unique reference per email) ===
+  [PASS] Add_row Application ID = @outputs('AppRef')
+  [PASS] AppRef has no random tail - the same email must mint the same ref
+  [PASS] AppRefSeed exists (the message id, cleaned and padded)
+  [PASS] AppRefSeed is built from the message id, the one value that is stable across retries
+  [PASS] AppRefSeed strips base64url punctuation ('-','')
+  [PASS] AppRefSeed strips base64url punctuation ('_','')
+  [PASS] AppRefSeed strips base64url punctuation ('=','')
+  [PASS] AppRefSeed is left-padded, so the slice can never run off the front
+  [PASS] AppRef slices that seed
+  [PASS] AppRef takes its tail 6 characters from the end, past the low-entropy padding
+  [PASS] AppRef uses received timestamp (not utcNow)
+  [PASS] AppRef date format from config
+  [PASS] AppRef includes time component (HHmm, minute precision)
+  [PASS] AppRef time trimmed to minute precision (no seconds)
+  [PASS] AppRef tail trimmed to the configured length
+  [PASS] AppRef tail is uppercased (consistent round-trip)
+  [PASS] AppRef runs after the seed it reads
+  [PASS] FileRef compose exists
+  [PASS] FileRef replaces '/' with '-' for filename safety
+
+=== D. ODATA APOSTROPHE ESCAPING ===
+  [PASS] Get_rows doubles apostrophes in Email OData filter
+  [PASS] Get_rows_ref doubles apostrophes in Email OData filter
+
+=== D2. SENDER NORMALIZATION (filter + stored Email symmetric) ===
+  [PASS] Get_rows $filter lowercases the sender address
+  [PASS] Get_rows $filter strips a 'Display Name <addr>' wrapper before comparing/storing
+  [PASS] Add_row Email value lowercases the sender address
+  [PASS] Add_row Email value strips a 'Display Name <addr>' wrapper before comparing/storing
+  [PASS] Get_rows_ref still embeds the exact same sender-email filter Get_rows uses (shared constant)
+  [PASS] Get_rows_ref can also look a row up by the quoted Application ID
+  [PASS] Get_rows (duplicate gate) can look a row up by the quoted Application ID
+  [PASS] by-reference duplicate lookup is restricted to ALLOW-LISTED senders - an external sender must not be able to overwrite another candidate's row by quoting their ref
+  [PASS] Get_rows still falls back to the sender-email filter when no ref was quoted
+  [PASS] Is_duplicate is an OR: by-reference match OR inside the date window
+  [PASS] Is_duplicate treats an allow-listed quoted reference as decisive, bypassing the window
+  [PASS] the 90-day window is still enforced for ordinary address-matched duplicates, on the same clock the stored Received Date uses, and anchored to the email's own received date
+  [PASS] the duplicate window is NOT anchored to utcNow() - that disables dedupe on any replay of mail older than the window (redacted-applicant2 double-row, 2026-08-28)
+  [PASS] the Application ID branch is gated on the sender being allow-listed, so an applicant can never patch another applicant's row by quoting their reference
+  [PASS] Get_rows_ref chooses between the two lookups at runtime, not at build time
+
+=== E. RESUME FOLDER PATH ===
+  [PASS] dated_resume_subfolders=true (files into <Year>/<Month>/)
+  [PASS] flow definition contains dated path components (yyyy / MMMM)
+  [PASS] flow definition no longer contains a week-level 'Wk' subfolder segment
+
+=== E2. DATED SUBFOLDER AUTO-CREATE (CreateNewFolder before every Create_file, no delay) ===
+  [PASS] Ensure_resume_folder exists (guarantees the dated folder before saving)
+  [PASS] Ensure_resume_folder uses the Documents library id (CreateNewFolder's required 'table' param)
+  [PASS] Ensure_resume_folder uses 'parameters/path' (library-relative), not 'folderPath'
+  [PASS] Save_resumes_to_SharePoint waits directly on Ensure_resume_folder (no delay action between them)
+  [PASS] Ensure_update_resume_folder exists (guarantees the dated folder before saving)
+  [PASS] Ensure_update_resume_folder uses the Documents library id (CreateNewFolder's required 'table' param)
+  [PASS] Ensure_update_resume_folder uses 'parameters/path' (library-relative), not 'folderPath'
+  [PASS] Save_update_resume waits directly on Ensure_update_resume_folder (no delay action between them)
+  [PASS] Ensure_dup_resume_folder exists (guarantees the dated folder before saving)
+  [PASS] Ensure_dup_resume_folder uses the Documents library id (CreateNewFolder's required 'table' param)
+  [PASS] Ensure_dup_resume_folder uses 'parameters/path' (library-relative), not 'folderPath'
+  [PASS] Save_dup_update_resume waits directly on Ensure_dup_resume_folder (no delay action between them)
+
+=== E3. WORKBOOK SELF-HEAL REMOVED (non-destructive) ===
+  [PASS] destructive self-heal action removed: EnsureWb_Probe
+  [PASS] destructive self-heal action removed: WorkbookExists_NoOp
+  [PASS] destructive self-heal action removed: WorkbookTemplate_B64
+  [PASS] destructive self-heal action removed: Create_workbook
+  [PASS] destructive self-heal action removed: Create_workbook_folder
+  [PASS] destructive self-heal action removed: Wait_after_workbook_heal
+  [PASS] destructive self-heal action removed: Wait_after_workbook_folder
+  [PASS] Get_rows is now the first action in HasResume (no probe/create ahead of it)
+  [PASS] Notify_failure still present (alerts admin if the workbook is genuinely missing)
+  [PASS] no Wait/Delay actions remain anywhere (0 found: [])
+
+=== F. RESUME FILENAME CONVENTION ===
+  [PASS] Original Filename column stores original filename (expression, no APP- prefix)
+  [PASS] Create_file uses the once-generated immutable attachment name
+  [PASS] Original Filename column != saved file path (column = original, file = prefixed)
+
+=== G. UPDATED-CV RE-QUEUE + OVERWRITE ===
+  [PASS] Create_update_file exists (updated resume save)
+  [PASS] Patch_update_attempts re-queues Status='New Email Received' (P2 re-scores)
+  [PASS] Update path writes no manifest column (the intake sidecar carries the references)
+  [PASS] Patch_update_attempts increments Application Updates
+  [PASS] Patch_update_attempts stamps Last Updated Date from the update email time
+  [PASS] Update saves under its own immutable filename
+  [PASS] Update never reuses the previous CV filename
+
+=== G2. NO-REFERENCE RESEND (duplicate path) RE-QUEUES + OVERWRITES ===
+  [PASS] Create_dup_update_file exists (resend-without-ref resume save)
+  [PASS] FileRef_from_dup exists (original AppID prefix for resend saves)
+  [PASS] Patch_dup_attempts re-queues Status='New Email Received' (a resend without a quoted ref still gets rescored)
+  [PASS] Resend path writes no manifest column (the intake sidecar carries the references)
+  [PASS] Patch_dup_attempts still increments Application Updates
+  [PASS] Patch_dup_attempts stamps Last Updated Date from the resend email time
+  [PASS] Resend records its own dated folder in the manifest
+  [PASS] Resend preserves the previous CV
+
+=== H. CAP SYSTEM (Application Updates thresholds) ===
+  [PASS] duplicate_notice_max = 5
+  [PASS] update_resume_max    = 5
+  [PASS] followup_reply_max   = 5
+  [PASS] reply_cap = 3 (contacts 1-3 get an email; 4-5 stay silent but keep counting)
+  [PASS] final-notice threshold = reply_cap-1 = 2 (fires on exactly the 3rd reply, never twice)
+  [PASS] final-notice closing absent in suppress mode (email bodies are suppressed no-ops)
+  [PASS] old cap-1 threshold (final notice on the 5th reply) no longer present
+  [PASS] overall cap gate action exists: IsUnderDupCap
+  [PASS] overall cap gate action exists: IsUnderUpdateCap
+  [PASS] overall cap gate action exists: IsUnderFollowupCap
+  [PASS] reply-cap gate action exists: IsUnderReplyCap_dup
+  [PASS] reply-cap gate action exists: IsUnderReplyCap_update
+  [PASS] reply-cap gate action exists: IsUnderReplyCap_followup
+  [PASS] no-reply patch action exists: Patch_dup_attempts_noreply
+  [PASS] Patch_dup_attempts_noreply never writes 'Mail Sent' (no email was sent)
+  [PASS] Patch_dup_attempts_noreply still increments Application Updates
+  [PASS] Patch_dup_attempts_noreply re-queues Status as expected
+  [PASS] Patch_dup_attempts_noreply stamps Last Updated Date on every contact
+  [PASS] no-reply patch action exists: Patch_update_attempts_noreply
+  [PASS] Patch_update_attempts_noreply never writes 'Mail Sent' (no email was sent)
+  [PASS] Patch_update_attempts_noreply still increments Application Updates
+  [PASS] Patch_update_attempts_noreply re-queues Status as expected
+  [PASS] Patch_update_attempts_noreply stamps Last Updated Date on every contact
+  [PASS] no-reply patch action exists: Patch_followup_attempts_noreply
+  [PASS] Patch_followup_attempts_noreply never writes 'Mail Sent' (no email was sent)
+  [PASS] Patch_followup_attempts_noreply still increments Application Updates
+  [PASS] Patch_followup_attempts_noreply does not touch Status as expected
+  [PASS] Patch_followup_attempts_noreply stamps Last Updated Date on every contact
+
+=== I. SPAM GATE COVERAGE ===
+  [PASS] bad_senders    = 43 (got 43)
+  [PASS] bad_senders includes vendor domain 'bacancy.com'
+  [PASS] bad_senders includes vendor domain 'equestsolutions.net'
+  [PASS] bad_senders includes vendor domain 'sigmasolve.com'
+  [PASS] bad_senders includes vendor domain 'logicrays.com'
+  [PASS] bad_senders includes vendor domain 'infilon.com'
+  [PASS] bad_senders includes vendor domain 'quebecsol.com'
+  [PASS] bad_senders includes vendor domain 'synapsetechservice.com'
+  [PASS] bad_senders includes vendor domain 'itidoltechnologies.com'
+  [PASS] bad_senders includes vendor domain 'atgcorp.com'
+  [PASS] bad_senders includes vendor domain 'pushcam-solution.com'
+  [PASS] bad_senders includes vendor domain 'fixelsmedia.com'
+  [PASS] bad_senders excludes 'teknotrain.com' (real applicant on an employer domain)
+  [PASS] bad_senders excludes 'marketing@' (substring-matched a real applicant)
+  [PASS] bad_subjects excludes bare 'alert' (matches real job titles)
+  [PASS] bad_subjects excludes bare 'invoice' (matches real job titles)
+  [PASS] bad_subjects excludes bare 'receipt' (matches real job titles)
+  [PASS] bad_subjects excludes bare 'payment' (matches real job titles)
+  [PASS] bad_subjects excludes bare 'survey' (matches real job titles)
+  [PASS] bad_subjects   = 27 (got 27)
+  [PASS] bad_senders excludes 'bounce' (still substring-matches a personal address)
+  [PASS] bad_senders excludes 'bounce@' (still substring-matches a personal address)
+  [PASS] bad_senders excludes 'bounces@' (still substring-matches a personal address)
+  [PASS] bad_senders keeps qualified 'bounce-' (VERP / subdomain shapes)
+  [PASS] bad_senders keeps qualified 'bounces.' (VERP / subdomain shapes)
+  [PASS] bad_subjects excludes bare 'digest' (bare common noun)
+  [PASS] bad_subjects keeps qualified 'daily digest'
+  [PASS] bad_subjects keeps qualified 'weekly digest'
+  [PASS] bad_subjects keeps qualified 'monthly digest'
+  [PASS] bad_subjects keeps qualified 'your digest'
+  [PASS] machine bounce sender still blocked: bounces@sendgrid.net
+  [PASS] machine bounce sender still blocked: bounce-123_HTML@mailer.example.com
+  [PASS] machine bounce sender still blocked: no-reply@bounces.example.com
+  [PASS] machine bounce sender still blocked: MAILER-DAEMON@googlemail.com
+  [PASS] machine bounce sender still blocked: postmaster@outlook.com
+  [PASS] a real person is NOT blocked: jane@bounce.com
+  [PASS] a real person is NOT blocked: michael.bounce@gmail.com
+  [PASS] a real person is NOT blocked: a.bounces@yahoo.com
+  [PASS] spam_phrases   = 30 (got 30)
+  [PASS] offensive      = 36 (got 36)
+  [PASS] malware        = 20 (got 20) - extensions/macros only, always checked
+  [PASS] foreign_scam   = 25 (got 25)
+  [PASS] link_shortener_phrases = 12 (got 12) - checked separately, bypassed when a real resume is attached
+  [PASS] total always-on spam gate phrases = 111 (got 111) (+ 12 conditional link-shortener phrases)
+  [PASS] malware_phrases and link_shortener_phrases don't overlap (clean split, nothing lost/duplicated)
+  [PASS] apply@driverai.io in bad_senders (self-loop protection)
+  [PASS] vendor_solicitation = 12 (got 12)
+  [PASS] vendor_solicitation excludes 'collaborat' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'bench' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'our team' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'agency' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'partner with' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'our company' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'we provide' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'case study' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'ready for relocation' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'for your review and consideration' (matched real applicants in replay)
+  [PASS] vendor_solicitation excludes 'professional development team' (matched real applicants in replay)
+  [PASS] no vendor phrase starts with 'our ' ('your' ends in 'our' - unanchored match)
+  [PASS] detect_pattern NOT in bad_subjects (allows applicant Re: replies to reach ref gate)
+  [PASS] offensive: death threats present
+  [PASS] offensive: sexual violence present
+  [PASS] malware: .exe extension present
+  [PASS] link_shortener_phrases: URL shorteners present (conditional gate, not the always-on malware list)
+  [PASS] foreign: Spanish scam present
+  [PASS] scam: lottery phrase present
+  [PASS] app_keywords = 21 (got 21)
+  [PASS] app_keywords includes 'resume' and 'cv'
+  [PASS] app_keywords includes 'pfa' (please find attached shorthand)
+
+=== I2. RESUME-AWARE LINK-SHORTENER BYPASS ===
+  [PASS] HasValidResumeEarly exists (computed before the spam gates)
+  [PASS] ResumeFilesEarly exists (a proper Filter-array Query action, not an inline filter() expression)
+  [PASS] ResumeFilesEarly uses the proven 'Filter array' action type (Query + from/where) - matches ResumeFiles' own pattern
+  [PASS] HasValidResumeEarly does NOT use an inline filter() expression (undocumented/unproven WDL syntax)
+  [PASS] LinkShortenerPhrases exists (separate conditional list)
+  [PASS] MatchLinkShortener exists (separate query, sibling of MatchSpam)
+  [PASS] IsSpam expression checks BOTH the always-on list and the conditional shortener list
+  [PASS] IsSpam expression references HasValidResumeEarly (shortener match alone isn't enough to block)
+  [PASS] IsSpam waits for MatchLinkShortener before evaluating
+
+=== I2. INTERNAL-TESTER ALLOW-LIST (spam-gate bypass) ===
+  [PASS] AllowSenders Compose exists
+  [PASS] MatchAllowSender Query exists
+  [PASS] MatchAllowSender is a Filter-array Query (same pattern as MatchSender)
+  [PASS] MatchAllowSender waits for AllowSenders
+  [PASS] the allow-list is matched against the lowercased From address, exactly like bad_senders
+  [PASS] IsSystem (sender screen) is bypassed for an allow-listed sender (carries the not-allow-listed clause)
+  [PASS] IsSubject (subject screen) is bypassed for an allow-listed sender (carries the not-allow-listed clause)
+  [PASS] IsSpam (content screen) is bypassed for an allow-listed sender (carries the not-allow-listed clause)
+  [PASS] the trigger mailbox (apply@driverai.io) is NOT allow-listed (self-loop guard intact)
+  [PASS] the trigger mailbox is still in bad_senders (the actual self-loop guard)
+  [PASS] every allow-list entry is a real address, not a bare token that could match broadly: ['yashv@driverai.io', 'tracys@driverai.io']
+
+=== J. WORKBOOK ADDRESSING + MANUAL-SETUP TEMPLATE ===
+  [PASS] workbook path has no <Year> subfolder (single file for all years): /Master_Files/Sharepoint_Master_File.xlsx
+  [PASS] workbook path ends with .xlsx: /Master_Files/Sharepoint_Master_File.xlsx
+  [PASS] table name = HiringAgent_P1_Candidates
+  [PASS] setup template sheet name = CandidateList (got CandidateList)
+  [PASS] setup template workbook has exactly 1 table (got 1)
+  [PASS] setup template table ref includes blank seed row: A1:AG2
+  [PASS] setup template row 2 is intentionally blank (Graph-safe seed row)
+  [PASS] setup template 'CandidateList' columns match P2's canonical order exactly (33 cols)
+  [PASS] setup template 'CandidateList' has exactly one Excel table
+  [PASS] setup template 'CandidateList' table includes the permanent row-2 spacer
+  [PASS] setup template 'CandidateList' has one fully blank row directly after the header
+  [PASS] setup template 'CandidateList' has a physical row 2 element
+  [PASS] setup template 'CandidateList' spacer row has a real cell per column (33 cells vs 33 header cells) - a cell-less <row/> makes the 'fully blank' check above pass vacuously
+  [PASS] setup template 'CandidateList' is exactly header + spacer (max_row=2)
+  [PASS] setup template 'Rejected' columns match P2's canonical order exactly (32 cols)
+  [PASS] setup template 'Rejected' has exactly one Excel table
+  [PASS] setup template 'Rejected' table includes the permanent row-2 spacer
+  [PASS] setup template 'Rejected' has one fully blank row directly after the header
+  [PASS] setup template 'Rejected' has a physical row 2 element
+  [PASS] setup template 'Rejected' spacer row has a real cell per column (32 cells vs 32 header cells) - a cell-less <row/> makes the 'fully blank' check above pass vacuously
+  [PASS] setup template 'Rejected' is exactly header + spacer (max_row=2)
+
+=== T. LOCAL TIMEZONE (dates are local wall-clock, not UTC) ===
+  [PASS] flow_config.json declares timezone.id
+  [PASS] utc_offset_hours is -7 (got -7) - a FIXED offset is only exact for a zone with no DST, which is why this must stay Arizona and not Denver
+  [PASS] timezone.id is the Arizona (no-DST, UTC-7 year round) Windows ID (got 'US Mountain Standard Time'); 'Mountain Standard Time' is Denver and would still put a 06:41 UTC May-1 email in May
+  [PASS] the trigger's receivedDateTime is converted to local before any date is derived, in exactly the shape build_zip.py::_local emits
+  [PASS] convertFromUtc() appears NOWHERE - it rejects this connector's timestamps at runtime (proven live 2026-08-27: AppRef failed on '2026-05-01T06:41:25.0000000')
+  [PASS] the local-time shift is present in the built flow, via addHours()
+  [PASS] the shift uses the configured offset (-7h) and an explicit output format
+  [PASS] no action formats utcNow() outside the timezone conversion (0 bare use(s)) - that would store or display a UTC wall-clock
+  [PASS] no action formats the raw receivedDateTime outside the timezone conversion (0 bare use(s)) - that would store or display a UTC wall-clock
+  [PASS] Received Date column is stored in local time
+  [PASS] Last Updated Date column is stored in local time
+  [PASS] the Application ID date comes from the local timestamp
+  [PASS] Versioned CV folder derives year/month from the localized source-message date
+  [PASS] Create_update_file folder path does NOT re-convert the row's stored Received Date (it is already local - a second conversion would shift it again)
+  [PASS] Create_update_file uses the source-message month; the manifest records the exact path
+  [PASS] Create_dup_update_file folder path does NOT re-convert the row's stored Received Date (it is already local - a second conversion would shift it again)
+  [PASS] Create_dup_update_file uses the source-message month; the manifest records the exact path
+  [PASS] the never-move-backward Last Updated comparison converts the incoming timestamp before comparing it against the stored (local) column
+
+=== U. ATTACHMENT TRIAGE (portfolio/cover-letter exclusion + no silent overwrite) ===
+  [PASS] flow_config declares resume_attachments.exclude_name_phrases (9)
+  [PASS] exclusion list covers 'portfolio'
+  [PASS] exclusion list covers 'cover letter'
+  [PASS] ResumeFilesAll exists and is a Query
+  [PASS] ResumeFilesKept exists and is a Query
+  [PASS] ResumeFiles exists and is a Query
+  [PASS] ResumeFilesAll is the original unfiltered .pdf/.docx-with-bytes test
+  [PASS] ResumeFilesKept narrows ResumeFilesAll rather than re-reading the attachments
+  [PASS] exclusion 'portfolio' is applied to the attachment FILENAME, case-insensitively
+  [PASS] exclusion 'cover letter' is applied to the attachment FILENAME, case-insensitively
+  [PASS] exclusion 'coverletter' is applied to the attachment FILENAME, case-insensitively
+  [PASS] exclusion 'cover_letter' is applied to the attachment FILENAME, case-insensitively
+  [PASS] exclusion '-cl.' is applied to the attachment FILENAME, case-insensitively
+  [PASS] exclusion '_cl.' is applied to the attachment FILENAME, case-insensitively
+  [PASS] exclusion 'cl.' is applied to the attachment FILENAME, case-insensitively
+  [PASS] exclusion 'transcript' is applied to the attachment FILENAME, case-insensitively
+  [PASS] exclusion 'certificate' is applied to the attachment FILENAME, case-insensitively
+  [PASS] exclusions are OR'd then negated - any one match drops that attachment
+  [PASS] ResumeFiles falls back to the UNFILTERED list when the exclusion would leave nothing
+  [PASS] ...and prefers the filtered list whenever it has anything in it
+  [PASS] Save_resumes_to_SharePoint still iterates the triaged list, so the exclusion covers this path too
+  [PASS] Save_dup_update_resume still iterates the triaged list, so the exclusion covers this path too
+  [PASS] Save_update_resume still iterates the triaged list, so the exclusion covers this path too
+  [PASS] Original Filename records only the KEPT attachments, so P2's slot count matches the files that actually exist
+  [PASS] Every incoming attachment receives a unique version name
+  [PASS] Each attachment keeps its own extension, including updates
+  [PASS] Original display filename is retained separately
+  [PASS] The manifest and upload refer to the same precomputed filename
+  [PASS] Create_file never recomputes a name or overwrites a previous version
+  [PASS] Create_dup_update_file never recomputes a name or overwrites a previous version
+  [PASS] Create_update_file never recomputes a name or overwrites a previous version
+  [PASS] P1 has no delete action
+
+=== V. LOGIC APPS FUNCTION ARITY (and/or must be binary) ===
+  [PASS] no and() in the built flow takes more than 2 arguments (max found: 2) - a flat multi-arg and() imports fine and then fails EVERY run at runtime
+  [PASS] no or() in the built flow takes more than 2 arguments (max found: 2) - a flat multi-arg or() imports fine and then fails EVERY run at runtime
+  [PASS] ResumeFilesKept folds its exclusion terms into nested BINARY or() calls
+  [PASS] ...and still tests every one of the 9 configured exclusion phrases
+
+=== K. INBOX TIDY (Archive vs Junk Email routing) ===
+  [PASS] inbox_tidy enabled
+  [PASS] legit destination = Archive (got 'Archive')
+  [PASS] spam destination = Junk Email (got 'Junk Email')
+  [PASS] spam move exists: Move_to_processed_spam_sender
+  [PASS] Move_to_processed_spam_sender -> Junk Email (got 'Junk Email')
+  [PASS] spam 'spam_sender' has NO mark-as-read (left unread in Junk)
+  [PASS] spam move exists: Move_to_processed_spam_subject
+  [PASS] Move_to_processed_spam_subject -> Junk Email (got 'Junk Email')
+  [PASS] spam 'spam_subject' has NO mark-as-read (left unread in Junk)
+  [PASS] spam move exists: Move_to_processed_spam_body
+  [PASS] Move_to_processed_spam_body -> Junk Email (got 'Junk Email')
+  [PASS] spam 'spam_body' has NO mark-as-read (left unread in Junk)
+  [PASS] Move_to_processed_update -> Archive (got 'Archive')
+  [PASS] legit 'update' is marked read before moving
+  [PASS] Move_to_processed_update_noreply -> Archive (got 'Archive')
+  [PASS] legit 'update_noreply' is marked read before moving
+  [PASS] Move_to_processed_update_cap -> Archive (got 'Archive')
+  [PASS] legit 'update_cap' is marked read before moving
+  [PASS] Move_to_processed_followup -> Archive (got 'Archive')
+  [PASS] legit 'followup' is marked read before moving
+  [PASS] Move_to_processed_followup_noreply -> Archive (got 'Archive')
+  [PASS] legit 'followup_noreply' is marked read before moving
+  [PASS] Move_to_processed_followup_cap -> Archive (got 'Archive')
+  [PASS] legit 'followup_cap' is marked read before moving
+  [PASS] top-level Move_to_processed -> Archive
+  [PASS] top-level pair marks read before moving
+  [PASS] exactly the 3 spam moves go to Junk Email (got ['Move_to_processed_spam_body', 'Move_to_processed_spam_sender', 'Move_to_processed_spam_subject'])
+  [PASS] exactly 7 legit moves go to Archive (got 7)
+  [PASS] exactly 7 mark-as-read (legit only; spam is unread) (got 7)
+  [PASS] 10 total moves (3 spam + 7 legit) (got 10)
+  [PASS] Move_to_processed_spam_sender disables automatic replay of the non-idempotent move
+  [PASS] Move_to_processed_spam_subject disables automatic replay of the non-idempotent move
+  [PASS] Move_to_processed_spam_body disables automatic replay of the non-idempotent move
+  [PASS] Move_to_processed disables automatic replay of the non-idempotent move
+  [PASS] Move_to_processed_update disables automatic replay of the non-idempotent move
+  [PASS] Move_to_processed_update_noreply disables automatic replay of the non-idempotent move
+  [PASS] Move_to_processed_update_cap disables automatic replay of the non-idempotent move
+  [PASS] Move_to_processed_followup disables automatic replay of the non-idempotent move
+  [PASS] Move_to_processed_followup_noreply disables automatic replay of the non-idempotent move
+  [PASS] Move_to_processed_followup_cap disables automatic replay of the non-idempotent move
+  [PASS] exactly 11 MoveV2 actions exist (10 outcome moves + 1 failure move; got 11)
+  [PASS] Move_to_processed_spam_sender uses the current polled message ID
+  [PASS] Move_to_processed_spam_sender uses the configured shared mailbox
+  [PASS] Move_to_processed_spam_sender uses a portable well-known folder name
+  [PASS] Move_to_processed_spam_subject uses the current polled message ID
+  [PASS] Move_to_processed_spam_subject uses the configured shared mailbox
+  [PASS] Move_to_processed_spam_subject uses a portable well-known folder name
+  [PASS] Move_to_processed_spam_body uses the current polled message ID
+  [PASS] Move_to_processed_spam_body uses the configured shared mailbox
+  [PASS] Move_to_processed_spam_body uses a portable well-known folder name
+  [PASS] Move_to_processed uses the current polled message ID
+  [PASS] Move_to_processed uses the configured shared mailbox
+  [PASS] Move_to_processed uses a portable well-known folder name
+  [PASS] Move_failed_to_archive_unread uses the current polled message ID
+  [PASS] Move_failed_to_archive_unread uses the configured shared mailbox
+  [PASS] Move_failed_to_archive_unread uses a portable well-known folder name
+  [PASS] Move_to_processed_update uses the current polled message ID
+  [PASS] Move_to_processed_update uses the configured shared mailbox
+  [PASS] Move_to_processed_update uses a portable well-known folder name
+  [PASS] Move_to_processed_update_noreply uses the current polled message ID
+  [PASS] Move_to_processed_update_noreply uses the configured shared mailbox
+  [PASS] Move_to_processed_update_noreply uses a portable well-known folder name
+  [PASS] Move_to_processed_update_cap uses the current polled message ID
+  [PASS] Move_to_processed_update_cap uses the configured shared mailbox
+  [PASS] Move_to_processed_update_cap uses a portable well-known folder name
+  [PASS] Move_to_processed_followup uses the current polled message ID
+  [PASS] Move_to_processed_followup uses the configured shared mailbox
+  [PASS] Move_to_processed_followup uses a portable well-known folder name
+  [PASS] Move_to_processed_followup_noreply uses the current polled message ID
+  [PASS] Move_to_processed_followup_noreply uses the configured shared mailbox
+  [PASS] Move_to_processed_followup_noreply uses a portable well-known folder name
+  [PASS] Move_to_processed_followup_cap uses the current polled message ID
+  [PASS] Move_to_processed_followup_cap uses the configured shared mailbox
+  [PASS] Move_to_processed_followup_cap uses a portable well-known folder name
+  [PASS] legacy Recruiting Review failure move is absent
+  [PASS] no tenant-specific Outlook folder ID is baked into a MoveV2 action
+  [PASS] 9 nested outcome moves require terminal handlers (got 9)
+  [PASS] Move_to_processed_spam_sender has exactly one same-scope Terminate continuation
+  [PASS] Move_to_processed_spam_sender continuation handles every terminal status
+  [PASS] Move_to_processed_spam_subject has exactly one same-scope Terminate continuation
+  [PASS] Move_to_processed_spam_subject continuation handles every terminal status
+  [PASS] Move_to_processed_spam_body has exactly one same-scope Terminate continuation
+  [PASS] Move_to_processed_spam_body continuation handles every terminal status
+  [PASS] Move_to_processed_update has exactly one same-scope Terminate continuation
+  [PASS] Move_to_processed_update continuation handles every terminal status
+  [PASS] Move_to_processed_update_noreply has exactly one same-scope Terminate continuation
+  [PASS] Move_to_processed_update_noreply continuation handles every terminal status
+  [PASS] Move_to_processed_update_cap has exactly one same-scope Terminate continuation
+  [PASS] Move_to_processed_update_cap continuation handles every terminal status
+  [PASS] Move_to_processed_followup has exactly one same-scope Terminate continuation
+  [PASS] Move_to_processed_followup continuation handles every terminal status
+  [PASS] Move_to_processed_followup_noreply has exactly one same-scope Terminate continuation
+  [PASS] Move_to_processed_followup_noreply continuation handles every terminal status
+  [PASS] Move_to_processed_followup_cap has exactly one same-scope Terminate continuation
+  [PASS] Move_to_processed_followup_cap continuation handles every terminal status
+  [PASS] Move_to_processed follows mark success/failure/timeout but never a skipped branch
+  [PASS] Move_to_processed_update follows mark success/failure/timeout but never a skipped branch
+  [PASS] Move_to_processed_update_noreply follows mark success/failure/timeout but never a skipped branch
+  [PASS] Move_to_processed_update_cap follows mark success/failure/timeout but never a skipped branch
+  [PASS] Move_to_processed_followup follows mark success/failure/timeout but never a skipped branch
+  [PASS] Move_to_processed_followup_noreply follows mark success/failure/timeout but never a skipped branch
+  [PASS] Move_to_processed_followup_cap follows mark success/failure/timeout but never a skipped branch
+  [PASS] Finalize_processed_cleanup handles the terminal normal-move result
+  [PASS] normal cleanup handles success/failure/timeout without activating on a skipped branch
+  [PASS] Terminate_System handles every terminal status from Move_to_processed_spam_sender
+  [PASS] Terminate_Subject handles every terminal status from Move_to_processed_spam_subject
+  [PASS] Terminate_Spam handles every terminal status from Move_to_processed_spam_body
+  [PASS] Terminate_update handles every terminal status from Move_to_processed_update
+  [PASS] Terminate_update_noreply handles every terminal status from Move_to_processed_update_noreply
+  [PASS] Terminate_update_silent handles every terminal status from Move_to_processed_update_cap
+  [PASS] Terminate_noted handles every terminal status from Move_to_processed_followup
+  [PASS] Terminate_noted_noreply handles every terminal status from Move_to_processed_followup_noreply
+  [PASS] Terminate_noted_silent handles every terminal status from Move_to_processed_followup_cap
+
+=== L. ERROR HANDLING ===
+  [PASS] Notify_failure admin alert action present
+  [PASS] Notify_poll_failure Inbox-read alert action present
+  [PASS] Notify_failure remains a real connector action
+  [PASS] failure alert targets yashv@driverai.io
+  [PASS] failure alert includes application reference for traceability
+  [PASS] unread-Inbox poll failure remains a real admin connector action
+  [PASS] unread-Inbox poll failure targets the configured admin
+  [PASS] poll failure alert runs only when Get_unread_emails fails or times out
+  [PASS] Notify_failure runs after flow body (not after a tidy action)
+  [PASS] Move_failed_to_archive_unread is a real shared-mailbox move
+  [PASS] Move_failed_to_archive_unread targets the configured portable failure folder
+  [PASS] Move_failed_to_archive_unread disables automatic replay of the non-idempotent move
+  [PASS] Move_failed_to_archive_unread runs only after an actual processing-failure alert attempt
+  [PASS] Move_failed_to_archive_unread cannot race normal cleanup when Notify_failure is skipped on success
+  [PASS] Finalize_failed_cleanup handles failure-routing cleanup errors
+  [PASS] failure cleanup handles success/failure/timeout without activating on normal success
+
+=== M. ROUTING SIMULATION ===
+  [PASS] new applicant PDF                                  -> EMAIL1 ack + NEW row + save resume
+  [PASS] new applicant DOCX                                 -> EMAIL1 ack + NEW row + save resume
+  [PASS] new applicant PDF+DOCX (two files)                 -> EMAIL1 ack + NEW row + save resume
+  [PASS] new applicant — body keyword only                  -> EMAIL1 ack + NEW row + save resume
+  [PASS] self-loop (apply@)                                 -> SILENT (loop/bad-sender)
+  [PASS] noreply sender                                     -> SILENT (loop/bad-sender)
+  [PASS] linkedin notification                              -> SILENT (loop/bad-sender)
+  [PASS] mailer-daemon bounce                               -> SILENT (loop/bad-sender)
+  [PASS] bad sender WITH a valid resume attached — gate 1 still wins (not rescued by resume bypass) -> SILENT (loop/bad-sender)
+  [PASS] webinar subject                                    -> SILENT (bad-subject)
+  [PASS] out-of-office subject                              -> SILENT (bad-subject)
+  [PASS] invoice subject                                    -> SILENT (bad-subject)
+  [PASS] our own ack subject (prevents re-reply loops)      -> SILENT (bad-subject)
+  [PASS] bad subject WITH a valid resume attached — gate 2 still wins (not rescued by resume bypass) -> SILENT (bad-subject)
+  [PASS] real applicant whose address ends in 'marketing@'  -> EMAIL1 ack + NEW row + save resume
+  [PASS] payments engineer is not a 'payment' spam subject  -> EMAIL1 ack + NEW row + save resume
+  [PASS] land surveyor is not a 'survey' spam subject       -> EMAIL1 ack + NEW row + save resume
+  [PASS] invoice processing specialist is a real job title  -> EMAIL1 ack + NEW row + save resume
+  [PASS] alert systems engineer is not an 'alert' spam subject -> EMAIL1 ack + NEW row + save resume
+  [PASS] receipt reconciliation analyst is a real job title -> EMAIL1 ack + NEW row + save resume
+  [PASS] lottery scam                                       -> SILENT (spam/abuse/malware)
+  [PASS] phishing link                                      -> SILENT (spam/abuse/malware)
+  [PASS] offensive — sexual solicitation                    -> SILENT (spam/abuse/malware)
+  [PASS] offensive — death threat                           -> SILENT (spam/abuse/malware)
+  [PASS] offensive — slur                                   -> SILENT (spam/abuse/malware)
+  [PASS] malware exe attachment                             -> SILENT (spam/abuse/malware)
+  [PASS] malware ps1 attachment                             -> SILENT (spam/abuse/malware)
+  [PASS] University of Exeter URL is not a .exe attachment  -> EMAIL1 ack + NEW row + save resume
+  [PASS] iso.org / ISO 27001 is not a .iso attachment       -> EMAIL1 ack + NEW row + save resume
+  [PASS] URL shortener in signature, but a real resume IS attached -> allowed through -> EMAIL1 ack + NEW row + save resume
+  [PASS] URL shortener in body, NO resume attached -> still blocked -> SILENT (spam/abuse/malware)
+  [PASS] URL shortener + wrong-format attachment (not a real resume) -> still blocked -> SILENT (spam/abuse/malware)
+  [PASS] foreign scam — Spanish                             -> SILENT (spam/abuse/malware)
+  [PASS] foreign scam — French                              -> SILENT (spam/abuse/malware)
+  [PASS] enable macros command                              -> SILENT (spam/abuse/malware)
+  [PASS] duplicate within 90 days                           -> EMAIL2 duplicate notice (capped, no new row)
+  [PASS] duplicate at cap=5 (silent)                        -> SILENT (cap reached)
+  [PASS] update with new CV                                 -> EMAIL5 update (re-queue row+file)
+  [PASS] update with DOCX                                   -> EMAIL5 update (re-queue row+file)
+  [PASS] follow-up no CV                                    -> EMAIL6 follow-up (no new CV)
+  [PASS] update at cap=5 (silent)                           -> SILENT (cap reached)
+  [PASS] follow-up at cap=5 (silent)                        -> SILENT (cap reached)
+  [PASS] ref in body not subject                            -> EMAIL5 update (re-queue row+file)
+  [PASS] decade-proof ref (app-2099)                        -> EMAIL5 update (re-queue row+file)
+  [PASS] quoted ref but unknown sender → new applicant      -> EMAIL1 ack + NEW row + save resume
+  [PASS] no-CV with keyword in subject                      -> EMAIL3 please attach CV (no row)
+  [PASS] no-CV with keyword in body only                    -> EMAIL3 please attach CV (no row)
+  [PASS] wrong format (.doc)                                -> EMAIL4 wrong format (resend PDF/DOCX)
+  [PASS] wrong format (.txt)                                -> EMAIL4 wrong format (resend PDF/DOCX)
+  [PASS] wrong format (.jpg image)                          -> EMAIL4 wrong format (resend PDF/DOCX)
+  [PASS] wrong format + hiring keyword → EMAIL4 (attachment present, not EMAIL3) -> EMAIL4 wrong format (resend PDF/DOCX)
+  [PASS] no attachment, no keyword → ignore                 -> IGNORE (not an application)
+  [PASS] completely blank email                             -> IGNORE (not an application)
+
+=== M2. DUPLICATE WINDOW BOUNDARY (90-day inclusive edge) ===
+  [PASS] 89 days since last submission -> still a duplicate (inside window)
+  [PASS] exactly 90 days since last submission -> still a duplicate (boundary is inclusive, >=)
+  [PASS] 90 days + 1 second since last submission -> NOT a duplicate (just outside window)
+  [PASS] 91 days since last submission -> NOT a duplicate (outside window)
+  [PASS] 1 minute since last submission -> duplicate (immediate resend)
+
+=== N. FLOW CONFIG INTEGRITY ===
+  [PASS] trigger mailbox = apply@driverai.io
+  [PASS] admin email = yashv@driverai.io
+  [PASS] duplicate_check_days = 90
+  [PASS] resumes_folder starts with '/' (absolute path)
+  [PASS] detect_pattern = app-20 (decade-proof, matches 2000-2099)
+  [PASS] inbox_tidy destination = Archive (capitalized well-known folder)
+  [PASS] flow displayName matches config flow_name 'DriverAI_HiringAgent_P1_AutoReply'
+
+=== O. OUTBOUND MAIL CONTROLS — definition matches config ===
+  (config says APPLICANT MAIL DISABLED - validating silent live intake)
+  [PASS] Send_acknowledgment is a no-op Compose (applicant not contacted)
+  [PASS] Send_acknowledgment keeps a runAfter/inputs shape (wiring intact)
+  [PASS] Send_duplicate_notice is a no-op Compose (applicant not contacted)
+  [PASS] Send_duplicate_notice keeps a runAfter/inputs shape (wiring intact)
+  [PASS] Send_CV_request is a no-op Compose (applicant not contacted)
+  [PASS] Send_CV_request keeps a runAfter/inputs shape (wiring intact)
+  [PASS] Send_wrong_format is a no-op Compose (applicant not contacted)
+  [PASS] Send_wrong_format keeps a runAfter/inputs shape (wiring intact)
+  [PASS] Send_update_ack is a no-op Compose (applicant not contacted)
+  [PASS] Send_update_ack keeps a runAfter/inputs shape (wiring intact)
+  [PASS] Send_noted_reply is a no-op Compose (applicant not contacted)
+  [PASS] Send_noted_reply keeps a runAfter/inputs shape (wiring intact)
+  [PASS] NO applicant shared-mailbox send operations remain (got 0)
+  [PASS] Mail Sent stamps record suppression in all 4 patches (got 4)
+  [PASS] no real "Sent <timestamp>" stamp expression remains
+  [PASS] admin failure alert remains enabled
+  [PASS] unread-Inbox poll failure alert remains enabled
+  [PASS] two admin send operations remain (processing + poll; got 14)
+
+=== O3. PATCH-FAILURE ALERTS (silent-failure guard) ===
+  [PASS] all 7 candidate-row PATCH actions are covered by an alert
+  [PASS] Notify_mail_sent_failed exists
+  [PASS] Notify_mail_sent_failed is a real admin send
+  [PASS] Notify_mail_sent_failed targets the configured admin
+  [PASS] Notify_mail_sent_failed retries on a transient send failure
+  [PASS] Notify_mail_sent_failed fires ONLY on Patch_mail_sent Failed/TimedOut
+  [PASS] Notify_mail_sent_failed never fires on a successful patch (no false alarm)
+  [PASS] Notify_mail_sent_failed is a SIBLING of Patch_mail_sent at depth 5 (adds no nesting)
+  [PASS] Notify_dup_attempts_failed exists
+  [PASS] Notify_dup_attempts_failed is a real admin send
+  [PASS] Notify_dup_attempts_failed targets the configured admin
+  [PASS] Notify_dup_attempts_failed retries on a transient send failure
+  [PASS] Notify_dup_attempts_failed fires ONLY on Patch_dup_attempts Failed/TimedOut
+  [PASS] Notify_dup_attempts_failed never fires on a successful patch (no false alarm)
+  [PASS] Notify_dup_attempts_failed is a SIBLING of Patch_dup_attempts at depth 7 (adds no nesting)
+  [PASS] Notify_dup_attempts_noreply_failed exists
+  [PASS] Notify_dup_attempts_noreply_failed is a real admin send
+  [PASS] Notify_dup_attempts_noreply_failed targets the configured admin
+  [PASS] Notify_dup_attempts_noreply_failed retries on a transient send failure
+  [PASS] Notify_dup_attempts_noreply_failed fires ONLY on Patch_dup_attempts_noreply Failed/TimedOut
+  [PASS] Notify_dup_attempts_noreply_failed never fires on a successful patch (no false alarm)
+  [PASS] Notify_dup_attempts_noreply_failed is a SIBLING of Patch_dup_attempts_noreply at depth 7 (adds no nesting)
+  [PASS] Notify_update_attempts_failed exists
+  [PASS] Notify_update_attempts_failed is a real admin send
+  [PASS] Notify_update_attempts_failed targets the configured admin
+  [PASS] Notify_update_attempts_failed retries on a transient send failure
+  [PASS] Notify_update_attempts_failed fires ONLY on Patch_update_attempts Failed/TimedOut
+  [PASS] Notify_update_attempts_failed never fires on a successful patch (no false alarm)
+  [PASS] Notify_update_attempts_failed is a SIBLING of Patch_update_attempts at depth 8 (adds no nesting)
+  [PASS] Notify_update_attempts_noreply_failed exists
+  [PASS] Notify_update_attempts_noreply_failed is a real admin send
+  [PASS] Notify_update_attempts_noreply_failed targets the configured admin
+  [PASS] Notify_update_attempts_noreply_failed retries on a transient send failure
+  [PASS] Notify_update_attempts_noreply_failed fires ONLY on Patch_update_attempts_noreply Failed/TimedOut
+  [PASS] Notify_update_attempts_noreply_failed never fires on a successful patch (no false alarm)
+  [PASS] Notify_update_attempts_noreply_failed is a SIBLING of Patch_update_attempts_noreply at depth 8 (adds no nesting)
+  [PASS] Notify_followup_attempts_failed exists
+  [PASS] Notify_followup_attempts_failed is a real admin send
+  [PASS] Notify_followup_attempts_failed targets the configured admin
+  [PASS] Notify_followup_attempts_failed retries on a transient send failure
+  [PASS] Notify_followup_attempts_failed fires ONLY on Patch_followup_attempts Failed/TimedOut
+  [PASS] Notify_followup_attempts_failed never fires on a successful patch (no false alarm)
+  [PASS] Notify_followup_attempts_failed is a SIBLING of Patch_followup_attempts at depth 8 (adds no nesting)
+  [PASS] Notify_followup_attempts_noreply_failed exists
+  [PASS] Notify_followup_attempts_noreply_failed is a real admin send
+  [PASS] Notify_followup_attempts_noreply_failed targets the configured admin
+  [PASS] Notify_followup_attempts_noreply_failed retries on a transient send failure
+  [PASS] Notify_followup_attempts_noreply_failed fires ONLY on Patch_followup_attempts_noreply Failed/TimedOut
+  [PASS] Notify_followup_attempts_noreply_failed never fires on a successful patch (no false alarm)
+  [PASS] Notify_followup_attempts_noreply_failed is a SIBLING of Patch_followup_attempts_noreply at depth 8 (adds no nesting)
+  [PASS] nothing runs after a patch-failure alert, so they are inert (got [])
+
+=== O3b. INTAKE-WRITE FAILURE ALERTS (applicant-lost guard) ===
+  [PASS] Notify_add_row_failed exists (guards Add_row)
+  [PASS] Notify_add_row_failed is a real admin send
+  [PASS] Notify_add_row_failed targets the configured admin
+  [PASS] Notify_add_row_failed retries on a transient send failure
+  [PASS] Notify_add_row_failed body states the recovery step (move back to Inbox as unread)
+  [PASS] Notify_add_row_failed fires ONLY on Add_row Failed/TimedOut
+  [PASS] Notify_add_row_failed is a SIBLING of Add_row (adds no nesting)
+  [PASS] Notify_create_file_failed exists (guards Create_file)
+  [PASS] Notify_create_file_failed is a real admin send
+  [PASS] Notify_create_file_failed targets the configured admin
+  [PASS] Notify_create_file_failed retries on a transient send failure
+  [PASS] Notify_create_file_failed body states the recovery step (move back to Inbox as unread)
+  [PASS] Notify_create_file_failed fires ONLY on Create_file Failed/TimedOut
+  [PASS] Notify_create_file_failed is a SIBLING of Create_file (adds no nesting)
+  [PASS] Notify_create_dup_update_file_failed exists (guards Create_dup_update_file)
+  [PASS] Notify_create_dup_update_file_failed is a real admin send
+  [PASS] Notify_create_dup_update_file_failed targets the configured admin
+  [PASS] Notify_create_dup_update_file_failed retries on a transient send failure
+  [PASS] Notify_create_dup_update_file_failed body states the recovery step (move back to Inbox as unread)
+  [PASS] Notify_create_dup_update_file_failed fires ONLY on Create_dup_update_file Failed/TimedOut
+  [PASS] Notify_create_dup_update_file_failed is a SIBLING of Create_dup_update_file (adds no nesting)
+  [PASS] Notify_create_update_file_failed exists (guards Create_update_file)
+  [PASS] Notify_create_update_file_failed is a real admin send
+  [PASS] Notify_create_update_file_failed targets the configured admin
+  [PASS] Notify_create_update_file_failed retries on a transient send failure
+  [PASS] Notify_create_update_file_failed body states the recovery step (move back to Inbox as unread)
+  [PASS] Notify_create_update_file_failed fires ONLY on Create_update_file Failed/TimedOut
+  [PASS] Notify_create_update_file_failed is a SIBLING of Create_update_file (adds no nesting)
+  [PASS] Add_row failure is watched by an alert (a silent failure loses the applicant)
+  [PASS] Create_file failure is watched by an alert (a silent failure loses the applicant)
+  [PASS] Create_dup_update_file failure is watched by an alert (a silent failure loses the applicant)
+  [PASS] Create_update_file failure is watched by an alert (a silent failure loses the applicant)
+  [PASS] nothing runs after an intake-write alert, so they are inert (got [])
+  [PASS] no candidate-row patch propagates - a row deleted mid-run cannot fail the flow
+  [PASS] Patch_mail_sent failure is SWALLOWED (alert is the only signal) - alert wording depends on this; followers=['Ack_stamp_done']
+  [PASS] Patch_dup_attempts failure is SWALLOWED (alert is the only signal) - alert wording depends on this; followers=['Dup_patch_done']
+  [PASS] Patch_dup_attempts_noreply failure is SWALLOWED (alert is the only signal) - alert wording depends on this; followers=['Dup_noreply_patch_done']
+  [PASS] Patch_update_attempts failure is SWALLOWED (alert is the only signal) - alert wording depends on this; followers=['Mark_as_read_update']
+  [PASS] Patch_update_attempts_noreply failure is SWALLOWED (alert is the only signal) - alert wording depends on this; followers=['Mark_as_read_update_noreply']
+  [PASS] Patch_followup_attempts failure is SWALLOWED (alert is the only signal) - alert wording depends on this; followers=['Mark_as_read_followup']
+  [PASS] Patch_followup_attempts_noreply failure is SWALLOWED (alert is the only signal) - alert wording depends on this; followers=['Mark_as_read_followup_noreply']
+  [PASS] Notify_mail_sent_failed tells the admin it is the ONLY signal
+  [PASS] Notify_dup_attempts_failed tells the admin it is the ONLY signal
+  [PASS] Notify_dup_attempts_noreply_failed tells the admin it is the ONLY signal
+  [PASS] Notify_update_attempts_failed tells the admin it is the ONLY signal
+  [PASS] Notify_update_attempts_noreply_failed tells the admin it is the ONLY signal
+  [PASS] Notify_followup_attempts_failed tells the admin it is the ONLY signal
+  [PASS] Notify_followup_attempts_noreply_failed tells the admin it is the ONLY signal
+  [PASS] adding the alerts kept nesting within the PA limit of 8 (got 8)
+  [PASS] Notify_failure retries (changed 2026-08-03; the no-retry rule is for MoveV2, not sends)
+  [PASS] Notify_poll_failure retries (changed 2026-08-03; the no-retry rule is for MoveV2, not sends)
+
+=== P. YEAR-BOUNDARY SEPARATOR (blank row before the first new-applicant row/year) ===
+  [PASS] separators are OFF, so Get_rows_any_applicant is not built (no stray blank rows appended)
+  [PASS] separators are OFF, so Get_rows_for_separators is not built (no stray blank rows appended)
+  [PASS] separators are OFF, so Filter_rows_this_year is not built (no stray blank rows appended)
+  [PASS] separators are OFF, so Filter_rows_this_month is not built (no stray blank rows appended)
+  [PASS] separators are OFF, so IsFirstOfNewYear is not built (no stray blank rows appended)
+  [PASS] separators are OFF, so IsFirstOfNewMonth is not built (no stray blank rows appended)
+  [PASS] separators are OFF, so Add_row_year_separator is not built (no stray blank rows appended)
+  [PASS] separators are OFF, so Add_row_month_separator is not built (no stray blank rows appended)
+  [PASS] Add_row no longer waits on any separator check
+  (config says year_separator DISABLED - validating clean removal)
+  [PASS] Filter_rows_this_year absent when disabled
+  [PASS] IsFirstOfNewYear absent when disabled
+  [PASS] Add_row_year_separator absent when disabled
+  [PASS] Add_row's runAfter has no dangling reference to the disabled feature
+
+=== N2. MONTH SEPARATOR ===
+  (config says month_separator DISABLED - validating clean removal)
+  [PASS] Filter_rows_this_month absent when disabled
+  [PASS] IsFirstOfNewMonth absent when disabled
+  [PASS] no dangling runAfter reference
+  [PASS] no Excel OData filter references the non-alphanumeric 'Received Date' header
+
+=== M3. DUPLICATE CHECK IS INDEPENDENT OF ROW ORDER ===
+  [PASS] the duplicate window no longer reads last() (which is the OLDEST row on the live sheet)
+  [PASS] the duplicate window takes the MAX received date, so any row order gives the same answer
+  [PASS] Submitted_ticks projects each matching row to its tick value
+  [PASS] Is_duplicate waits on the projection it reads
+  [PASS] the tick collection is floored so a brand-new applicant never hits max() on an empty array
+  [PASS] no action reads last() off a candidate-row array (found [])
+  [PASS] append order (oldest first): a recent re-application is still a duplicate
+  [PASS] newest-first order (the live sheet): SAME answer - this is the bug that was fixed
+  [PASS] a sender whose only application is outside the window is not a duplicate
+  [PASS] a brand-new sender with no rows is not a duplicate (and does not error)
+
+=== O2. OPERATING POSTURE — applicant mail is OFF (silent intake) ===
+  [PASS] the posture is committed in flow_config.json, not left to an untracked override
+  [PASS] suppressed builds stamp a visibly-distinct marker instead of claiming 'Sent'
+  [PASS] no applicant send operation remains in a suppressed build
+  [PASS] admin failure alerts stay ON regardless of the applicant-mail posture
+  [PASS] the trigger still polls for real (every 1 min)
+
+============================================================
+  P1 RESULT: 708 passed, 0 failed
+============================================================

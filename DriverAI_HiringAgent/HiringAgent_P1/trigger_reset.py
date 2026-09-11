@@ -4,17 +4,35 @@ so the Power Automate trigger re-fires on them.
 
 HOW IT WORKS
 ------------
-The PA "When a new email arrives in a shared mailbox (V2)" trigger uses a delta
-query against the Inbox folder. Moving a message FROM Archive BACK TO Inbox is
-detected as a "new change" by the delta — the next 1-minute poll picks it up and
-runs the full flow (spam gates, duplicate check, reply, SharePoint row) as if the
-email just arrived.
+P1 is a SCHEDULED POLLER, not an event trigger (corrected 2026-08-03; this note used
+to describe the old "When a new email arrives in a shared mailbox (V2)" delta-query
+trigger, which the package no longer uses). The trigger is a plain Recurrence that
+fires every minute regardless of mail; the flow's first action, Get_unread_emails,
+then queries the mailbox with:
+
+    folderPath = "Inbox"   fetchOnlyUnread = true   top = 1
+
+Eligibility is therefore just three things — in Inbox, unread, and the one message
+selected that minute. **Age is irrelevant: there is no date filter anywhere in that
+query.** That is why this tool works: making an archived message unread and moving
+it back to Inbox puts it straight back in scope, and the next poll runs the full
+flow on it (spam gates, duplicate check, reply, SharePoint row).
+
+The mechanism is unchanged, but the reason is — it is unread-polling now, not delta
+change-detection.
 
 WHEN TO USE
 -----------
   - Testing the flow against real historical mail without forwarding new test emails.
   - Reprocessing a batch that the flow may have missed (e.g. flow was off, misconfigured).
-  - Validating the 30-column schema against live data.
+  - Validating the 32-column schema against live data.
+
+MOVE ONE AT A TIME
+------------------
+`top: 1` plus `concurrency: {runs: 1}` means one message per minute, and the query
+specifies NO orderBy — with a backlog, which message gets picked is the Office 365
+connector's default, not something P1 controls. Bulk-moving a large batch back into
+Inbox has stalled the trigger in practice. Drain oldest-first, one month at a time.
 
 PREREQUISITES
 -------------
@@ -139,6 +157,87 @@ def _list_archive_messages(session, mailbox: str, since: "datetime.datetime | No
 
 # ── main ─────────────────────────────────────────────────────────────────────
 
+# ── replay safety gate ───────────────────────────────────────────────────────
+# Re-injecting Archive mail makes P1 run the FULL flow again, including its six
+# applicant sends. P1 has no runtime "this is a replay" signal - the only control
+# is email.send_applicant_emails in flow_config.json, which build_zip.py bakes
+# into the package. Without this gate a replay silently re-emails real people:
+# the 2026-08-24 audit found 498 duplicate sends (of 1048 total) traced to replay
+# runs on 12 Jul, 04 Aug and 15 Aug, with candidates contacted up to 6 times.
+FLOW_DIR = Path(__file__).resolve().parent / "flow"
+FLOW_CONFIG = FLOW_DIR / "flow_config.json"
+FLOW_ZIP = FLOW_DIR / "DriverAI-Hiring-AutoReply-apply.zip"
+_SUPPRESS_MARKER = "Applicant email disabled"
+
+
+def _config_sends_applicant_mail() -> "bool | None":
+    """True/False from flow_config.json; None if it can't be read."""
+    try:
+        import json
+        cfg = json.loads(FLOW_CONFIG.read_text(encoding="utf-8"))
+        return bool(cfg.get("email", {}).get("send_applicant_emails", True))
+    except Exception:
+        return None
+
+
+def _zip_sends_applicant_mail() -> "bool | None":
+    """False when the built package carries build_zip's suppression stamps."""
+    try:
+        import zipfile
+        with zipfile.ZipFile(FLOW_ZIP) as z:
+            blob = "".join(
+                z.read(n).decode("utf-8", "replace")
+                for n in z.namelist() if n.endswith(".json")
+            )
+        return _SUPPRESS_MARKER not in blob
+    except Exception:
+        return None
+
+
+def _enforce_replay_posture(force: bool) -> None:
+    """Refuse a live replay while P1 would email applicants."""
+    cfg_sends = _config_sends_applicant_mail()
+    zip_sends = _zip_sends_applicant_mail()
+
+    if cfg_sends is False and zip_sends is False:
+        print("  Replay posture : applicant email SUPPRESSED in config and in the built ZIP.")
+        print("                   Confirm that ZIP is the version imported in Power Automate -")
+        print("                   this script cannot see what is actually deployed.\n")
+        return
+
+    if cfg_sends is False and zip_sends is not False:
+        print("\n[BLOCKED] flow_config.json disables applicant email, but the built ZIP still")
+        print("          contains live sends. The config change has not been built yet.")
+        print("          Run:  python flow/build_zip.py   then re-import the ZIP.\n")
+        if not force:
+            sys.exit(2)
+        print("  [--force-send] proceeding anyway; candidates MAY receive duplicate email.\n")
+        return
+
+    if cfg_sends is not False:
+        print("\n" + "=" * 68)
+        print("  BLOCKED - this replay would email real candidates again")
+        print("=" * 68)
+        print("  email.send_applicant_emails is TRUE, so every message you move back")
+        print("  to the Inbox makes P1 re-send its applicant replies - 'Application")
+        print("  Received', 'Please Attach Your Resume', 'Updated Resume Received' -")
+        print("  to the real applicant, who has already had them.")
+        print("")
+        print("  To replay safely:")
+        print("    1. flow_config.json  ->  \"send_applicant_emails\": false")
+        print("    2. python flow/build_zip.py")
+        print("    3. import the ZIP in Power Automate")
+        print("    4. run this script")
+        print("    5. restore the flag, rebuild, re-import when the replay is finished")
+        print("")
+        print("  --dry-run is always safe and needs none of the above.")
+        print("  To replay anyway and accept the duplicate emails, pass --force-send.")
+        print("=" * 68 + "\n")
+        if not force:
+            sys.exit(2)
+        print("  [--force-send] proceeding; candidates WILL receive duplicate email.\n")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -164,6 +263,11 @@ def main():
     parser.add_argument(
         "--dry-run", action="store_true",
         help="List matching emails without making any changes",
+    )
+    parser.add_argument(
+        "--force-send", action="store_true",
+        help="Replay even though P1 will re-email real candidates. Only use when the "
+             "duplicate applicant emails are genuinely acceptable.",
     )
     args = parser.parse_args()
 
@@ -205,6 +309,10 @@ def main():
     print(f"  Window   : {window_str}")
     print(f"  Mode     : {'DRY RUN (no changes)' if args.dry_run else 'LIVE — will move + mark unread'}")
     print(f"{'=' * 60}\n")
+
+    # A dry run changes nothing, so it never needs the gate.
+    if not args.dry_run:
+        _enforce_replay_posture(args.force_send)
 
     # ── authenticate ────────────────────────────────────────────────────────
     print("Authenticating with Microsoft Graph...")
