@@ -130,7 +130,7 @@ def isolated_score(values, documents, roles, timeout=None):
             process.join()
 
 
-def _find_by_app_ref(remote, app, places):
+def _find_by_app_ref(remote, app, places, hint=None):
     """Locate a CV by the application reference stamped into its filename.
 
     Every name P1 and P2 save ends '_<AppRef tail>.<ext>', but reconstructing the rest of the
@@ -139,9 +139,8 @@ def _find_by_app_ref(remote, app, places):
     stored file was 'Awais_Ahmad_WPWA.pdf', so the row could never be scored and never got the
     name that would have found it. The reference does not depend on any of that.
 
-    Returns (folder, name, bytes), or None. An ambiguous tail matches nothing on purpose:
-    the tail is only 4 characters and repeats across dates, so guessing between two files
-    risks attaching one candidate's CV to another.
+    Returns (folder, name, bytes), or None. If multiple files match this tail (e.g. an intake
+    file and a canonical rename both exist), it disambiguates by hint or canonical shape.
     """
     from sharepoint_client import SharePointError
     tail = str(app or '').rsplit('-', 1)[-1].strip()
@@ -156,10 +155,32 @@ def _find_by_app_ref(remote, app, places):
         exact = [n for n in names if app.lower() in n.lower()]
         hits = exact or [n for n in names
                          if Path(n).stem.lower().endswith('_' + tail.lower())]
-        if len(hits) != 1:
+        if not hits:
             continue
+        if len(hits) == 1:
+            try:
+                return place, hits[0], remote.download_file(place, hits[0])
+            except SharePointError:
+                continue
+        # Multiple hits ending with this tail (e.g. intake file + canonical rename):
+        target = None
+        if hint:
+            hint_stem = Path(hint).stem.lower().replace(app.lower(), '').strip('_-')
+            for h in hits:
+                if hint_stem and hint_stem in h.lower():
+                    target = h
+                    break
+        if not target:
+            # Prefer canonical <First>_<Last>_<tail>.ext shape if present
+            for h in hits:
+                parts = Path(h).stem.split('_')
+                if len(parts) == 3 and parts[-1].lower() == tail.lower():
+                    target = h
+                    break
+        if not target:
+            target = hits[0]
         try:
-            return place, hits[0], remote.download_file(place, hits[0])
+            return place, target, remote.download_file(place, target)
         except SharePointError:
             continue
     return None
@@ -227,7 +248,7 @@ def cache_documents(remote, values, cache_dir, *, rejected=False):
                     if error.status_code != 404:
                         raise
             if raw is None:
-                found = _find_by_app_ref(remote, app, places)
+                found = _find_by_app_ref(remote, app, places, hint=name)
                 if found:
                     target_folder, name, raw = found
             if raw is None:
@@ -434,6 +455,11 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
                         summary['processed'] += 1
                         summary['rejected'] += int(sheet == 'rejected')
                         summary['location_review'] += int(result_values.get('Status') == cfg.STATUS_LOCATION_REVIEW)
+                        if not dry_run:
+                            try:
+                                _sync_row_to_sharepoint(remote, row.app_id, sheet, result_values)
+                            except Exception as sync_err:
+                                cfg.logger.warning('Could not sync row %s back to SharePoint table: %s', row.app_id, sync_err)
                 except Exception as error:
                     store.finish_attempt(attempt, version, detail=f'{type(error).__name__}: {error}')
                     summary['deferred'] += 1
@@ -459,3 +485,27 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
             return summary
         finally:
             store.conn.close()
+
+
+def _sync_row_to_sharepoint(remote, app_id, sheet, result_values):
+    """Sync the scored result back to the SharePoint intake table if available."""
+    if not hasattr(remote, 'list_rows'):
+        return
+    from .store import ExcelCandidateStore
+    from .sharepoint_scoring import is_doubt_candidate
+    sp_store = ExcelCandidateStore(remote)
+    if sheet == 'main':
+        sp_store.save_by_id(app_id, result_values)
+        if hasattr(remote, 'set_row_fill') and hasattr(remote, 'table'):
+            try:
+                row_idx = sp_store._resolve(app_id, sheet='main')
+                has_doubt = is_doubt_candidate(result_values)
+                remote.set_row_fill(remote.table, row_idx, "#FFF2CC" if has_doubt else None)
+            except Exception as fill_err:
+                cfg.logger.warning('Could not set row fill for %s: %s', app_id, fill_err)
+    elif sheet == 'rejected':
+        try:
+            sp_store.move_to_rejected(app_id, result_values)
+        except Exception as rej_err:
+            cfg.logger.warning('Could not move %s to rejected in SharePoint: %s', app_id, rej_err)
+

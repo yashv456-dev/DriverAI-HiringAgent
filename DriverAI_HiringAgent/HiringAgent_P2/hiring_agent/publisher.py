@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font
+from openpyxl.styles import Font, PatternFill
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.utils import get_column_letter
 
@@ -78,6 +78,12 @@ def build_master(store, path, generation):
                 if isinstance(cell.value, str):
                     cell.data_type = 's'
                 cell.number_format = '@'
+            if sheet == 'main':
+                from .sharepoint_scoring import is_doubt_candidate
+                if is_doubt_candidate(row.values):
+                    amber_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+                    for cell in ws[ws.max_row]:
+                        cell.fill = amber_fill
         if ws.max_row == 1:
             ws.append([''] * len(columns))
         table = Table(displayName=table_name, ref=f'A1:{get_column_letter(len(columns))}{ws.max_row}')
