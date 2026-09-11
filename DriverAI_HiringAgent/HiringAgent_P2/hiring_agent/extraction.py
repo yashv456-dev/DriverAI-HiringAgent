@@ -9,6 +9,7 @@ from hiring_agent.config import (
     SKILL_KEYWORDS, SKILL_DISPLAY, SECTION_WORDS, ROLE_WORDS,
     LOCATION_KEYWORDS, AI_TEXT_LIMIT,
     OLLAMA_ENABLED, OLLAMA_MODEL, OLLAMA_HOST, OLLAMA_TIMEOUT,
+    REQUIRE_AI,
     SCORING_MAX_SKILLS, US_STATE_ABBREVS, US_STATE_NAMES,
     US_STATE_ABBREV_TO_NAME, US_STATE_NAME_TO_ABBREV, US_TERRITORY_NAMES,
     US_COUNTRY_TERMS, FOREIGN_COUNTRIES, FOREIGN_CITIES, logger,
@@ -2661,6 +2662,25 @@ def _get_rapidocr_engine():
     return _RAPID_OCR_ENGINE
 
 
+def ocr_health() -> tuple[bool, str]:
+    """Check if at least one OCR engine (RapidOCR or Tesseract) is available."""
+    try:
+        engine = _get_rapidocr_engine()
+        if engine is not None:
+            return True, "RapidOCR (ONNX) available"
+    except Exception as e:
+        logger.debug(f"RapidOCR health probe failed: {e}")
+
+    try:
+        tess = find_tesseract()
+        if tess:
+            return True, f"Tesseract available at {tess}"
+    except Exception as e:
+        logger.debug(f"Tesseract health probe failed: {e}")
+
+    return False, "No OCR engine available (RapidOCR and Tesseract both unavailable)"
+
+
 def _ocr_process(connection, raw):
     try:
         connection.send(_ocr_pdf_unbounded(raw))
@@ -2867,9 +2887,15 @@ def extract_text_from_bytes(raw: bytes, filename: str) -> str:
             _bad_text_layer = len(text.strip()) < 250 or _single > max(80, _words * 2)
             if _bad_text_layer:
                 ocr_text = _ocr_pdf(raw)
-                if len(ocr_text.strip()) > len(text.strip()) / 3:
+                if len(ocr_text.strip()) > len(text.strip()) / 3 and len(ocr_text.strip()) >= 50:
                     text = ocr_text
                     logger.info("   used OCR (PDF text layer was empty or low quality)")
+                else:
+                    # Low quality or corrupt text layer, and OCR yielded no usable text.
+                    # Clear text completely so regex extractors never run on garbage fragments or email bodies!
+                    text = ""
+                    logger.warning(f"   OCR failed or unavailable for '{filename or '?'}' (low quality text layer); "
+                                   "marked unreadable (no regex fallback).")
             if not text.strip():
                 try:
                     import pdfplumber
@@ -3368,7 +3394,7 @@ def ai_recheck_fields(fields: dict, resume_text: str, mail_body: str) -> dict:
         resp.raise_for_status()
         data = json.loads(resp.json()["message"]["content"])
     except Exception as e:
-        if globals().get("STRICT_AI_STAGES", False):
+        if globals().get("STRICT_AI_STAGES", False) or REQUIRE_AI:
             raise RuntimeError("Independent AI recheck failed; result deferred") from e
         logger.warning(f"       Recheck   : Ollama unavailable ({e}); keeping original fields.")
         return fields

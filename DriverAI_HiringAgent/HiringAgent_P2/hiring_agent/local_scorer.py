@@ -47,7 +47,12 @@ def score_resume_file(file_path, roles=None) -> dict:
         return {"file": path.name, "candidate": {}, "role_matches": [],
                 "error": "Could not extract text"}
 
+    from hiring_agent.extraction import EXTRACTION_SOURCE
     candidate = extract_candidate_details_smart(text)
+    if getattr(_cfg, "REQUIRE_AI", False) and EXTRACTION_SOURCE.get("value") != "ollama":
+        return {"file": path.name, "candidate": {}, "role_matches": [],
+                "error": f"AI extraction unavailable ({EXTRACTION_SOURCE.get('value')}); regex fallback disabled under REQUIRE_AI"}
+
     if roles is None:
         roles = get_active_roles()
 

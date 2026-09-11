@@ -30,6 +30,7 @@ class ExcelReportExporter:
             _client_export_sort_key,
             prepare_client_export_rows,
             write_client_export,
+            audit_client_export_integrity,
         )
 
         main_candidates = self.store.all_rows("main")

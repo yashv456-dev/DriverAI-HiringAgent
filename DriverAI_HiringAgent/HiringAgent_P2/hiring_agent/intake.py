@@ -193,7 +193,13 @@ def run_intake(path: str = None, dry_run: bool = False, excel_file=None) -> dict
                 logger.warning(f"   no readable text in '{name}' (scanned/image PDF?) - skipped.")
                 skipped += 1
                 continue
+            from hiring_agent.extraction import EXTRACTION_SOURCE
             d = extract_candidate_details_smart(text)
+            if getattr(_cfg, "REQUIRE_AI", False) and EXTRACTION_SOURCE.get("value") != "ollama":
+                logger.warning(f"   LLM extraction unavailable for '{name}' ({EXTRACTION_SOURCE.get('value')}); "
+                               "skipped under REQUIRE_AI (regex fallback disabled).")
+                skipped += 1
+                continue
 
             # Snapshot the Tier 1/2 fields right after extraction, before the portfolio
             # gap-fill or role-inference below can still touch them - Step E uses this to
@@ -206,6 +212,11 @@ def run_intake(path: str = None, dry_run: bool = False, excel_file=None) -> dict
                 # No mail body in local-folder intake - infer from resume skills only.
                 role_pref = infer_looking_for_role(text, "", skills)
             res = suggested_roles(skills, role_pref, roles=roles, resume_text=text)
+            if getattr(_cfg, "REQUIRE_AI", False) and res.get("source") != "ollama":
+                logger.warning(f"   LLM role scoring unavailable for '{name}' ({res.get('source')}); "
+                               "skipped under REQUIRE_AI (keyword fallback disabled).")
+                skipped += 1
+                continue
             r1, r2, r3 = res["role_1"], res["role_2"], res.get("role_3", "")
             category = assign_category(r1, skills)   # never blank — falls back to "General"
             portfolio_1 = d.get("portfolio_1", "N/A")

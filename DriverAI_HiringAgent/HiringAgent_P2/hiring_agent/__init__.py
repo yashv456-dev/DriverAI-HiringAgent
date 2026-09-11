@@ -16,7 +16,7 @@ from hiring_agent.extraction import (
     extract_text_from_bytes, resolve_full_name,
     _looks_like_name, _normalize_name, _scan_skill_keywords, html_to_text,
     merge_mail_body_fallback, ai_recheck_fields,
-    extract_with_ollama,
+    extract_with_ollama, ocr_health,
 )
 from hiring_agent.scoring import (
     get_open_roles, suggested_roles, assign_category, rematch_sheet, _skill_set,

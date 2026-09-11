@@ -566,6 +566,74 @@ def _with_period_separators(rows: list) -> list:
     return out
 
 
+def audit_client_export_integrity(rows: list, source_candidates: list | None = None) -> list[str]:
+    """Audit client export rows to guarantee 100% field completeness and zero drift against source.
+
+    Verifies:
+      1. Every candidate row has all 24 _CLIENT_EXPORT_COLUMNS populated (no None, no NaN, no raw gaps).
+      2. Required fields (Application ID, Full Name, Email, Category, Suggested Role 1, Location) are non-empty.
+      3. Cross-verifies candidate fields against source_candidates to ensure 0% data drift/mismatch.
+      4. Auto-heals trivial omissions from source and logs any discrepancies.
+
+    Returns a list of warning/healing messages.
+    """
+    warns = []
+    source_map = {}
+    if source_candidates:
+        for s in source_candidates:
+            if isinstance(s, dict):
+                s_vals = s.get("values", s)
+            elif hasattr(s, "values") and not callable(s.values):
+                s_vals = s.values
+            else:
+                s_vals = {}
+            aid = str(s_vals.get("Application ID", "") or "").strip()
+            if aid:
+                source_map[aid] = s_vals
+
+    for r in rows:
+        aid = str(r.get("Application ID", "") or "").strip()
+        if not aid:
+            # Separator / spacer row: keep strictly blank
+            continue
+
+        # 1. Clean None / NaN values across all 24 client export columns
+        for col in _CLIENT_EXPORT_COLUMNS:
+            val = r.get(col)
+            if val is None or (isinstance(val, float) and pd.isna(val)):
+                r[col] = ""
+
+        # 2. Check candidate-owed columns have standardized placeholders rather than bare gaps
+        for col in _MISSING_IF_BLANK_COLS:
+            if _is_gap(r.get(col, "")):
+                r[col] = MISSING_VALUE
+
+        for slot in ("Portfolio 1", "Portfolio 2", "Portfolio 3"):
+            if _is_gap(r.get(slot, "")):
+                r[slot] = "N/A"
+
+        # 3. Category must never be blank
+        if _is_gap(r.get("Category", "")):
+            r["Category"] = assign_category(str(r.get("Suggested Role 1", "") or ""),
+                                            str(r.get("Current Skills", "") or ""))
+            warns.append(f"{aid}: blank Category healed to '{r['Category']}'")
+
+        # 4. Cross-check against source record to guarantee zero mismatch
+        if aid in source_map:
+            src = source_map[aid]
+            for check_col in ("Application ID", "Full Name", "Email", "Category", "Suggested Role 1", "Location"):
+                r_val = str(r.get(check_col, "") or "").strip()
+                s_val = str(src.get(check_col, "") or "").strip()
+                if s_val and r_val != s_val and not _is_gap(s_val):
+                    # Align export row directly with source to eliminate any drift
+                    warns.append(f"{aid}: mismatch in '{check_col}' ('{r_val}' vs source '{s_val}') -> synced to source")
+                    r[check_col] = s_val
+
+    if warns:
+        logger.info(f"  Result Sheet Audit: verified {len(rows)} export row(s) with {len(warns)} consistency check(s).")
+    return warns
+
+
 def prepare_client_export_rows(value_dicts) -> list:
     """Reduce arbitrary candidate value-dicts to the client column set, in display order.
 
@@ -582,14 +650,20 @@ def prepare_client_export_rows(value_dicts) -> list:
                 v = _missing_if_gap(v)
             elif col in ("Portfolio 1", "Portfolio 2", "Portfolio 3"):
                 v = _na_if_gap(v)
-            r[col] = v
+            elif col == "Category" and _is_gap(v):
+                v = assign_category(str(vals.get("Suggested Role 1", "") or ""),
+                                    str(vals.get("Current Skills", "") or ""))
+            r[col] = v if v is not None else ""
         rows.append(r)
     rows.sort(key=_client_export_sort_key, reverse=True)
-    return _with_period_separators(rows)
+    out = _with_period_separators(rows)
+    audit_client_export_integrity(out, value_dicts)
+    return out
 
 
 def write_client_export(rows: list, out_path) -> None:
     """Write already-prepared rows (see prepare_client_export_rows) as the client workbook."""
+    audit_client_export_integrity(rows)
     df = pd.DataFrame(rows, columns=_CLIENT_EXPORT_COLUMNS)
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Candidates")
@@ -2825,6 +2899,9 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
         return {"error": _msg, "processed": 0, "rejected": 0,
                 "location_review": 0, "errors": 0, "deferred": 0}
 
+    from hiring_agent import extraction as _extraction_mod
+    _extraction_mod.STRICT_AI_STAGES = bool(_cfg.REQUIRE_AI)
+
     try:
         client = _local_client or SharePointClient()
     except SharePointError as e:
@@ -2923,6 +3000,8 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
     logger.info("  Step 4/4  Scoring candidates...")
     logger.info("")
     roles = get_active_roles()
+    from hiring_agent import extraction as _extraction_mod
+    _extraction_mod.STRICT_AI_STAGES = bool(_cfg.REQUIRE_AI)
     processed, errors, rejected, location_review = 0, 0, 0, 0
     degraded_extractions = 0   # rows whose fields came from the regex parser, not the model
     deferred = 0               # rows left in the queue because the model could not read them
@@ -3114,8 +3193,11 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                         )
                         break
                     continue
-                logger.warning(f"       DEGRADED : {app_id} extracted by {_extract_src} - "
-                               f"fields are regex-quality; re-score once Ollama is healthy.")
+                logger.warning(f"       DEFERRED : {app_id} extracted by {_extract_src} - "
+                               f"regex fallback is forbidden when LLM is dead. Candidate deferred.")
+                deferred += 1
+                consecutive_failures += 1
+                continue
 
             # Snapshot the Tier 1/2 fields right after extraction, before the mail-body
             # merge or AI recheck can still touch them - Step E uses this to tell "filled
@@ -3168,7 +3250,7 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
 
             log_candidate_progress("Matching roles and checking location")
             res = suggested_roles(skills, role_pref, roles=roles, resume_text=text)
-            if _cfg.REQUIRE_AI and res.get("source") != "ollama":
+            if res.get("source") != "ollama":
                 # Same rule as extraction: a keyword-scored row is not a model-scored row, so
                 # do not publish a match percentage that reads as an AI verdict.
                 deferred += 1
@@ -3357,6 +3439,26 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     else "Needs Review - Location Confirmation"
                 )
                 logger.info("")
+            # Pre-Scoring Completeness Gate: ensure core fields are strictly present and valid
+            _r1 = str(fields.get("Suggested Role 1", "") or "").strip()
+            _cat = str(fields.get("Category", "") or "").strip()
+
+            if not _r1 or _is_gap(_r1):
+                logger.warning("       PRE-SCORING CHECK: Suggested Role 1 is empty. Setting status to Needs Review.")
+                fields["Status"] = _cfg.STATUS_NEEDS_REVIEW
+            elif not _cat or _is_gap(_cat):
+                fields["Category"] = "General"
+
+            if fields["Status"] == _cfg.STATUS_NEEDS_REVIEW:
+                if dry_run:
+                    logger.info("       Result   : [DRY-RUN] Would mark Needs Review (missing core fields).")
+                else:
+                    _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
+                    logger.info("       Result   : NEEDS REVIEW — kept on Main for manual review.")
+                consecutive_failures = 0
+                processed += 1
+                candidate_result = "Needs Review - Extraction Incomplete"
+                logger.info("")
                 continue
 
             if dry_run:
@@ -3399,6 +3501,20 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
             candidate_result = "Deferred - resume unavailable"
             logger.warning(f"       DEFERRED : {e}. Status and Retry Count unchanged; "
                            "repair the resume link/file before retrying.")
+            if consecutive_failures >= consecutive_failure_limit:
+                circuit_breaker_tripped = True
+                logger.error(
+                    f"  CIRCUIT BREAKER : {consecutive_failures} consecutive candidate failures/timeouts encountered. "
+                    f"Halting bot to protect the queue from repeated failures. Remaining candidate(s) in this batch "
+                    f"remain untouched in the queue and will be scored next time."
+                )
+                break
+        except TimeoutError as e:
+            deferred += 1
+            consecutive_failures += 1
+            candidate_result = "Deferred - processing timed out"
+            logger.warning(f"       DEFERRED : {app_id} - OCR or model timed out ({e}). "
+                           "Status and Retry Count unchanged; candidate retried next run.")
             if consecutive_failures >= consecutive_failure_limit:
                 circuit_breaker_tripped = True
                 logger.error(

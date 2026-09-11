@@ -113,6 +113,22 @@ def assign_category(role_str: str, skills_str: str = "") -> str:
                 return rule["category"]
         elif needle in title:
             return rule["category"]
+
+    # Precedence 3: Unaligned technical skills fallback (if title doesn't match any category rule)
+    _CYBERSEC_SKILLS = {"siem", "soc", "wireshark", "metasploit", "penetration testing",
+                        "incident response", "kali linux", "firewall", "cissp", "ceh", "cism", "owasp",
+                        "vulnerability assessment", "threat intelligence", "edr", "xdr", "ids/ips"}
+    _SDE_SKILLS = {"fastapi", "django", "flask", "spring boot", "express.js", "react", "angular",
+                   "vue", "node.js", "typescript", "graphql", "rest api"}
+
+    if not (skills & _AUTOMATION_SKILLS) and not any(k in title for k in ("automation", "rpa", "uipath", "process developer")):
+        if len(skills & _CYBERSEC_SKILLS) >= 2:
+            return "Cybersecurity and IT Admin"
+        if len(skills & _SDE_SKILLS) >= 2:
+            return "Web Team (Full stack/Back end & UI/UX)"
+        if len(skills & _AI_TOOL_SKILLS) >= 2:
+            return "AI/ML/CV (SIN2)"
+
     return ROLE_CATEGORY_DEFAULT
 
 
@@ -480,6 +496,19 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
                     "reason": r1.get("reason", ""),
                     "source": "ollama",
                 }
+
+    # If Ollama AI scoring was enabled, but Ollama failed or timed out:
+    # Under REQUIRE_AI, strictly forbid falling back to keyword scoring!
+    if getattr(_cfg, "REQUIRE_AI", False) and (OLLAMA_ENABLED and OLLAMA_SCORING):
+        logger.warning("   scorer: Ollama AI role scoring failed or timed out; "
+                       "keyword fallback is disabled under REQUIRE_AI.")
+        return {
+            "role_1": "",
+            "role_2": "",
+            "role_3": "",
+            "reason": "AI role scoring failed or timed out",
+            "source": "unavailable",
+        }
 
     # ── keyword fallback ──
     top = _top_n_list(skills_str, role_pref, top_n=3, roles=roles)

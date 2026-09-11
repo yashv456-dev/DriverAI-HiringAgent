@@ -295,7 +295,7 @@ OLLAMA_SCORING_TIMEOUT = int(_ollama.get("scoring_timeout", 150))
 
 # Never publish a row the model did not actually read - defer it instead. See config.yaml's
 # ai_extraction.ollama.require_ai for the full reasoning.
-REQUIRE_AI = _envflag("HIRING_REQUIRE_AI", bool(_ollama.get("require_ai", False)))
+REQUIRE_AI = _envflag("HIRING_REQUIRE_AI", bool(_ollama.get("require_ai", True)))
 
 # Use the Ollama brain for SCORING too (role-fit + reasoning), not just extraction.
 # Falls back to the deterministic keyword scorer when off or unavailable.
