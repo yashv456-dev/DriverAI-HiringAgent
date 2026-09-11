@@ -1,0 +1,18 @@
+{
+  "_comment": "Copy this to app_settings.json on a new machine. The real file is gitignored because it also stores per-machine state such as window position. app.py reads it for GUI defaults, and test_p2.py asserts it is consistent with the shipped CLIENT_MODE, so the suite cannot run without it.",
+  "_comment_model": "Must match a model you have pulled. The README tells you to pull qwen3:1.7b. If you use the tuned build instead, set qwen3-1.7b-p2:latest here and keep HIRING_OLLAMA_MODEL in .env in step with it.",
+  "ollama_model": "qwen3:1.7b",
+  "ollama_host": "http://localhost:11434",
+  "use_ai": true,
+  "usa_only": true,
+  "_comment_autostart": "Leave auto_start false. CLIENT_MODE in app.py force-disables it at startup anyway, so a true here would be silently overridden and test_p2.py flags that inconsistency rather than letting it sit.",
+  "auto_start": false,
+  "trigger_interval_min": 5,
+  "scheduled_times": [],
+  "schedule_enabled": false,
+  "backdate_enabled": false,
+  "last_scheduled_run": "",
+  "launch_on_startup": false,
+  "batch_size": 25,
+  "online_only": true
+}

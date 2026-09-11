@@ -1,0 +1,31 @@
+# Never bake secrets or candidate data into an image. The compose file mounts what
+# the scorer actually needs at run time instead.
+.env
+local.settings.json
+candidates.db
+candidates.db-shm
+candidates.db-wal
+candidates.db.bak*
+*.xlsx
+
+# Personal data
+P2_Logs/
+P2_Input/
+P2_Output/
+P2_Final_Results/
+P2_Preview/
+resume_cache/
+processing_artifacts/
+benchmark_resumes/
+
+# Host environment and build noise — a 524 MB Windows venv must never enter a Linux image
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.lock
+jd_roles_cache.json
+.git/
+
+# Windows-only launchers; the container uses bot.py directly
+*.bat

@@ -515,7 +515,15 @@ class HiringApp:
             folder = APP_DIR
         try:
             folder.mkdir(parents=True, exist_ok=True)
-            os.startfile(str(folder))  # noqa: S606 - local folder open on Windows
+            # os.startfile exists only on Windows. The team runs macOS too, and an
+            # AttributeError here used to be swallowed by the except below, so the
+            # button silently did nothing rather than opening anything.
+            if sys.platform == "win32":
+                os.startfile(str(folder))  # noqa: S606
+            elif sys.platform == "darwin":
+                subprocess.run(["open", str(folder)], check=False)
+            else:
+                subprocess.run(["xdg-open", str(folder)], check=False)
         except Exception:
             pass
 

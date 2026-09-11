@@ -1,0 +1,43 @@
+# Run P2 identically on macOS and Windows.
+#
+#   docker compose build
+#   docker compose run --rm p2 --doctor                     # check the setup
+#   docker compose run --rm p2 --test-sharepoint            # check credentials
+#   docker compose run --rm p2 --score-sharepoint --dry-run # read-only
+#   docker compose run --rm p2 --score-sharepoint           # for real
+#
+# Everything after "p2" is passed straight to bot.py.
+
+services:
+  p2:
+    build: .
+    image: driverai-p2
+
+    # Credentials stay on your machine and are never baked into the image.
+    env_file:
+      - .env
+
+    environment:
+      # Ollama runs on the HOST. host.docker.internal resolves to it from inside
+      # Docker Desktop on macOS and Windows.
+      HIRING_OLLAMA_HOST: http://host.docker.internal:11434
+
+    # On plain Linux (not Docker Desktop) host.docker.internal does not exist.
+    # Uncomment this to create it:
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+
+    # The whole working copy is mounted, rather than listing individual files.
+    #
+    # Binding single files is the obvious approach and it is a trap: if the host file
+    # does not exist yet, Docker silently creates a DIRECTORY with that name, and
+    # candidates.db then becomes an unusable folder that sqlite refuses to open. A
+    # directory mount has no such failure mode, and it means the database, results,
+    # logs and cached resumes all persist in your checkout with nothing to configure.
+    #
+    # Dependencies live in the image's site-packages, outside /app, so they are not
+    # shadowed by this mount. A Windows .venv sitting in the checkout is simply ignored.
+    volumes:
+      - .:/app
+
+    working_dir: /app
