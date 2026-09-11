@@ -634,6 +634,43 @@ def audit_client_export_integrity(rows: list, source_candidates: list | None = N
     return warns
 
 
+def is_doubt_candidate(fields: dict) -> tuple[bool, str]:
+    """Check if candidate has doubts or unaligned fields requiring visual review highlighting.
+
+    Returns (has_doubt: bool, reason: str).
+    Triggers on:
+      - Status starting with 'Needs Review'
+      - Location unconfirmed or ambiguous or 'Missing'
+      - Country not matching USA or 'Missing'
+      - Phone is weird: masked ('*'), incomplete (<10 digits), or non-US international prefix ('+')
+      - Education is 'Missing' or empty
+    """
+    status = str(fields.get("Status", "") or "").strip()
+    if status.startswith("Needs Review"):
+        return True, f"Status: {status}"
+
+    loc = str(fields.get("Location", "") or "").strip()
+    if not loc or loc.lower() in ("missing", "unknown", "n/a", "not extracted"):
+        return True, "Location not aligned/missing"
+
+    country = str(fields.get("Country", "") or "").strip().lower()
+    if not country or country in ("missing", "unknown", "n/a", "not extracted") or country not in ("united states", "usa", "us"):
+        return True, "Country not matching US"
+
+    phone = str(fields.get("Phone", "") or "").strip()
+    digits = "".join(c for c in phone if c.isdigit())
+    if not phone or phone.lower() in ("missing", "n/a") or "*" in phone or len(digits) < 10:
+        return True, "Phone number is weird/missing/masked"
+    if phone.startswith("+") and not (phone.startswith("+1") or phone.startswith("+ 1")):
+        return True, "Phone has foreign international prefix"
+
+    edu = str(fields.get("Education", "") or "").strip()
+    if not edu or edu.lower() in ("missing", "n/a", "not extracted"):
+        return True, "Education is missing/not aligned"
+
+    return False, ""
+
+
 def prepare_client_export_rows(value_dicts) -> list:
     """Reduce arbitrary candidate value-dicts to the client column set, in display order.
 
@@ -3432,6 +3469,8 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     if _score_attempts_of(vals) != 0:
                         fields["Retry Count"] = 0
                     _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
+                    if hasattr(client, "set_row_fill") and hasattr(client, "table_name"):
+                        client.set_row_fill(client.table_name, index, color_hex="#FFF2CC")
                     logger.info("       Result   : LOCATION REVIEW - kept on Main; "
                                 "no decline email queued.")
                 consecutive_failures = 0
@@ -3442,6 +3481,7 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     else "Needs Review - Location Confirmation"
                 )
                 logger.info("")
+                continue
             # Pre-Scoring Completeness Gate: ensure core fields are strictly present and valid
             _r1 = str(fields.get("Suggested Role 1", "") or "").strip()
             _cat = str(fields.get("Category", "") or "").strip()
@@ -3457,6 +3497,8 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     logger.info("       Result   : [DRY-RUN] Would mark Needs Review (missing core fields).")
                 else:
                     _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
+                    if hasattr(client, "set_row_fill") and hasattr(client, "table_name"):
+                        client.set_row_fill(client.table_name, index, color_hex="#FFF2CC")
                     logger.info("       Result   : NEEDS REVIEW — kept on Main for manual review.")
                 consecutive_failures = 0
                 processed += 1
@@ -3476,6 +3518,11 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                 if _score_attempts_of(vals) != 0:
                     fields["Retry Count"] = 0
                 _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
+                has_doubt, doubt_reason = is_doubt_candidate(fields)
+                if hasattr(client, "set_row_fill") and hasattr(client, "table_name"):
+                    client.set_row_fill(client.table_name, index, color_hex="#FFF2CC" if has_doubt else None)
+                if has_doubt:
+                    logger.info(f"       HIGHLIGHT : Row highlighted for review ({doubt_reason})")
                 if scorecards:
                     card = (
                         f"Application: {app_id}\nName: {fields['Full Name']}\n"

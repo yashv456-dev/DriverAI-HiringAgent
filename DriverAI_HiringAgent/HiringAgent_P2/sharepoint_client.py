@@ -592,6 +592,21 @@ class SharePointClient:
         except SharePointError:
             pass
 
+    def set_row_fill(self, table_name: str, row_index: int, color_hex: str | None = "#FFF2CC") -> None:
+        """Set a table row's background fill color via Microsoft Graph (best-effort).
+
+        Used to visually highlight rows on the Master sheet that need human review or have
+        data doubts (e.g. location unconfirmed, weird phone, missing education).
+        Pass color_hex=None to clear fill.
+        """
+        try:
+            body = {"color": color_hex} if color_hex else {"color": None}
+            self._req("PATCH", f"{self._wb_base()}/tables/{table_name}"
+                               f"/rows/itemAt(index={row_index})/range/format/fill",
+                      json=body)
+        except SharePointError:
+            pass
+
     def set_column_number_format(self, table_name: str, col_name: str, code: str) -> None:
         """Set one Excel number-format code (e.g. '@' for Text) down a whole table column.
 
