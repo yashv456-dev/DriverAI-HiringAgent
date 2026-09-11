@@ -106,6 +106,45 @@ def apply_reliability(definition, config):
             'folder': '@' + graph_folder}}}
     actions['ResumeNames']['runAfter'] = {'ResumeManifest': ['Succeeded']}
     manifest = "@concat('manifest:',string(body('ResumeManifest')))"
+    # Off by default: the reader that was supposed to consume these never found them.
+    # See flow_config.json _comment_intake_sidecars for the exact defect and how to revive.
+    sidecars_on = bool(config.get('intake_sidecars', {}).get('enabled', False))
+
+    def drop_sidecars(tree):
+        """Remove any sidecar actions a PREVIOUS build left in the package.
+
+        build_zip.py does not regenerate the definition from nothing - it reads the one
+        inside the existing ZIP and transforms it (see its READ_BASE). So an action added
+        by an earlier build survives every later build unless something deletes it. Simply
+        not creating it, as the flag above does, leaves the old pair in place forever.
+        Any runAfter pointing at a removed action is re-pointed at that action's own
+        predecessor, so no dangling reference is left behind.
+        """
+        for holder in list(tree.values()):
+            if not isinstance(holder, dict):
+                continue
+            for key in ('actions',):
+                kids = holder.get(key)
+                if not isinstance(kids, dict):
+                    continue
+                doomed = {n: a for n, a in kids.items()
+                          if n.startswith('Capture_Create') or n.startswith('Preserve_Create')}
+                for name in doomed:
+                    kids.pop(name, None)
+                if doomed:
+                    for other in kids.values():
+                        ra = other.get('runAfter')
+                        if not isinstance(ra, dict):
+                            continue
+                        for dead in list(ra):
+                            if dead in doomed:
+                                ra.pop(dead)
+                                ra.update(doomed[dead].get('runAfter') or {})
+                drop_sidecars(kids)
+            for branch in ('else', 'default'):
+                sub = holder.get(branch)
+                if isinstance(sub, dict) and isinstance(sub.get('actions'), dict):
+                    drop_sidecars(sub['actions'])
 
     # Which row each branch is actually writing against. coalesce() keeps a first
     # application working if the lookup returned nothing.
@@ -168,15 +207,16 @@ def apply_reliability(definition, config):
                             'Mail Body': "@coalesce(outputs('CurrentEmail')?['bodyPreview'],'')",
                             'Status': 'New Email Received', 'Has Resume': 'Yes',
                         }
-                        compose_name = 'Capture_'+child_name
-                        event_name = 'Preserve_'+child_name
-                        action['actions'][compose_name] = {'type':'Compose', 'inputs':metadata,
-                                                         'runAfter':{child_name:['Succeeded']}}
-                        event = copy.deepcopy(child)
-                        event['runAfter'] = {compose_name:['Succeeded']}
-                        event['inputs']['parameters']['name'] = "@concat('intake_',items('%s')?['stored_name'],'.json')" % name
-                        event['inputs']['parameters']['body'] = "@string(outputs('%s'))" % compose_name
-                        action['actions'][event_name] = event
+                        if sidecars_on:
+                            compose_name = 'Capture_'+child_name
+                            event_name = 'Preserve_'+child_name
+                            action['actions'][compose_name] = {'type':'Compose', 'inputs':metadata,
+                                                             'runAfter':{child_name:['Succeeded']}}
+                            event = copy.deepcopy(child)
+                            event['runAfter'] = {compose_name:['Succeeded']}
+                            event['inputs']['parameters']['name'] = "@concat('intake_',items('%s')?['stored_name'],'.json')" % name
+                            event['inputs']['parameters']['body'] = "@string(outputs('%s'))" % compose_name
+                            action['actions'][event_name] = event
             if name in ('Ensure_resume_folder', 'Ensure_update_resume_folder', 'Ensure_dup_resume_folder'):
                 action['inputs']['parameters']['parameters/path'] = '@' + folder_relative
             # Add_row and the Patch_* actions are deliberately NOT touched. Writing
@@ -188,3 +228,5 @@ def apply_reliability(definition, config):
                 if isinstance(subtree, dict):
                     visit(subtree)
     visit(actions)
+    if not sidecars_on:
+        drop_sidecars(definition['actions'])

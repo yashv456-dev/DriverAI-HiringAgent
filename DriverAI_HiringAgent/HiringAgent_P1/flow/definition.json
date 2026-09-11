@@ -638,51 +638,6 @@
                                               },
                                               "authentication": "@parameters('$authentication')"
                                             }
-                                          },
-                                          "Capture_Create_dup_update_file": {
-                                            "type": "Compose",
-                                            "inputs": {
-                                              "Application ID": "@first(body('Latest_submitted'))?['Application ID']",
-                                              "Received Date": "@first(body('Latest_submitted'))?['Received Date']",
-                                              "Last Updated Date": "@formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy-MM-ddTHH:mm:ss')",
-                                              "Application Updates": "@add(int(coalesce(first(body('Latest_submitted'))?['Application Updates'],'0')),1)",
-                                              "Email": "@toLower(trim(if(contains(outputs('CurrentEmail')?['from'],'<'),replace(last(split(outputs('CurrentEmail')?['from'],'<')),'>',''),outputs('CurrentEmail')?['from'])))",
-                                              "Full Name": "@first(body('Latest_submitted'))?['Full Name']",
-                                              "Original Filename": "@join(body('ResumeNames'), ', ')",
-                                              "Resume URL": "@concat('manifest:',string(body('Manifest_dup')))",
-                                              "Resume Folder Path": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
-                                              "Mail Subject": "@coalesce(outputs('CurrentEmail')?['subject'],'')",
-                                              "Mail Body": "@coalesce(outputs('CurrentEmail')?['bodyPreview'],'')",
-                                              "Status": "New Email Received",
-                                              "Has Resume": "Yes"
-                                            },
-                                            "runAfter": {
-                                              "Create_dup_update_file": [
-                                                "Succeeded"
-                                              ]
-                                            }
-                                          },
-                                          "Preserve_Create_dup_update_file": {
-                                            "type": "OpenApiConnection",
-                                            "runAfter": {
-                                              "Capture_Create_dup_update_file": [
-                                                "Succeeded"
-                                              ]
-                                            },
-                                            "inputs": {
-                                              "host": {
-                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
-                                                "connectionName": "shared_sharepointonline",
-                                                "operationId": "CreateFile"
-                                              },
-                                              "parameters": {
-                                                "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
-                                                "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
-                                                "name": "@concat('intake_',items('Save_dup_update_resume')?['stored_name'],'.json')",
-                                                "body": "@string(outputs('Capture_Create_dup_update_file'))"
-                                              },
-                                              "authentication": "@parameters('$authentication')"
-                                            }
                                           }
                                         }
                                       },
@@ -1012,51 +967,6 @@
                                               "operationId": "CreateFile"
                                             },
                                             "authentication": "@parameters('$authentication')"
-                                          }
-                                        },
-                                        "Capture_Create_file": {
-                                          "type": "Compose",
-                                          "inputs": {
-                                            "Application ID": "@outputs('AppRef')",
-                                            "Received Date": "@formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy-MM-ddTHH:mm:ss')",
-                                            "Last Updated Date": "@formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy-MM-ddTHH:mm:ss')",
-                                            "Application Updates": 0,
-                                            "Email": "@toLower(trim(if(contains(outputs('CurrentEmail')?['from'],'<'),replace(last(split(outputs('CurrentEmail')?['from'],'<')),'>',''),outputs('CurrentEmail')?['from'])))",
-                                            "Full Name": "",
-                                            "Original Filename": "@join(body('ResumeNames'), ', ')",
-                                            "Resume URL": "@concat('manifest:',string(body('Manifest_new')))",
-                                            "Resume Folder Path": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
-                                            "Mail Subject": "@coalesce(outputs('CurrentEmail')?['subject'],'')",
-                                            "Mail Body": "@coalesce(outputs('CurrentEmail')?['bodyPreview'],'')",
-                                            "Status": "New Email Received",
-                                            "Has Resume": "Yes"
-                                          },
-                                          "runAfter": {
-                                            "Create_file": [
-                                              "Succeeded"
-                                            ]
-                                          }
-                                        },
-                                        "Preserve_Create_file": {
-                                          "type": "OpenApiConnection",
-                                          "inputs": {
-                                            "parameters": {
-                                              "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
-                                              "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
-                                              "name": "@concat('intake_',items('Save_resumes_to_SharePoint')?['stored_name'],'.json')",
-                                              "body": "@string(outputs('Capture_Create_file'))"
-                                            },
-                                            "host": {
-                                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
-                                              "connectionName": "shared_sharepointonline",
-                                              "operationId": "CreateFile"
-                                            },
-                                            "authentication": "@parameters('$authentication')"
-                                          },
-                                          "runAfter": {
-                                            "Capture_Create_file": [
-                                              "Succeeded"
-                                            ]
                                           }
                                         }
                                       },
@@ -2027,51 +1937,6 @@
                                                     "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
                                                     "name": "@items('Save_update_resume')?['stored_name']",
                                                     "body": "@base64ToBinary(items('Save_update_resume')?['contentBytes'])"
-                                                  },
-                                                  "authentication": "@parameters('$authentication')"
-                                                }
-                                              },
-                                              "Capture_Create_update_file": {
-                                                "type": "Compose",
-                                                "inputs": {
-                                                  "Application ID": "@first(body('Latest_ref'))?['Application ID']",
-                                                  "Received Date": "@first(body('Latest_ref'))?['Received Date']",
-                                                  "Last Updated Date": "@formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy-MM-ddTHH:mm:ss')",
-                                                  "Application Updates": "@add(int(coalesce(first(body('Latest_ref'))?['Application Updates'],'0')),1)",
-                                                  "Email": "@toLower(trim(if(contains(outputs('CurrentEmail')?['from'],'<'),replace(last(split(outputs('CurrentEmail')?['from'],'<')),'>',''),outputs('CurrentEmail')?['from'])))",
-                                                  "Full Name": "@first(body('Latest_ref'))?['Full Name']",
-                                                  "Original Filename": "@join(body('ResumeNames'), ', ')",
-                                                  "Resume URL": "@concat('manifest:',string(body('Manifest_update')))",
-                                                  "Resume Folder Path": "@concat('/Candidate_Resumes','/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
-                                                  "Mail Subject": "@coalesce(outputs('CurrentEmail')?['subject'],'')",
-                                                  "Mail Body": "@coalesce(outputs('CurrentEmail')?['bodyPreview'],'')",
-                                                  "Status": "New Email Received",
-                                                  "Has Resume": "Yes"
-                                                },
-                                                "runAfter": {
-                                                  "Create_update_file": [
-                                                    "Succeeded"
-                                                  ]
-                                                }
-                                              },
-                                              "Preserve_Create_update_file": {
-                                                "type": "OpenApiConnection",
-                                                "runAfter": {
-                                                  "Capture_Create_update_file": [
-                                                    "Succeeded"
-                                                  ]
-                                                },
-                                                "inputs": {
-                                                  "host": {
-                                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
-                                                    "connectionName": "shared_sharepointonline",
-                                                    "operationId": "CreateFile"
-                                                  },
-                                                  "parameters": {
-                                                    "dataset": "https://led1234567.sharepoint.com/sites/CandidateList_HiringAgent",
-                                                    "folderPath": "@concat(outputs('CONFIG')['resumes_folder'],'/',formatDateTime(addHours(outputs('CurrentEmail')?['receivedDateTime'],-7),'yyyy/MMMM'))",
-                                                    "name": "@concat('intake_',items('Save_update_resume')?['stored_name'],'.json')",
-                                                    "body": "@string(outputs('Capture_Create_update_file'))"
                                                   },
                                                   "authentication": "@parameters('$authentication')"
                                                 }
