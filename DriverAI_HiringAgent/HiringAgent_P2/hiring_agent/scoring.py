@@ -94,8 +94,9 @@ def assign_category(role_str: str, skills_str: str = "") -> str:
         elif needle in title:
             return rule["category"]
 
+    _AUTOMATION_SKILLS = {"uipath", "rpa", "blue prism", "power automate", "automation anywhere"}
     # Precedence 2: Uncontested AI / Agentic tool stack (3+ specialized AI skills)
-    if len(skills & _AI_TOOL_SKILLS) >= 3:
+    if len(skills & _AI_TOOL_SKILLS) >= 3 and not (skills & _AUTOMATION_SKILLS) and not any(k in title for k in ("automation", "rpa", "uipath", "process developer")):
         return "AI/ML/CV (SIN2)"
 
     for rule in ROLE_CATEGORY_RULES:
@@ -147,6 +148,10 @@ _SKILL_EXPANSIONS = {
     "machine learning": {"machine learning", "ml"},
     "deep learning": {"deep learning", "neural networks"},
     "github actions": {"github actions", "ci/cd", "automation"},
+    "uipath": {"uipath", "rpa", "automation", "process automation"},
+    "rpa": {"uipath", "rpa", "automation", "process automation"},
+    "power automate": {"power automate", "automation", "rpa", "process automation"},
+    "blue prism": {"blue prism", "rpa", "automation"},
 }
 
 
@@ -223,6 +228,9 @@ _PREF_FAMILIES = (
       "artificial intelligence", "computer vision", "forward deployed", "fde",
       "applied ai", "agentic", "agentic ai", "generative ai", "genai", "llm"),
      ("data scientist", "ai ml", "ai/ ml", "ai/", "computer vision", " cv ", "agai", "swdev ai ml", "ai")),
+    (("rpa", "uipath", "automation", "process automation", "power automate", "blue prism",
+      "robotic process automation"),
+     ("automation", "process developer", "automation process developer", "power automate", "rpa")),
     (("software engineer", "sde", "swe", "software developer", "forward deployed", "fde",
       "full stack", "backend", "developer"),
      ("software developer", "software engineer", "swdev", "software", "developer", "backend", "full stack")),
@@ -250,6 +258,17 @@ def _preference_matches_title(role_pref: str, title: str) -> bool:
     role = _re.sub(r"[^a-z0-9+#/]+", " ", (title or "").lower()).strip()
     if not pref or not role:
         return False
+
+    # Domain specialization guard: If candidate specifies RPA/Automation, only match automation/RPA JDs.
+    rpa_kw = ("rpa", "uipath", "automation", "process automation", "power automate", "blue prism", "robotic process automation")
+    if any(k in pref for k in rpa_kw):
+        return any(k in role for k in ("automation", "process developer", "rpa", "power automate"))
+
+    # Domain specialization guard: If candidate specifies Mobile, only match mobile JDs.
+    mobile_kw = ("mobile", "ios", "android", "swift", "kotlin", "flutter")
+    if any(k in pref for k in mobile_kw):
+        return any(k in role for k in ("mobile", "android", "ios"))
+
     for pref_terms, title_terms in _PREF_FAMILIES:
         if any(term in pref for term in pref_terms):
             if any(term in role for term in title_terms):

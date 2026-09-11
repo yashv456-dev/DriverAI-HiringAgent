@@ -1,112 +1,475 @@
 {
-  "built_at": "2026-07-31T04:28:46",
-  "signature": "cb06411e5e650922",
-  "folder_fingerprint": null,
+  "built_at": "2026-09-11T09:53:38",
+  "signature": "de52962fa0e71284",
+  "folder_fingerprint": "4f75930dd45e2ba3",
   "roles": [
     {
-      "title": "Finance Intern Job Announcement",
+      "title": "Computer Vision 3D Eng  PD",
       "skills": [
+        "transformers",
         "computer vision",
+        "deep learning",
+        "neural networks",
+        "mlops",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "pandas",
+        "numpy",
+        "data science",
+        "data engineering",
         "python",
-        "sql",
-        "excel",
-        "power bi",
-        "tableau",
-        "marketing",
-        "google sheets"
-      ]
+        "c++",
+        "aws",
+        "azure",
+        "gcp",
+        "docker",
+        "ci/cd"
+      ],
+      "opening": "Computer Vision 3D Eng",
+      "opening_id": "computer-vision-3d-eng",
+      "doc_type": "Position Description"
     },
     {
-      "title": "Finance Intern Position Description",
-      "skills": [
-        "python",
-        "sql",
-        "automation",
-        "compliance",
-        "excel",
-        "power bi",
-        "tableau",
-        "marketing",
-        "data entry",
-        "google sheets"
-      ]
-    },
-    {
-      "title": "Business Analytics Marketing Intern Job Announcement",
-      "skills": [
-        "generative ai",
-        "natural language processing",
-        "computer vision",
-        "data analysis",
-        "python",
-        "sql",
-        "excel",
-        "power bi",
-        "tableau",
-        "looker",
-        "marketing",
-        "content",
-        "social media",
-        "google analytics",
-        "google sheets"
-      ]
-    },
-    {
-      "title": "Business Analytics Marketing Intern Position Description",
-      "skills": [
-        "generative ai",
-        "natural language processing",
-        "computer vision",
-        "data analysis",
-        "python",
-        "sql",
-        "automation",
-        "excel",
-        "power bi",
-        "tableau",
-        "looker",
-        "marketing",
-        "content",
-        "social media",
-        "google analytics",
-        "google sheets"
-      ]
-    },
-    {
-      "title": "Business Data Analyst Job Announcement",
+      "title": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Job Description",
       "skills": [
         "computer vision",
         "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "pandas",
+        "numpy",
         "data science",
         "python",
-        "javascript",
-        "sql",
-        "aws",
-        "automation",
-        "excel",
-        "power bi",
-        "tableau",
-        "looker",
-        "marketing",
-        "social media",
-        "google analytics",
-        "google sheets"
-      ]
+        "c++",
+        "matlab",
+        "rest",
+        "docker",
+        "git",
+        "linux",
+        "unity",
+        "unreal",
+        "unreal engine",
+        "blender",
+        "agile",
+        "scrum"
+      ],
+      "opening": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT",
+      "opening_id": "driverai-sin3-3d-ai-ml-cv-iot-engineer-opt",
+      "doc_type": "Job Description"
     },
     {
-      "title": "Business Data Analyst Position Description",
+      "title": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Position Description",
       "skills": [
+        "computer vision",
         "machine learning",
-        "data analysis",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "pandas",
+        "numpy",
         "data science",
         "python",
-        "javascript",
-        "sql",
-        "aws",
+        "c++",
+        "matlab",
+        "rest",
+        "docker",
+        "git",
+        "linux",
         "automation",
+        "unity",
+        "unreal",
+        "unreal engine",
+        "blender",
+        "prototyping",
+        "agile",
+        "scrum",
+        "jira",
+        "content"
+      ],
+      "opening": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT",
+      "opening_id": "driverai-sin3-3d-ai-ml-cv-iot-engineer-opt",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "IoT Developer Job Announcement",
+      "skills": [
+        "computer vision",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c++",
+        "c#",
+        "kotlin",
+        "swift",
+        "react",
+        "rest",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "automation",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "swiftui",
+        "jetpack compose",
+        "xcode",
+        "cybersecurity",
+        "agile",
+        "jira"
+      ],
+      "opening": "IoT Developer",
+      "opening_id": "iot-developer",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "IoT Developer Position Description",
+      "skills": [
+        "computer vision",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c++",
+        "c#",
+        "kotlin",
+        "swift",
+        "react",
+        "rest",
+        "aws",
+        "azure",
+        "git",
+        "ci/cd",
+        "automation",
+        "react native",
+        "flutter",
+        "ios",
+        "android",
+        "firebase",
+        "swiftui",
+        "jetpack compose",
+        "xcode",
         "cybersecurity",
         "compliance",
+        "project management",
+        "agile",
+        "jira"
+      ],
+      "opening": "IoT Developer",
+      "opening_id": "iot-developer",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "SIN3 3D CV Intern",
+      "skills": [
+        "computer vision"
+      ],
+      "opening": "SIN3 3D CV Intern",
+      "opening_id": "sin3-3d-cv-intern",
+      "doc_type": ""
+    },
+    {
+      "title": "SIN3 3D CV Position Announcement",
+      "skills": [
+        "computer vision",
+        "deep learning",
+        "mlops",
+        "tensorflow",
+        "pytorch",
+        "python",
+        "airflow",
+        "aws",
+        "git",
+        "unity",
+        "unreal",
+        "blender"
+      ],
+      "opening": "SIN3 3D CV",
+      "opening_id": "sin3-3d-cv",
+      "doc_type": "Position Announcement"
+    },
+    {
+      "title": "SIN3 3D CV Position",
+      "skills": [
+        "computer vision",
+        "deep learning",
+        "mlops",
+        "tensorflow",
+        "pytorch",
+        "python",
+        "airflow",
+        "aws",
+        "git",
+        "unity",
+        "unreal",
+        "blender"
+      ],
+      "opening": "SIN3 3D CV",
+      "opening_id": "sin3-3d-cv",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "SIN3 3D CV AI Intern Position Announcement",
+      "skills": [
+        "computer vision",
+        "automation"
+      ],
+      "opening": "SIN3 3D CV AI Intern",
+      "opening_id": "sin3-3d-cv-ai-intern",
+      "doc_type": "Position Announcement"
+    },
+    {
+      "title": "SIN3 3D CV IoT Intern Position Description",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "pandas",
+        "numpy",
+        "data science",
+        "python",
+        "javascript",
+        "typescript",
+        "c++",
+        "c#",
+        "kotlin",
+        "swift",
+        "aws",
+        "docker",
+        "git",
+        "linux",
+        "automation",
+        "unity",
+        "unreal",
+        "unreal engine",
+        "blender",
+        "prototyping",
+        "agile",
+        "jira"
+      ],
+      "opening": "SIN3 3D CV IoT Intern",
+      "opening_id": "sin3-3d-cv-iot-intern",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "SIN3 AI ML CV Engineering Intern Position Description",
+      "skills": [
+        "fine-tuning",
+        "computer vision",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "pandas",
+        "numpy",
+        "data science",
+        "python",
+        "aws",
+        "azure",
+        "docker",
+        "git",
+        "linux",
+        "agile",
+        "jira"
+      ],
+      "opening": "SIN3 AI ML CV Engineering Intern",
+      "opening_id": "sin3-ai-ml-cv-engineering-intern",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "SIN3 AI ML CV Engineering Intern Position Description v2",
+      "skills": [
+        "fine-tuning",
+        "computer vision",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "pandas",
+        "numpy",
+        "data science",
+        "python",
+        "aws",
+        "azure",
+        "docker",
+        "git",
+        "linux",
+        "unity",
+        "unreal",
+        "unreal engine",
+        "blender",
+        "3d modeling",
+        "prototyping",
+        "agile",
         "jira",
+        "content"
+      ],
+      "opening": "SIN3 AI ML CV Engineering Intern",
+      "opening_id": "sin3-ai-ml-cv-engineering-intern",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "SIN 2   AI ML ENg Job Announcement",
+      "skills": [
+        "transformer",
+        "embeddings",
+        "computer vision",
+        "deep learning",
+        "tensorflow",
+        "pytorch",
+        "python",
+        "aws"
+      ],
+      "opening": "SIN 2 AI ML ENg",
+      "opening_id": "sin-2-ai-ml-eng",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "SIN 2   AI ML Eng Postion Description",
+      "skills": [
+        "transformer",
+        "embeddings",
+        "computer vision",
+        "deep learning",
+        "tensorflow",
+        "pytorch",
+        "python",
+        "aws",
+        "ios",
+        "android"
+      ],
+      "opening": "SIN 2 AI ML Eng",
+      "opening_id": "sin-2-ai-ml-eng",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
+      "skills": [
+        "llm",
+        "transformer",
+        "prompt engineering",
+        "embeddings",
+        "computer vision",
+        "neural networks",
+        "agentic",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "python",
+        "aws",
+        "git",
+        "automation",
+        "unity",
+        "unreal",
+        "blender",
+        "cybersecurity",
+        "agile"
+      ],
+      "opening": "SIN2 Software Developer AgAI ML CV 3D",
+      "opening_id": "sin2-software-developer-agai-ml-cv-3d",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "SIN2 Software Developer AgAI ML CV 3D Position Description",
+      "skills": [
+        "llm",
+        "transformer",
+        "prompt engineering",
+        "embeddings",
+        "computer vision",
+        "neural networks",
+        "agentic",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "data analysis",
+        "data science",
+        "python",
+        "aws",
+        "git",
+        "automation",
+        "unity",
+        "unreal",
+        "blender",
+        "cybersecurity",
+        "agile"
+      ],
+      "opening": "SIN2 Software Developer AgAI ML CV 3D",
+      "opening_id": "sin2-software-developer-agai-ml-cv-3d",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "SIN2 SWDev AI ML CV Job Announcement",
+      "skills": [
+        "transformer",
+        "embeddings",
+        "computer vision",
+        "neural networks",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "python",
+        "git"
+      ],
+      "opening": "SIN2 SWDev AI ML CV",
+      "opening_id": "sin2-swdev-ai-ml-cv",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "Software Developer - AI/ML, Computer Vision",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "python"
+      ],
+      "opening": "Software Developer - AI/ML, Computer Vision",
+      "opening_id": "software-developer-ai-ml-computer-vision",
+      "doc_type": ""
+    },
+    {
+      "title": "SIN2 SWDev AI ML CV Position Description",
+      "skills": [
+        "transformer",
+        "embeddings",
+        "computer vision",
+        "neural networks",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
+        "scikit-learn",
+        "data analysis",
+        "data science",
+        "python",
+        "git"
+      ],
+      "opening": "SIN2 SWDev AI ML CV",
+      "opening_id": "sin2-swdev-ai-ml-cv",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "DriverAI Dual Business Analytics Marketing Intern Job Announcement (2)",
+      "skills": [
+        "generative ai",
+        "natural language processing",
+        "data analysis",
+        "python",
+        "sql",
+        "crm",
+        "lead generation",
         "excel",
         "power bi",
         "tableau",
@@ -115,30 +478,39 @@
         "content",
         "social media",
         "google analytics",
-        "google sheets"
-      ]
+        "google sheets",
+        "forecasting"
+      ],
+      "opening": "DriverAI Dual Business Analytics Marketing Intern",
+      "opening_id": "driverai-dual-business-analytics-marketing-intern",
+      "doc_type": "Job Announcement"
     },
     {
-      "title": "Marketing Intern Job Announcement",
+      "title": "DriverAI Dual Business Analytics Marketing Intern Position Description (2)",
       "skills": [
+        "generative ai",
+        "natural language processing",
         "computer vision",
-        "go",
-        "marketing",
-        "content",
-        "social media",
-        "microsoft office"
-      ]
-    },
-    {
-      "title": "Marketing Intern Position Description",
-      "skills": [
-        "go",
+        "data analysis",
+        "python",
+        "sql",
         "automation",
+        "crm",
+        "lead generation",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
         "marketing",
         "content",
         "social media",
-        "microsoft office"
-      ]
+        "google analytics",
+        "google sheets",
+        "forecasting"
+      ],
+      "opening": "DriverAI Dual Business Analytics Marketing Intern",
+      "opening_id": "driverai-dual-business-analytics-marketing-intern",
+      "doc_type": "Position Description"
     },
     {
       "title": "AWS Lead Job Announcement",
@@ -155,7 +527,10 @@
         "cybersecurity",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "AWS Lead",
+      "opening_id": "aws-lead",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "AWS Lead Position Description",
@@ -173,7 +548,10 @@
         "incident response",
         "compliance",
         "agile"
-      ]
+      ],
+      "opening": "AWS Lead",
+      "opening_id": "aws-lead",
+      "doc_type": "Position Description"
     },
     {
       "title": "AWS Senior Engineer Position",
@@ -182,7 +560,10 @@
         "ci/cd",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "AWS Senior Engineer",
+      "opening_id": "aws-senior-engineer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Cloud Database Engineer  PD",
@@ -200,7 +581,55 @@
         "terraform",
         "linux",
         "compliance"
-      ]
+      ],
+      "opening": "Cloud Database Engineer",
+      "opening_id": "cloud-database-engineer",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Software and AWS Developer Job Announcement",
+      "skills": [
+        "computer vision",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c#",
+        "aws",
+        "docker",
+        "git",
+        "ci/cd",
+        "automation",
+        "cybersecurity"
+      ],
+      "opening": "Software and AWS Developer",
+      "opening_id": "software-and-aws-developer",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "Software and AWS Developer Position Description",
+      "skills": [
+        "computer vision",
+        "data science",
+        "python",
+        "java",
+        "javascript",
+        "typescript",
+        "c#",
+        "aws",
+        "docker",
+        "git",
+        "ci/cd",
+        "automation",
+        "cybersecurity",
+        "compliance",
+        "project management",
+        "agile",
+        "jira"
+      ],
+      "opening": "Software and AWS Developer",
+      "opening_id": "software-and-aws-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Software Cloud Developer Job Announcement",
@@ -235,7 +664,10 @@
         "cybersecurity",
         "compliance",
         "agile"
-      ]
+      ],
+      "opening": "Software Cloud Developer",
+      "opening_id": "software-cloud-developer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Software Cloud Developer Position Description",
@@ -272,99 +704,10 @@
         "agile",
         "jira",
         "content"
-      ]
-    },
-    {
-      "title": "CISO LinkedIn Announcement",
-      "skills": [
-        "incident response",
-        "compliance",
-        "risk management"
-      ]
-    },
-    {
-      "title": "CISO Job Announcement Updated v2",
-      "skills": [
-        "computer vision",
-        "machine learning",
-        "aws",
-        "automation",
-        "cybersecurity",
-        "firewalls",
-        "incident response",
-        "compliance",
-        "risk management"
-      ]
-    },
-    {
-      "title": "CISO Position Description Updated v2",
-      "skills": [
-        "computer vision",
-        "machine learning",
-        "automation",
-        "cybersecurity",
-        "firewalls",
-        "incident response",
-        "compliance",
-        "risk management"
-      ]
-    },
-    {
-      "title": "CMO LinkedIn Announcement",
-      "skills": [
-        "go",
-        "marketing",
-        "social media"
-      ]
-    },
-    {
-      "title": "CMO Job Announcement Updated",
-      "skills": [
-        "go",
-        "automation",
-        "cybersecurity",
-        "stakeholder management",
-        "marketing",
-        "content",
-        "social media"
-      ]
-    },
-    {
-      "title": "CMO Position Description Updated",
-      "skills": [
-        "go",
-        "automation",
-        "cybersecurity",
-        "project management",
-        "marketing",
-        "content",
-        "social media"
-      ]
-    },
-    {
-      "title": "Corporate Facilities Security Officer Job Announcement",
-      "skills": [
-        "computer vision",
-        "cybersecurity",
-        "incident response",
-        "compliance"
-      ]
-    },
-    {
-      "title": "Corporate Facilities Security Officer Position Description",
-      "skills": [
-        "cybersecurity",
-        "incident response",
-        "compliance"
-      ]
-    },
-    {
-      "title": "CTO Position",
-      "skills": [
-        "ci/cd",
-        "cybersecurity",
-        "compliance"
-      ]
+      ],
+      "opening": "Software Cloud Developer",
+      "opening_id": "software-cloud-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Cybersecurity Analyst Position Description Incident Response Updated",
@@ -377,7 +720,10 @@
         "network security",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "Cybersecurity Analyst",
+      "opening_id": "cybersecurity-analyst",
+      "doc_type": "Position Description"
     },
     {
       "title": "Cybersecurity IT Admin Manager JA AI Tools Updated",
@@ -387,7 +733,10 @@
         "siem",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "Cybersecurity IT Admin Manager",
+      "opening_id": "cybersecurity-it-admin-manager",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Cybersecurity IT Admin Manager JA Updated",
@@ -397,7 +746,10 @@
         "siem",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "Cybersecurity IT Admin Manager",
+      "opening_id": "cybersecurity-it-admin-manager",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Cybersecurity IT Admin Manager PD AI Tools Updated",
@@ -406,7 +758,10 @@
         "siem",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "Cybersecurity IT Admin Manager",
+      "opening_id": "cybersecurity-it-admin-manager",
+      "doc_type": "Position Description"
     },
     {
       "title": "Cybersecurity IT Admin Manager PD Updated",
@@ -415,7 +770,10 @@
         "siem",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "Cybersecurity IT Admin Manager",
+      "opening_id": "cybersecurity-it-admin-manager",
+      "doc_type": "Position Description"
     },
     {
       "title": "Cybersecurity IT Administrator JA",
@@ -426,7 +784,10 @@
         "siem",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "Cybersecurity IT Administrator",
+      "opening_id": "cybersecurity-it-administrator",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Cybersecurity IT Administrator JA Comprehensive",
@@ -437,7 +798,10 @@
         "siem",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "Cybersecurity IT Administrator",
+      "opening_id": "cybersecurity-it-administrator",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Cybersecurity IT Administrator PD",
@@ -449,7 +813,10 @@
         "incident response",
         "compliance",
         "risk management"
-      ]
+      ],
+      "opening": "Cybersecurity IT Administrator",
+      "opening_id": "cybersecurity-it-administrator",
+      "doc_type": "Position Description"
     },
     {
       "title": "Cybersecurity IT Administrator PD Comprehensive",
@@ -457,12 +824,16 @@
         "aws",
         "azure",
         "automation",
+        "account management",
         "cybersecurity",
         "siem",
         "incident response",
         "compliance",
         "risk management"
-      ]
+      ],
+      "opening": "Cybersecurity IT Administrator",
+      "opening_id": "cybersecurity-it-administrator",
+      "doc_type": "Position Description"
     },
     {
       "title": "Cybersecurity IT Administrator Position",
@@ -472,14 +843,84 @@
         "siem",
         "incident response",
         "compliance"
-      ]
+      ],
+      "opening": "Cybersecurity IT Administrator",
+      "opening_id": "cybersecurity-it-administrator",
+      "doc_type": "Position Description"
     },
     {
       "title": "Cybersecurity IT Intern Position",
       "skills": [
         "cybersecurity",
         "compliance"
-      ]
+      ],
+      "opening": "Cybersecurity IT Intern",
+      "opening_id": "cybersecurity-it-intern",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Business Data Analyst Job Announcement",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "data science",
+        "python",
+        "javascript",
+        "sql",
+        "aws",
+        "automation",
+        "crm",
+        "salesforce",
+        "hubspot",
+        "lead generation",
+        "sales pipeline",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing",
+        "social media",
+        "google analytics",
+        "google sheets",
+        "pivot tables"
+      ],
+      "opening": "Business Data Analyst",
+      "opening_id": "business-data-analyst",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "Business Data Analyst Position Description",
+      "skills": [
+        "machine learning",
+        "data analysis",
+        "data science",
+        "python",
+        "javascript",
+        "sql",
+        "aws",
+        "automation",
+        "crm",
+        "salesforce",
+        "hubspot",
+        "lead generation",
+        "sales pipeline",
+        "cybersecurity",
+        "compliance",
+        "jira",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing",
+        "content",
+        "social media",
+        "google analytics",
+        "google sheets",
+        "pivot tables"
+      ],
+      "opening": "Business Data Analyst",
+      "opening_id": "business-data-analyst",
+      "doc_type": "Position Description"
     },
     {
       "title": "Data Analyst Position Description",
@@ -507,8 +948,12 @@
         "tableau",
         "looker",
         "marketing",
-        "google sheets"
-      ]
+        "google sheets",
+        "forecasting"
+      ],
+      "opening": "Data Analyst",
+      "opening_id": "data-analyst",
+      "doc_type": "Position Description"
     },
     {
       "title": "Data Analyst Job Announcement rev",
@@ -531,7 +976,10 @@
         "tableau",
         "looker",
         "marketing"
-      ]
+      ],
+      "opening": "Data Analyst",
+      "opening_id": "data-analyst",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Data Analyst Job Announcement",
@@ -554,7 +1002,10 @@
         "tableau",
         "looker",
         "marketing"
-      ]
+      ],
+      "opening": "Data Analyst",
+      "opening_id": "data-analyst",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Data Engineer Job Announcement",
@@ -582,7 +1033,10 @@
         "power bi",
         "tableau",
         "looker"
-      ]
+      ],
+      "opening": "Data Engineer",
+      "opening_id": "data-engineer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Data Engineer Position Description",
@@ -611,7 +1065,217 @@
         "power bi",
         "tableau",
         "looker"
-      ]
+      ],
+      "opening": "Data Engineer",
+      "opening_id": "data-engineer",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "DriverAI Data Center Supply Chain Specialist Job Announcement(1)",
+      "skills": [
+        "transformers",
+        "project management",
+        "risk management",
+        "excel",
+        "erp"
+      ],
+      "opening": "DriverAI Data Center Supply Chain Specialist",
+      "opening_id": "driverai-data-center-supply-chain-specialist",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "DriverAI Data Center Supply Chain Specialist Position Description(1)",
+      "skills": [
+        "transformers",
+        "project management",
+        "risk management",
+        "excel",
+        "forecasting",
+        "accounting",
+        "erp"
+      ],
+      "opening": "DriverAI Data Center Supply Chain Specialist",
+      "opening_id": "driverai-data-center-supply-chain-specialist",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "CISO LinkedIn Announcement",
+      "skills": [
+        "incident response",
+        "compliance",
+        "risk management"
+      ],
+      "opening": "CISO",
+      "opening_id": "ciso",
+      "doc_type": "LinkedIn Announcement"
+    },
+    {
+      "title": "CISO Job Announcement Updated v2",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "aws",
+        "automation",
+        "cybersecurity",
+        "firewalls",
+        "incident response",
+        "compliance",
+        "risk management",
+        "due diligence"
+      ],
+      "opening": "CISO",
+      "opening_id": "ciso",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "CISO Position Description Updated v2",
+      "skills": [
+        "computer vision",
+        "machine learning",
+        "automation",
+        "cybersecurity",
+        "firewalls",
+        "incident response",
+        "compliance",
+        "risk management",
+        "due diligence"
+      ],
+      "opening": "CISO",
+      "opening_id": "ciso",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "CMO LinkedIn Announcement",
+      "skills": [
+        "marketing",
+        "social media"
+      ],
+      "opening": "CMO",
+      "opening_id": "cmo",
+      "doc_type": "LinkedIn Announcement"
+    },
+    {
+      "title": "CMO Job Announcement Updated",
+      "skills": [
+        "automation",
+        "negotiation",
+        "cybersecurity",
+        "stakeholder management",
+        "marketing",
+        "content",
+        "social media",
+        "budgeting",
+        "forecasting"
+      ],
+      "opening": "CMO",
+      "opening_id": "cmo",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "CMO Position Description Updated",
+      "skills": [
+        "automation",
+        "negotiation",
+        "cybersecurity",
+        "project management",
+        "marketing",
+        "content",
+        "social media",
+        "budgeting",
+        "forecasting",
+        "due diligence"
+      ],
+      "opening": "CMO",
+      "opening_id": "cmo",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Corporate Facilities Security Officer Job Announcement",
+      "skills": [
+        "cybersecurity",
+        "incident response",
+        "compliance"
+      ],
+      "opening": "Corporate Facilities Security Officer",
+      "opening_id": "corporate-facilities-security-officer",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "Corporate Facilities Security Officer Position Description",
+      "skills": [
+        "cybersecurity",
+        "incident response",
+        "compliance"
+      ],
+      "opening": "Corporate Facilities Security Officer",
+      "opening_id": "corporate-facilities-security-officer",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "CTO Position",
+      "skills": [
+        "ci/cd",
+        "cybersecurity",
+        "compliance"
+      ],
+      "opening": "CTO",
+      "opening_id": "cto",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Finance Intern Job Announcement",
+      "skills": [
+        "python",
+        "sql",
+        "crm",
+        "excel",
+        "power bi",
+        "tableau",
+        "marketing",
+        "google sheets",
+        "financial modeling",
+        "financial analysis",
+        "variance analysis",
+        "budgeting",
+        "forecasting",
+        "accounting",
+        "quickbooks",
+        "erp",
+        "pivot tables"
+      ],
+      "opening": "Finance Intern",
+      "opening_id": "finance-intern",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "Finance Intern Position Description",
+      "skills": [
+        "python",
+        "sql",
+        "automation",
+        "crm",
+        "compliance",
+        "excel",
+        "power bi",
+        "tableau",
+        "marketing",
+        "data entry",
+        "google sheets",
+        "financial reporting",
+        "financial modeling",
+        "financial analysis",
+        "financial planning",
+        "budgeting",
+        "forecasting",
+        "accounting",
+        "internal controls",
+        "quickbooks",
+        "erp",
+        "pivot tables"
+      ],
+      "opening": "Finance Intern",
+      "opening_id": "finance-intern",
+      "doc_type": "Position Description"
     },
     {
       "title": "Gaming Position Announcement",
@@ -621,8 +1285,12 @@
         "kotlin",
         "swift",
         "ios",
-        "android"
-      ]
+        "android",
+        "unity"
+      ],
+      "opening": "Gaming",
+      "opening_id": "gaming",
+      "doc_type": "Position Announcement"
     },
     {
       "title": "Gaming Position",
@@ -637,26 +1305,246 @@
         "ios",
         "android",
         "firebase",
+        "xcode",
+        "unity",
+        "unreal",
+        "unreal engine",
+        "blender",
+        "maya",
+        "cinema 4d",
+        "figma",
+        "after effects",
+        "adobe",
         "agile",
         "scrum",
         "content"
-      ]
+      ],
+      "opening": "Gaming",
+      "opening_id": "gaming",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Automation Process Developer Position Description",
+      "skills": [
+        "power automate",
+        "automation",
+        "cybersecurity",
+        "project management",
+        "business analysis"
+      ],
+      "opening": "Automation Process Developer",
+      "opening_id": "automation-process-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Graphics Position Announcement",
       "skills": [
+        "blender",
+        "maya",
+        "figma",
+        "photoshop",
+        "illustrator",
+        "motion graphics",
+        "graphic design",
         "marketing"
-      ]
+      ],
+      "opening": "Graphics",
+      "opening_id": "graphics",
+      "doc_type": "Position Announcement"
     },
     {
       "title": "Graphics Position",
       "skills": [
+        "unity",
+        "unreal",
+        "unreal engine",
+        "blender",
+        "maya",
+        "3ds max",
+        "cinema 4d",
+        "zbrush",
+        "3d modeling",
+        "texturing",
+        "figma",
+        "photoshop",
+        "illustrator",
+        "after effects",
+        "adobe",
+        "canva",
+        "sketch",
+        "wireframes",
+        "typography",
+        "graphic design",
+        "ui design",
         "agile",
         "jira",
         "marketing",
         "content",
         "social media"
-      ]
+      ],
+      "opening": "Graphics",
+      "opening_id": "graphics",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Mobile Animation Design Intern  PD",
+      "skills": [
+        "c#",
+        "kotlin",
+        "swift",
+        "react",
+        "react native",
+        "flutter",
+        "unity",
+        "unreal",
+        "unreal engine",
+        "shader",
+        "blender",
+        "maya",
+        "cinema 4d",
+        "figma",
+        "photoshop",
+        "illustrator",
+        "after effects",
+        "adobe",
+        "sketch",
+        "prototyping",
+        "motion graphics",
+        "graphic design",
+        "ui design",
+        "agile"
+      ],
+      "opening": "Mobile Animation Design Intern",
+      "opening_id": "mobile-animation-design-intern",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Business Analytics Marketing Intern Job Announcement",
+      "skills": [
+        "generative ai",
+        "natural language processing",
+        "data analysis",
+        "python",
+        "sql",
+        "crm",
+        "lead generation",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing",
+        "content",
+        "social media",
+        "google analytics",
+        "google sheets",
+        "forecasting"
+      ],
+      "opening": "Business Analytics Marketing Intern",
+      "opening_id": "business-analytics-marketing-intern",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "Business Analytics Marketing Intern Position Description",
+      "skills": [
+        "generative ai",
+        "natural language processing",
+        "computer vision",
+        "data analysis",
+        "python",
+        "sql",
+        "automation",
+        "crm",
+        "lead generation",
+        "excel",
+        "power bi",
+        "tableau",
+        "looker",
+        "marketing",
+        "content",
+        "social media",
+        "google analytics",
+        "google sheets",
+        "forecasting"
+      ],
+      "opening": "Business Analytics Marketing Intern",
+      "opening_id": "business-analytics-marketing-intern",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Marketing Intern Job Announcement",
+      "skills": [
+        "adobe",
+        "canva",
+        "graphic design",
+        "account management",
+        "marketing",
+        "content",
+        "social media",
+        "microsoft office"
+      ],
+      "opening": "Marketing Intern",
+      "opening_id": "marketing-intern",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "Marketing Intern Position Description",
+      "skills": [
+        "automation",
+        "adobe",
+        "canva",
+        "graphic design",
+        "lead generation",
+        "marketing",
+        "content",
+        "social media",
+        "microsoft office"
+      ],
+      "opening": "Marketing Intern",
+      "opening_id": "marketing-intern",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Marketing Specialist Job Announcement Updated",
+      "skills": [
+        "computer vision",
+        "automation",
+        "adobe",
+        "canva",
+        "graphic design",
+        "crm",
+        "account management",
+        "seo",
+        "marketing",
+        "content",
+        "social media",
+        "google analytics",
+        "microsoft office"
+      ],
+      "opening": "Marketing Specialist",
+      "opening_id": "marketing-specialist",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "Marketing Specialist Position Description Updated",
+      "skills": [
+        "computer vision",
+        "automation",
+        "adobe",
+        "canva",
+        "graphic design",
+        "crm",
+        "lead generation",
+        "account management",
+        "seo",
+        "marketing",
+        "content",
+        "social media",
+        "google analytics",
+        "microsoft office"
+      ],
+      "opening": "Marketing Specialist",
+      "opening_id": "marketing-specialist",
+      "doc_type": "Position Description"
     },
     {
       "title": "AI ML Mobile Applications Developer Job Announcement",
@@ -685,10 +1573,17 @@
         "ios",
         "android",
         "firebase",
+        "swiftui",
+        "dart",
+        "jetpack compose",
+        "xcode",
         "cybersecurity",
         "agile",
         "jira"
-      ]
+      ],
+      "opening": "AI ML Mobile Applications Developer",
+      "opening_id": "ai-ml-mobile-applications-developer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "AI ML Mobile Applications Developer Position Description",
@@ -717,33 +1612,18 @@
         "ios",
         "android",
         "firebase",
+        "swiftui",
+        "dart",
+        "jetpack compose",
+        "xcode",
         "cybersecurity",
         "project management",
         "agile",
         "jira"
-      ]
-    },
-    {
-      "title": "Automation Process Developer Position Description",
-      "skills": [
-        "power automate",
-        "automation",
-        "cybersecurity",
-        "project management",
-        "business analysis"
-      ]
-    },
-    {
-      "title": "Mobile Animation Design Intern  PD",
-      "skills": [
-        "c#",
-        "kotlin",
-        "swift",
-        "react",
-        "react native",
-        "flutter",
-        "agile"
-      ]
+      ],
+      "opening": "AI ML Mobile Applications Developer",
+      "opening_id": "ai-ml-mobile-applications-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Mobile Application Lead Developer Job Announcement",
@@ -766,8 +1646,16 @@
         "ios",
         "android",
         "firebase",
+        "swiftui",
+        "dart",
+        "android sdk",
+        "xcode",
+        "wireframes",
         "agile"
-      ]
+      ],
+      "opening": "Mobile Application Lead Developer",
+      "opening_id": "mobile-application-lead-developer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Mobile Application Lead Developer Job Announcement With Overview",
@@ -790,10 +1678,18 @@
         "ios",
         "android",
         "firebase",
+        "swiftui",
+        "dart",
+        "android sdk",
+        "xcode",
+        "wireframes",
         "cybersecurity",
         "agile",
         "jira"
-      ]
+      ],
+      "opening": "Mobile Application Lead Developer",
+      "opening_id": "mobile-application-lead-developer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Mobile Application Lead Developer Position Description",
@@ -815,10 +1711,17 @@
         "ios",
         "android",
         "firebase",
+        "swiftui",
+        "android sdk",
+        "xcode",
         "cybersecurity",
         "compliance",
-        "agile"
-      ]
+        "agile",
+        "due diligence"
+      ],
+      "opening": "Mobile Application Lead Developer",
+      "opening_id": "mobile-application-lead-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Mobile Application Lead Developer Position Description v2",
@@ -840,10 +1743,17 @@
         "ios",
         "android",
         "firebase",
+        "swiftui",
+        "android sdk",
+        "xcode",
         "cybersecurity",
         "compliance",
-        "agile"
-      ]
+        "agile",
+        "due diligence"
+      ],
+      "opening": "Mobile Application Lead Developer",
+      "opening_id": "mobile-application-lead-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Mobile Application Software Developer Job Announcement",
@@ -866,9 +1776,17 @@
         "ios",
         "android",
         "firebase",
+        "swiftui",
+        "dart",
+        "android sdk",
+        "xcode",
+        "wireframes",
         "agile",
         "jira"
-      ]
+      ],
+      "opening": "Mobile Application Software Developer",
+      "opening_id": "mobile-application-software-developer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Mobile Application Software Developer Position Description",
@@ -890,341 +1808,219 @@
         "ios",
         "android",
         "firebase",
+        "swiftui",
+        "android sdk",
+        "xcode",
         "cybersecurity",
         "compliance",
-        "agile"
-      ]
+        "agile",
+        "due diligence"
+      ],
+      "opening": "Mobile Application Software Developer",
+      "opening_id": "mobile-application-software-developer",
+      "doc_type": "Position Description"
     },
     {
-      "title": "Software and AWS Developer Job Announcement",
+      "title": "Sales and Business Development Representative Position Description",
+      "skills": [
+        "automation",
+        "crm",
+        "salesforce",
+        "hubspot",
+        "lead generation",
+        "prospecting",
+        "sales pipeline",
+        "pipeline management",
+        "account management",
+        "negotiation",
+        "b2b",
+        "cybersecurity",
+        "compliance",
+        "marketing",
+        "social media",
+        "forecasting"
+      ],
+      "opening": "Sales and Business Development Representative",
+      "opening_id": "sales-and-business-development-representative",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "RF Communications Engineer R&D Job Announcement",
+      "skills": [
+        "python",
+        "matlab",
+        "prototyping",
+        "compliance"
+      ],
+      "opening": "RF Communications Engineer R&D",
+      "opening_id": "rf-communications-engineer-r-d",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "RF Communications Engineer R&D Position Description",
+      "skills": [
+        "python",
+        "c++",
+        "matlab",
+        "automation",
+        "prototyping",
+        "compliance",
+        "content",
+        "budgeting"
+      ],
+      "opening": "RF Communications Engineer R&D",
+      "opening_id": "rf-communications-engineer-r-d",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "RF Phased Array Systems Engineer Job Announcement Internal",
+      "skills": [
+        "python",
+        "matlab"
+      ],
+      "opening": "RF Phased Array Systems Engineer",
+      "opening_id": "rf-phased-array-systems-engineer",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "RF Phased Array Systems Engineer Position Description Internal",
+      "skills": [
+        "python",
+        "matlab",
+        "prototyping"
+      ],
+      "opening": "RF Phased Array Systems Engineer",
+      "opening_id": "rf-phased-array-systems-engineer",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "Satellite Systems Flight Software Engineer Job Announcement",
       "skills": [
         "computer vision",
+        "tensorflow",
+        "pytorch",
         "python",
-        "java",
-        "javascript",
-        "typescript",
-        "c#",
-        "aws",
-        "docker",
+        "c++",
+        "go",
+        "matlab",
         "git",
-        "ci/cd",
+        "linux",
         "automation",
         "cybersecurity"
-      ]
+      ],
+      "opening": "Satellite Systems Flight Software Engineer",
+      "opening_id": "satellite-systems-flight-software-engineer",
+      "doc_type": "Job Announcement"
     },
     {
-      "title": "Software and AWS Developer Position Description",
+      "title": "Satellite Systems Flight Software Engineer Position Description",
       "skills": [
         "computer vision",
-        "data science",
+        "machine learning",
+        "tensorflow",
+        "pytorch",
         "python",
-        "java",
-        "javascript",
-        "typescript",
-        "c#",
+        "c++",
+        "matlab",
+        "git",
+        "linux",
+        "automation",
+        "cybersecurity"
+      ],
+      "opening": "Satellite Systems Flight Software Engineer",
+      "opening_id": "satellite-systems-flight-software-engineer",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "DriverAI Senior Manager AWS Cloud DevOps Agile Job Announcement",
+      "skills": [
+        "computer vision",
+        "data engineering",
         "aws",
-        "docker",
+        "kubernetes",
         "git",
         "ci/cd",
+        "terraform",
         "automation",
         "cybersecurity",
         "compliance",
+        "agile",
+        "scrum",
+        "risk management"
+      ],
+      "opening": "DriverAI Senior Manager AWS Cloud DevOps Agile",
+      "opening_id": "driverai-senior-manager-aws-cloud-devops-agile",
+      "doc_type": "Job Announcement"
+    },
+    {
+      "title": "DriverAI Senior Manager AWS Cloud DevOps Agile Position Description",
+      "skills": [
+        "computer vision",
+        "data engineering",
+        "aws",
+        "kubernetes",
+        "git",
+        "ci/cd",
+        "terraform",
+        "ansible",
+        "automation",
+        "pipeline management",
+        "cybersecurity",
+        "incident response",
+        "compliance",
         "project management",
         "agile",
-        "jira"
-      ]
+        "scrum"
+      ],
+      "opening": "DriverAI Senior Manager AWS Cloud DevOps Agile",
+      "opening_id": "driverai-senior-manager-aws-cloud-devops-agile",
+      "doc_type": "Position Description"
     },
     {
-      "title": "SIN 2   AI ML ENg Job Announcement",
-      "skills": [
-        "transformer",
-        "embeddings",
-        "computer vision",
-        "deep learning",
-        "tensorflow",
-        "pytorch",
-        "python",
-        "aws"
-      ]
-    },
-    {
-      "title": "SIN 2   AI ML Eng Postion Description",
-      "skills": [
-        "transformer",
-        "embeddings",
-        "computer vision",
-        "deep learning",
-        "tensorflow",
-        "pytorch",
-        "python",
-        "aws",
-        "ios",
-        "android"
-      ]
-    },
-    {
-      "title": "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
-      "skills": [
-        "llm",
-        "transformer",
-        "prompt engineering",
-        "embeddings",
-        "computer vision",
-        "neural networks",
-        "agentic",
-        "machine learning",
-        "tensorflow",
-        "pytorch",
-        "scikit-learn",
-        "python",
-        "aws",
-        "git",
-        "automation",
-        "cybersecurity",
-        "agile"
-      ]
-    },
-    {
-      "title": "SIN2 Software Developer AgAI ML CV 3D Position Description",
-      "skills": [
-        "llm",
-        "transformer",
-        "prompt engineering",
-        "embeddings",
-        "computer vision",
-        "neural networks",
-        "agentic",
-        "machine learning",
-        "tensorflow",
-        "pytorch",
-        "scikit-learn",
-        "data analysis",
-        "data science",
-        "python",
-        "aws",
-        "git",
-        "automation",
-        "cybersecurity",
-        "agile"
-      ]
-    },
-    {
-      "title": "SIN2 SWDev AI ML CV Job Announcement",
-      "skills": [
-        "transformer",
-        "embeddings",
-        "computer vision",
-        "neural networks",
-        "machine learning",
-        "tensorflow",
-        "pytorch",
-        "scikit-learn",
-        "python",
-        "git"
-      ]
-    },
-    {
-      "title": "Software Developer - AI/ML, Computer Vision",
-      "skills": [
-        "computer vision",
-        "machine learning",
-        "tensorflow",
-        "pytorch",
-        "python"
-      ]
-    },
-    {
-      "title": "SIN2 SWDev AI ML CV Position Description",
-      "skills": [
-        "transformer",
-        "embeddings",
-        "computer vision",
-        "neural networks",
-        "machine learning",
-        "tensorflow",
-        "pytorch",
-        "scikit-learn",
-        "data analysis",
-        "data science",
-        "python",
-        "git"
-      ]
-    },
-    {
-      "title": "Computer Vision 3D Eng  PD",
+      "title": "DriverAI Data Center Supply Chain Specialist Job Announcement",
       "skills": [
         "transformers",
-        "computer vision",
-        "deep learning",
-        "neural networks",
-        "mlops",
-        "machine learning",
-        "tensorflow",
-        "pytorch",
-        "pandas",
-        "numpy",
-        "data science",
-        "data engineering",
-        "python",
-        "c++",
-        "aws",
-        "azure",
-        "gcp",
-        "docker",
-        "ci/cd"
-      ]
-    },
-    {
-      "title": "IoT Developer Job Announcement",
-      "skills": [
-        "computer vision",
-        "data science",
-        "python",
-        "java",
-        "javascript",
-        "typescript",
-        "c++",
-        "c#",
-        "kotlin",
-        "swift",
-        "react",
-        "rest",
-        "aws",
-        "azure",
-        "git",
-        "ci/cd",
-        "automation",
-        "react native",
-        "flutter",
-        "ios",
-        "android",
-        "firebase",
-        "cybersecurity",
-        "agile",
-        "jira"
-      ]
-    },
-    {
-      "title": "IoT Developer Position Description",
-      "skills": [
-        "computer vision",
-        "data science",
-        "python",
-        "java",
-        "javascript",
-        "typescript",
-        "c++",
-        "c#",
-        "kotlin",
-        "swift",
-        "react",
-        "rest",
-        "aws",
-        "azure",
-        "git",
-        "ci/cd",
-        "automation",
-        "react native",
-        "flutter",
-        "ios",
-        "android",
-        "firebase",
         "cybersecurity",
         "compliance",
         "project management",
-        "agile",
-        "jira"
-      ]
+        "jira",
+        "risk management",
+        "excel",
+        "power bi",
+        "tableau",
+        "forecasting",
+        "netsuite",
+        "sap"
+      ],
+      "opening": "DriverAI Data Center Supply Chain Specialist",
+      "opening_id": "driverai-data-center-supply-chain-specialist",
+      "doc_type": "Job Announcement"
     },
     {
-      "title": "SIN3 3D CV Intern",
+      "title": "DriverAI Data Center Supply Chain Specialist Position Description",
       "skills": [
-        "computer vision"
-      ]
-    },
-    {
-      "title": "SIN3 3D CV Position Announcement",
-      "skills": [
-        "computer vision",
-        "deep learning",
-        "mlops",
-        "tensorflow",
-        "pytorch",
-        "python",
-        "airflow",
-        "aws",
-        "git"
-      ]
-    },
-    {
-      "title": "SIN3 3D CV Position",
-      "skills": [
-        "computer vision",
-        "deep learning",
-        "mlops",
-        "tensorflow",
-        "pytorch",
-        "python",
-        "airflow",
-        "aws",
-        "git"
-      ]
-    },
-    {
-      "title": "SIN3 3D CV AI Intern Position Announcement",
-      "skills": [
-        "computer vision",
-        "automation"
-      ]
-    },
-    {
-      "title": "SIN3 3D CV IoT Intern Position Description",
-      "skills": [
-        "computer vision",
-        "machine learning",
-        "tensorflow",
-        "pytorch",
-        "scikit-learn",
-        "pandas",
-        "numpy",
-        "data science",
-        "python",
-        "javascript",
-        "typescript",
-        "c++",
-        "c#",
-        "kotlin",
-        "swift",
-        "aws",
-        "docker",
-        "git",
-        "linux",
-        "automation",
-        "agile",
-        "jira"
-      ]
-    },
-    {
-      "title": "SIN3 AI ML CV Engineering Intern Position Description",
-      "skills": [
-        "fine-tuning",
-        "computer vision",
-        "machine learning",
-        "tensorflow",
-        "pytorch",
-        "scikit-learn",
-        "pandas",
-        "numpy",
-        "data science",
-        "python",
-        "aws",
-        "azure",
-        "docker",
-        "git",
-        "linux",
-        "agile",
-        "jira"
-      ]
+        "transformers",
+        "rigging",
+        "crm",
+        "cybersecurity",
+        "compliance",
+        "project management",
+        "jira",
+        "stakeholder management",
+        "risk management",
+        "excel",
+        "power bi",
+        "tableau",
+        "financial reporting",
+        "forecasting",
+        "netsuite",
+        "sap",
+        "erp",
+        "pivot tables"
+      ],
+      "opening": "DriverAI Data Center Supply Chain Specialist",
+      "opening_id": "driverai-data-center-supply-chain-specialist",
+      "doc_type": "Position Description"
     },
     {
       "title": "Full Stack Web Developer Job Announcement Revised",
@@ -1255,9 +2051,13 @@
         "ci/cd",
         "ios",
         "android",
+        "wireframes",
         "cybersecurity",
         "agile"
-      ]
+      ],
+      "opening": "Full Stack Web Developer",
+      "opening_id": "full-stack-web-developer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Full Stack Web Developer Position Description Revised",
@@ -1291,10 +2091,14 @@
         "ci/cd",
         "ios",
         "android",
+        "wireframes",
         "cybersecurity",
         "compliance",
         "agile"
-      ]
+      ],
+      "opening": "Full Stack Web Developer",
+      "opening_id": "full-stack-web-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Software and Website Developer Job Announcement",
@@ -1312,9 +2116,17 @@
         "html",
         "css",
         "git",
+        "blender",
+        "figma",
+        "adobe",
+        "canva",
+        "graphic design",
         "agile",
         "content"
-      ]
+      ],
+      "opening": "Software and Website Developer",
+      "opening_id": "software-and-website-developer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Software and Website Developer Position Description",
@@ -1337,11 +2149,26 @@
         "sql",
         "git",
         "automation",
+        "blender",
+        "figma",
+        "photoshop",
+        "illustrator",
+        "after effects",
+        "premiere pro",
+        "adobe",
+        "canva",
+        "wireframes",
+        "typography",
+        "motion graphics",
+        "graphic design",
         "cybersecurity",
         "jira",
         "marketing",
         "content"
-      ]
+      ],
+      "opening": "Software and Website Developer",
+      "opening_id": "software-and-website-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Software Website Developer Intern PD",
@@ -1360,10 +2187,17 @@
         "sql",
         "git",
         "automation",
+        "figma",
+        "adobe",
+        "canva",
+        "graphic design",
         "compliance",
         "jira",
         "content"
-      ]
+      ],
+      "opening": "Software Website Developer Intern",
+      "opening_id": "software-website-developer-intern",
+      "doc_type": "Position Description"
     },
     {
       "title": "Software Website Developer Intern Performance Metrics",
@@ -1371,7 +2205,10 @@
         "git",
         "compliance",
         "content"
-      ]
+      ],
+      "opening": "Software Website Developer Intern",
+      "opening_id": "software-website-developer-intern",
+      "doc_type": ""
     },
     {
       "title": "UI UX Developer Job Announcement",
@@ -1382,8 +2219,18 @@
         "react",
         "ios",
         "android",
+        "figma",
+        "adobe",
+        "sketch",
+        "wireframes",
+        "prototyping",
+        "typography",
+        "user research",
         "agile"
-      ]
+      ],
+      "opening": "UI UX Developer",
+      "opening_id": "ui-ux-developer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "UI UX Developer Position description",
@@ -1396,9 +2243,22 @@
         "flutter",
         "ios",
         "android",
+        "swiftui",
+        "jetpack compose",
+        "figma",
+        "adobe",
+        "sketch",
+        "wireframes",
+        "prototyping",
+        "typography",
+        "ui design",
+        "user research",
         "agile",
         "stakeholder management"
-      ]
+      ],
+      "opening": "UI UX Developer",
+      "opening_id": "ui-ux-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "UI UX Mobile Web Developer Job Announcement Final",
@@ -1420,9 +2280,20 @@
         "flutter",
         "ios",
         "android",
+        "swiftui",
+        "jetpack compose",
+        "figma",
+        "adobe",
+        "sketch",
+        "wireframes",
+        "prototyping",
+        "typography",
         "agile",
         "content"
-      ]
+      ],
+      "opening": "UI UX Mobile Web Developer",
+      "opening_id": "ui-ux-mobile-web-developer",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "UI UX Mobile Web Developer Position Description Final",
@@ -1444,10 +2315,21 @@
         "flutter",
         "ios",
         "android",
+        "swiftui",
+        "jetpack compose",
+        "figma",
+        "wireframes",
+        "prototyping",
+        "typography",
+        "ui design",
+        "user research",
         "project management",
         "agile",
         "content"
-      ]
+      ],
+      "opening": "UI UX Mobile Web Developer",
+      "opening_id": "ui-ux-mobile-web-developer",
+      "doc_type": "Position Description"
     },
     {
       "title": "Web Dev  Full Stack Position",
@@ -1477,14 +2359,17 @@
         "ci/cd",
         "ios",
         "android",
+        "wireframes",
         "agile",
         "requirements gathering"
-      ]
+      ],
+      "opening": "Web Dev Full Stack",
+      "opening_id": "web-dev-full-stack",
+      "doc_type": "Position Description"
     },
     {
       "title": "Web Developer (Full Stack)  Position Announcement",
       "skills": [
-        "computer vision",
         "python",
         "java",
         "javascript",
@@ -1497,7 +2382,10 @@
         "html",
         "css",
         "git"
-      ]
+      ],
+      "opening": "Web Developer (Full Stack)",
+      "opening_id": "web-developer-full-stack",
+      "doc_type": "Position Announcement"
     },
     {
       "title": "Website Developer Lead Developer Full Stack Job Announcement",
@@ -1532,7 +2420,10 @@
         "agile",
         "seo",
         "marketing"
-      ]
+      ],
+      "opening": "Website Developer Lead Developer Full Stack",
+      "opening_id": "website-developer-lead-developer-full-stack",
+      "doc_type": "Job Announcement"
     },
     {
       "title": "Website Developer Lead Developer Full Stack Position Description",
@@ -1563,13 +2454,17 @@
         "automation",
         "ios",
         "android",
+        "wireframes",
         "cybersecurity",
         "compliance",
         "agile",
         "seo",
         "marketing",
         "content"
-      ]
+      ],
+      "opening": "Website Developer Lead Developer Full Stack",
+      "opening_id": "website-developer-lead-developer-full-stack",
+      "doc_type": "Position Description"
     }
   ]
 }

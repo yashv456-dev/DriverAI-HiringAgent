@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.utils import get_column_letter
 
@@ -90,7 +91,15 @@ def build_master(store, path, generation):
             for row in range(2, ws.max_row + 1):
                 url = str(ws.cell(row, url_col).value or '')
                 if url.startswith(('https://', 'http://')):
-                    ws.cell(row, link_col, 'Open resume').hyperlink = url
+                    cell = ws.cell(row, link_col, 'Open resume')
+                    cell.hyperlink = url
+                    # The loop above stamps every cell as Text ('@') so a stored value can
+                    # never be evaluated as a formula. Correct for data, wrong here: it left
+                    # the link rendering as ordinary black text with no underline, so it did
+                    # not READ as a link even though clicking it worked. Restore the default
+                    # format and apply Excel's own Hyperlink styling to this cell only.
+                    cell.number_format = 'General'
+                    cell.font = Font(color='0563C1', underline='single')
     temp = Path(path).with_suffix('.tmp.xlsx')
     wb.save(temp)
     wb.close()
@@ -131,21 +140,20 @@ def publish_results(store, remote, *, upload=True, output_dir=None):
     client = generation / 'Candidate_List_Results.xlsx'
     if upload and record['published_revision'] == revision and master.exists() and client.exists():
         return client
-    # The single worker lock covers imports, generation, and publication. No model calls here.
-    if not master.exists() or not client.exists():
-        build_master(store, master, revision)
-        temp_client = client.with_suffix('.tmp.xlsx')
-        ExcelReportExporter(store).generate_workbook(temp_client)
-        wb = load_workbook(temp_client)
-        wb.properties.description = f'P2 committed generation {revision}'
-        for ws in wb:
-            for row in ws.iter_rows(min_row=2):
-                for cell in row:
-                    if isinstance(cell.value, str):
-                        cell.data_type = 's'
-        wb.save(temp_client)
-        wb.close()
-        temp_client.replace(client)
+    # Always rebuild master and client fresh from store so published files are never stale.
+    build_master(store, master, revision)
+    temp_client = client.with_suffix('.tmp.xlsx')
+    ExcelReportExporter(store).generate_workbook(temp_client)
+    wb = load_workbook(temp_client)
+    wb.properties.description = f'P2 committed generation {revision}'
+    for ws in wb:
+        for row in ws.iter_rows(min_row=2):
+            for cell in row:
+                if isinstance(cell.value, str):
+                    cell.data_type = 's'
+    wb.save(temp_client)
+    wb.close()
+    temp_client.replace(client)
     manifest = {'generation': revision, 'files': [],
                 'import_conflicts': [dict(r) for r in store.conn.execute('SELECT app_id,reason FROM import_conflicts')]}
     if not upload:

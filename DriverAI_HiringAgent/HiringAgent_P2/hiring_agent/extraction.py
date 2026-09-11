@@ -1558,8 +1558,17 @@ _EXP_YEARS_FIRST_RE = re.compile(
     r"approximately|close\s+to)?\s*" + _EXP_NUM + r"\s*(?:\+|plus)?\s*"
     r"(?:(?:-|–|—|to)\s*\d{1,2}\s*(?:\+|plus)?\s*)?"
     r"years?[’']?s?\s*(?:\+|plus)?\s*(?:of\s+|in\s+|with\s+|across\s+|within\s+|as\s+)?"
-    r"(?:[A-Za-z][A-Za-z/&+.\-]*\s+){0,4}?"
-    r"(?:experience|expertise|background|engineering|development|industry|software|production|systems)\b")
+    # Filler tolerates a trailing comma, and runs a little longer. Resumes list
+    # activities - "9+ years designing, developing, testing and supporting ..." - and a
+    # comma stopped the filler dead, so the terminal word was never reached and a total
+    # the candidate HAD stated was reported as Missing (live case, 2026-09-11).
+    r"(?:[A-Za-z][A-Za-z/&+.\-]*,?\s+){0,6}?"
+    # Gerunds sit alongside the nouns for the same reason: "9+ years designing enterprise
+    # automation" states a total as plainly as "9+ years of experience". _exp_scan still
+    # takes the LARGEST figure, so a per-skill breakdown cannot outrank an overall one.
+    r"(?:experience|expertise|background|engineering|development|industry|software|"
+    r"production|systems|designing|developing|building|delivering|leading|managing|"
+    r"supporting|architecting|automating)\b")
 
 #: The mirrored phrasing: "Experience: 6 years", "total experience of 8+ years".
 _EXP_YEARS_LAST_RE = re.compile(
@@ -2779,6 +2788,40 @@ def _docx_hyperlinks(document) -> list:
     return list(dict.fromkeys(links))
 
 
+def _demarkdown(text: str) -> str:
+    """Strip Markdown emphasis and structure markers from extracted PDF text.
+
+    pymupdf4llm is the PRIMARY extractor and it returns Markdown, not plain text. Every
+    deterministic extractor downstream was written against plain text, so the markers
+    leaked straight into the fields and broke pattern matching in ways that were easy to
+    misread as "the resume does not say":
+
+      * "# **YASH VERMA**" made the name extractor return 'Not extracted'.
+      * "with **9+ years** designing" never matched the experience pattern, because the
+        asterisks sit between "years" and the following word, so Years Exp read 'Missing'
+        on a resume that states the total plainly (live case, 2026-09-11).
+      * Education and the notes field stored the raw "**" markers verbatim.
+
+    Fixing it here rather than in each regex means one rule instead of a dozen, and the
+    LLM also sees cleaner input. Link text is kept and the target dropped, since resumes
+    print the URL as the visible text anyway and extract_portfolios reads it from there.
+    """
+    if not text:
+        return text
+    import re as _re
+    text = _re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", text)   # [label](url) -> label
+    text = _re.sub(r"\*\*\*(.+?)\*\*\*", r"\1", text, flags=_re.S)
+    text = _re.sub(r"\*\*(.+?)\*\*", r"\1", text, flags=_re.S)
+    text = _re.sub(r"(?<!\w)_{2}(.+?)_{2}(?!\w)", r"\1", text, flags=_re.S)
+    text = _re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)             # headings
+    text = _re.sub(r"(?m)^\s{0,3}>\s?", "", text)                  # block quotes
+    text = _re.sub(r"(?m)^\s*([-*+])\s+", "", text)                # bullets
+    text = _re.sub(r"(?m)^\s*\|", " ", text)                       # table pipes
+    text = _re.sub(r"(?m)^[\s|:-]{4,}$", "", text)                  # table rules
+    text = text.replace("`", "")
+    return text
+
+
 def extract_text_from_bytes(raw: bytes, filename: str) -> str:
     """Extract text from raw PDF/DOCX bytes (with layout-aware extraction and OCR fallback)."""
     name = (filename or "").lower()
@@ -2799,7 +2842,7 @@ def extract_text_from_bytes(raw: bytes, filename: str) -> str:
                 import pymupdf
                 import pymupdf4llm
                 doc = pymupdf.open(stream=raw, filetype="pdf")
-                text = pymupdf4llm.to_markdown(doc) or ""
+                text = _demarkdown(pymupdf4llm.to_markdown(doc) or "")
                 doc.close()
             except Exception as e:
                 logger.debug(f"   pymupdf4llm extraction failed ({e}); trying pypdf.")
@@ -2960,27 +3003,39 @@ def extract_with_ollama(text: str, hints: dict | None = None) -> dict | None:
                 "from the text below - confirm each is correct, or correct it if the text "
                 "says otherwise:\n" + lines
             )
+    payload = {
+        "model": OLLAMA_MODEL,
+        "format": _CANDIDATE_FORMAT,
+        "think": False,
+        "stream": False,
+        "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
+        "messages": [
+            {"role": "system",
+             "content": _AI_PROMPT + hint_block + " Respond ONLY with a JSON object "
+             "whose keys are full_name, phone, location, country, skills, "
+             "looking_for_role, education."},
+            {"role": "user", "content": text[:AI_TEXT_LIMIT]},
+        ],
+    }
+
+    def _ask():
+        r = _post_ollama_extraction(f"{OLLAMA_HOST}/api/chat", json=payload,
+                                    timeout=OLLAMA_TIMEOUT)
+        r.raise_for_status()
+        return json.loads(r.json()["message"]["content"])
+
     try:
-        resp = _post_ollama_extraction(
-            f"{OLLAMA_HOST}/api/chat",
-            json={
-                "model": OLLAMA_MODEL,
-                "format": _CANDIDATE_FORMAT,
-                "think": False,
-                "stream": False,
-                "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
-                "messages": [
-                    {"role": "system",
-                     "content": _AI_PROMPT + hint_block + " Respond ONLY with a JSON object "
-                     "whose keys are full_name, phone, location, country, skills, "
-                     "looking_for_role, education."},
-                    {"role": "user", "content": text[:AI_TEXT_LIMIT]},
-                ],
-            },
-            timeout=OLLAMA_TIMEOUT,
-        )
-        resp.raise_for_status()
-        data = json.loads(resp.json()["message"]["content"])
+        try:
+            data = _ask()
+        except json.JSONDecodeError:
+            # A truncated or malformed body is transient in exactly the way a timeout is,
+            # but it was the one failure with no second attempt: _post_ollama_extraction
+            # retries the REQUEST and deliberately keeps parsing outside that loop, so a
+            # single bad response deferred the candidate outright. Seen live 2026-09-11,
+            # "Unterminated string starting at line 8 column 13", on a resume that scored
+            # fine on the retry. One more attempt, then fall through as before.
+            logger.warning("       Ollama returned malformed JSON; retrying once.")
+            data = _ask()
     except Exception as e:
         # requests is imported lazily inside the helper. Keep provenance classification
         # independent of that import, so a missing dependency also falls back cleanly.

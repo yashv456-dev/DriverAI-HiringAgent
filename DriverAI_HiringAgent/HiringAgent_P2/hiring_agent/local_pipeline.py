@@ -64,6 +64,12 @@ class LocalClient:
     def download_resume(self, name, subfolder=''):
         from sharepoint_client import SharePointError
         if name not in self.documents:
+            if len(self.documents) == 1:
+                doc = next(iter(self.documents.values()))
+                raw = Path(doc['path']).read_bytes()
+                if hashlib.sha256(raw).hexdigest() != doc['sha256']:
+                    raise ValueError('Cached attachment hash changed')
+                return raw
             raise SharePointError('Not in verified local attachment manifest', status_code=404)
         raw = Path(self.documents[name]['path']).read_bytes()
         if hashlib.sha256(raw).hexdigest() != self.documents[name]['sha256']:
@@ -403,7 +409,16 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
                     documents = _rename_to_canonical(
                         remote, documents, row.app_id, result_values.get('Full Name'),
                         result_values.get('Category'), dry_run)
-                    result_values['Original Filename'] = ', '.join(documents)
+                    # 'Original Filename' means what the APPLICANT sent. It used to be
+                    # overwritten here with the post-rename canonical name, so the column
+                    # reported 'Yash_Verma_AF6A.pdf' rather than the
+                    # 'Yash_Verma_Senior_UiPath_RPA_Developer_Final_2026.pdf' that actually
+                    # arrived - destroying the only record of the sender's own filename and
+                    # making the column a duplicate of the file's current name. Resume URL
+                    # below already carries where the file now lives, so nothing needs this
+                    # cell to track the rename. Only fill it when P1 left it blank.
+                    if not str(result_values.get('Original Filename', '') or '').strip():
+                        result_values['Original Filename'] = ', '.join(documents)
                     first_document = next(iter(documents.values()))
                     result_values['Resume URL'] = first_document['url']
                     result_values['Resume Folder Path'] = first_document['folder']

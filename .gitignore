@@ -39,6 +39,7 @@ app_settings.json
 Thumbs.db
 desktop.ini
 .DS_Store
+.vscode/
 
 # runtime audit exports — bulk candidate PII, never version these
 archive/audits/
