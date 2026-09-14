@@ -143,21 +143,33 @@ def require_saved_resume(actions, failure_folder, mailbox):
             if alert is not None and alert_owner is not owner:
                 alert_owner.pop(alert_name, None)
         if alert is not None:
-            alert["runAfter"] = {foreach_name: ["Failed", "TimedOut"]}
-            body = alert["inputs"]["parameters"]["emailMessage/Body"]
-            # Idempotent, as the module docstring promises. On a pristine body the cut
-            # point is the original closing paragraph; on a body this function already
-            # rewrote, it is the inserted copy itself. partition() returns the WHOLE
-            # string when its marker is absent, so without the second marker a re-run
-            # appends _LOST_COPY and another </div> on every pass.
-            for _marker in ("<p>The run reports", _LOST_MARKER):
-                if _marker in body:
-                    head = body.partition(_marker)[0]
-                    break
-            else:
-                head = body
-            alert["inputs"]["parameters"]["emailMessage/Body"] = (
-                head + (_LOST_COPY % (failure_folder, failure_folder)) + "</div>")
+            # Skipped too, matching the move in (c). A loop is skipped when the step before it
+            # (the Ensure_*_resume_folder create, or the file-list Select) fails or times out;
+            # (c) then parks the message unread and terminates green, and without Skipped here
+            # that happened with NO alert at all - an applicant silently shelved. On a
+            # successful save the loop is Succeeded, so this still never fires then.
+            alert["runAfter"] = {foreach_name: ["Failed", "TimedOut", "Skipped"]}
+            # With send_admin_failure_alerts=false the alert is already a no-op Compose
+            # whose inputs is a plain string, and indexing it crashed the whole build - so
+            # that documented switch could not be used at all (found 2026-09-14). The
+            # rewiring above still applies; only a real send has a body to rewrite.
+            params = (alert.get("inputs") or {}).get("parameters") \
+                if isinstance(alert.get("inputs"), dict) else None
+            body = params.get("emailMessage/Body") if isinstance(params, dict) else None
+            if body is not None:
+                # Idempotent, as the module docstring promises. On a pristine body the cut
+                # point is the original closing paragraph; on a body this function already
+                # rewrote, it is the inserted copy itself. partition() returns the WHOLE
+                # string when its marker is absent, so without the second marker a re-run
+                # appends _LOST_COPY and another </div> on every pass.
+                for _marker in ("<p>The run reports", _LOST_MARKER):
+                    if _marker in body:
+                        head = body.partition(_marker)[0]
+                        break
+                else:
+                    head = body
+                params["emailMessage/Body"] = (
+                    head + (_LOST_COPY % (failure_folder, failure_folder)) + "</div>")
             owner.pop(alert_name, None)
             owner[alert_name] = alert
 
@@ -198,8 +210,11 @@ def require_saved_resume(actions, failure_folder, mailbox):
         # loop and therefore run in parallel, and a MoveV2 completes well inside the time
         # an Office365 send takes. Ending the run on the move alone cancels the still-
         # running alert, producing the silent lost resume this whole fix exists to
-        # prevent. All four statuses are accepted, so a failed alert still ends green.
-        term_after = {move_name: ["Succeeded", "Failed", "TimedOut", "Skipped"]}
+        # prevent.
+        # CRITICAL: move_name must NEVER accept Skipped. On a successful save, move_name
+        # is skipped, so Terminate must also be skipped to allow the outer Mark_as_read
+        # and Move_to_processed (to Archive) to run.
+        term_after = {move_name: ["Succeeded", "Failed", "TimedOut"]}
         if alert is not None:
             term_after[alert_name] = ["Succeeded", "Failed", "TimedOut", "Skipped"]
         owner[term_name] = {

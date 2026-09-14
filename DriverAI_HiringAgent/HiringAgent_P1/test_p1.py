@@ -315,6 +315,33 @@ ok("Mail Sent" not in item, "Add_row does NOT list 'Mail Sent' (stamped by Patch
 # conditional real-looking stamp would lie).
 _send_applicant_mail = bool(cfg.get("email", {}).get("send_applicant_emails", True))
 _send_admin_alerts = bool(cfg.get("email", {}).get("send_admin_failure_alerts", True))
+
+
+def _alert_body(name):
+    """An alert's HTML body, or "" when it is absent or suppressed to a no-op Compose.
+
+    A suppressed alert's inputs is a plain string, so chained .get() on it raised and the
+    whole suite died whenever send_admin_failure_alerts was false (found 2026-09-14).
+    """
+    inputs = actions.get(name, {}).get("inputs")
+    params = inputs.get("parameters") if isinstance(inputs, dict) else None
+    return str(params.get("emailMessage/Body", "")) if isinstance(params, dict) else ""
+
+
+def _patch_reaches(source, target):
+    """True when `target` runs (transitively) after `source` through runAfter links."""
+    seen, frontier = set(), [source]
+    while frontier:
+        cur = frontier.pop()
+        for n, a in actions.items():
+            if cur in (a.get("runAfter") or {}) and n not in seen:
+                if n == target:
+                    return True
+                seen.add(n)
+                frontier.append(n)
+    return False
+
+
 _suppress_b = not _send_applicant_mail
 # An applicant must never be acknowledged for an application that was not recorded. The zip
 # base shipped Send_acknowledgment on Add_row [Succeeded, Failed, Skipped], so an Excel write
@@ -743,16 +770,42 @@ for _real in ("bounces@sendgrid.net", "bounce-123_HTML@mailer.example.com",
 for _person in ("jane@bounce.com", "michael.bounce@gmail.com", "a.bounces@yahoo.com"):
     ok(not any(b in _person.lower() for b in _bs), f"a real person is NOT blocked: {_person}")
 ok(len(sf["spam_phrases"])         == 30, f"spam_phrases   = 30 (got {len(sf['spam_phrases'])})")
-ok(len(sf["offensive_phrases"])    == 36, f"offensive      = 36 (got {len(sf['offensive_phrases'])})")
+ok(len(sf["offensive_phrases"])    == 40, f"offensive      = 40 (got {len(sf['offensive_phrases'])})")
 ok(len(sf["malware_phrases"])      == 20, f"malware        = 20 (got {len(sf['malware_phrases'])}) - extensions/macros only, always checked")
 ok(len(sf["foreign_scam_phrases"]) == 25, f"foreign_scam   = 25 (got {len(sf['foreign_scam_phrases'])})")
 ok(len(sf["link_shortener_phrases"]) == 12,
    f"link_shortener_phrases = 12 (got {len(sf.get('link_shortener_phrases', []))}) - checked separately, bypassed when a real resume is attached")
 total = (len(sf["spam_phrases"]) + len(sf["offensive_phrases"]) +
          len(sf["malware_phrases"]) + len(sf["foreign_scam_phrases"]))
-ok(total == 111, f"total always-on spam gate phrases = 111 (got {total}) (+ 12 conditional link-shortener phrases)")
+ok(total == 115, f"total always-on spam gate phrases = 115 (got {total}) (+ 12 conditional link-shortener phrases)")
 ok(not (set(sf["malware_phrases"]) & set(sf["link_shortener_phrases"])),
    "malware_phrases and link_shortener_phrases don't overlap (clean split, nothing lost/duplicated)")
+
+# Every gate term is a BARE SUBSTRING - P1 has no regex and no word boundaries - so a
+# term that hides inside an ordinary word junks a real applicant silently: no row, no
+# reply, no alert. 'horny' shipped for months and matched 'thorny' (found 2026-09-11).
+# These are sentences a real candidate could plausibly write.
+_INNOCENT = (
+    "We solved a thorny integration problem and shipped it on time.",
+    "I led a class of twenty analysts through the migration.",
+    "Scaled the platform to assess thousands of documents per hour.",
+    "My title was Associate Consultant at a mid-size firm.",
+    "Built a document classifier and a shipment tracker in Python.",
+    "Experience with Scunthorpe Steel Works as a process engineer.",
+)
+_ALWAYS_ON = (sf["spam_phrases"] + sf["offensive_phrases"]
+              + sf["malware_phrases"] + sf["foreign_scam_phrases"])
+for _sentence in _INNOCENT:
+    _hits = [t for t in _ALWAYS_ON if t.lower() in _sentence.lower()]
+    ok(not _hits,
+       f"an ordinary resume sentence is not junked by a substring term "
+       f"({_sentence[:44]!r} -> {_hits or 'clean'})")
+# ...while the spam those terms exist for is still caught.
+for _spam, _why in (("horny singles waiting in your area", "adult spam"),
+                    ("you have won the lottery, claim your prize", "scam"),
+                    ("open the attached invoice.exe to proceed", "malware")):
+    ok(any(t.lower() in _spam.lower() for t in _ALWAYS_ON),
+       f"{_why} is still blocked ({_spam[:38]!r})")
 ok("apply@driverai.io" in sf["bad_senders"],
    "apply@driverai.io in bad_senders (self-loop protection)")
 ok(len(sf["vendor_solicitation_phrases"]) == 12,
@@ -1033,7 +1086,11 @@ if "Last Updated Date" in _lu:
 # 'Gayuh Nurul Huda - CV - 2026.pdf' vs '... - Portfolio - 2026.pdf'). P2 then concatenated
 # the text of every survivor before scoring, so a portfolio polluted the resume's own scores.
 print("\n=== U. ATTACHMENT TRIAGE (portfolio/cover-letter exclusion + no silent overwrite) ===")
-_EXCL = [str(p).strip().lower()
+# rstrip, mirroring build_zip.py. A LEADING space is part of the term: ' cl.' is the
+# separator-anchored form that must NOT collapse to the far broader bare 'cl.'. This
+# used to .strip() like the build did, so both sides agreed on the wrong answer and the
+# suite passed while the package shipped a wider filter than the config asked for.
+_EXCL = [str(p).rstrip().lower()
          for p in (cfg.get("resume_attachments") or {}).get("exclude_name_phrases", [])
          if str(p).strip()]
 ok(bool(_EXCL), f"flow_config declares resume_attachments.exclude_name_phrases ({len(_EXCL)})")
@@ -1047,9 +1104,23 @@ for _a in ("ResumeFilesAll", "ResumeFilesKept", "ResumeFiles"):
 _all_where = actions["ResumeFilesAll"]["inputs"]["where"]
 ok(".pdf" in _all_where and ".docx" in _all_where and "contentBytes" in _all_where,
    "ResumeFilesAll is the original unfiltered .pdf/.docx-with-bytes test")
+ok("'.doc'" in _all_where,
+   "legacy Word (.doc) is accepted - older installs still send it, and P2 reads it "
+   "via extraction.py::_word97_text")
+ok(_all_where == actions["ResumeFilesEarly"]["inputs"]["where"],
+   "the early spam-gate probe and the real save loop use the SAME resume test - if the "
+   "probe accepts a file the loop rejects, the mail is treated as an application that "
+   "then saves nothing")
 _kept_where = actions["ResumeFilesKept"]["inputs"]["where"]
 ok(actions["ResumeFilesKept"]["inputs"]["from"] == "@body('ResumeFilesAll')",
    "ResumeFilesKept narrows ResumeFilesAll rather than re-reading the attachments")
+# The build compiles each configured phrase into the package verbatim. It used to
+# .strip() them, which silently turned the separator-anchored ' cl.' into the far
+# broader 'cl.' - the config said one thing and the running flow did another, and
+# nothing compared the two. This does.
+_zip_excl = [_m for _m in re.findall(r"'([^']*)'", _kept_where) if _m != "name"]
+ok(_zip_excl == _EXCL,
+   f"every exclusion phrase reaches the package unaltered (config {_EXCL} -> zip {_zip_excl})")
 for _p in _EXCL:
     ok("contains(toLower(item()?['name']), '%s')" % _p.replace("'", "''") in _kept_where,
        f"exclusion {_p!r} is applied to the attachment FILENAME, case-insensitively")
@@ -1173,12 +1244,43 @@ def _max_arity(expr: str, fn: str) -> int:
         worst = max(worst, args)
     return worst
 
+
+def _min_arity(expr: str, fn: str) -> int:
+    """Smallest top-level argument count of any `fn(...)` call in `expr`."""
+    worst = 999
+    found_any = False
+    for m in re.finditer(r"(?<![A-Za-z0-9_])" + fn + r"\(", expr):
+        i, depth, args, in_str = m.end(), 1, 1, False
+        found_any = True
+        while i < len(expr) and depth > 0:
+            ch = expr[i]
+            if ch == "'":
+                if in_str and i + 1 < len(expr) and expr[i + 1] == "'":
+                    i += 2          # '' is an escaped quote inside a literal
+                    continue
+                in_str = not in_str
+            elif not in_str:
+                if ch == "(":
+                    depth += 1
+                elif ch == ")":
+                    depth -= 1
+                elif ch == "," and depth == 1:
+                    args += 1
+            i += 1
+        worst = min(worst, args)
+    return worst if found_any else 2
+
 _defn_all = json.dumps(defn)
 for _fn in ("and", "or"):
     _n = _max_arity(_defn_all, _fn)
     ok(_n <= 2,
        f"no {_fn}() in the built flow takes more than 2 arguments (max found: {_n}) - "
        f"a flat multi-arg {_fn}() imports fine and then fails EVERY run at runtime")
+    _min_n = _min_arity(_defn_all, _fn)
+    ok(_min_n >= 2,
+       f"no {_fn}() in the built flow takes fewer than 2 arguments (min found: {_min_n}) - "
+       f"a unary {_fn}() fails at runtime in Power Automate")
+
 
 # And specifically the action that caused the outage.
 _kept = actions.get("ResumeFilesKept")
@@ -1268,6 +1370,9 @@ ok(not any(str(a.get("inputs", {}).get("parameters", {}).get("folderPath", "")).
 
 # Every nested outcome move must have exactly one same-scope terminal continuation.
 # This reverse check catches a move that accidentally loses its downstream handler.
+# Since 2026-09-14 each move also has exactly one failure-only admin alert sibling
+# (build_zip.py section 16e): a caught move used to leave the message in the Inbox, to be
+# read again on the next poll, with no signal at all.
 branch_moves = [name for name in all_moves if name != "Move_to_processed"]
 ok(len(branch_moves) == 9, f"9 nested outcome moves require terminal handlers (got {len(branch_moves)})")
 for move_name in branch_moves:
@@ -1276,10 +1381,15 @@ for move_name in branch_moves:
         if owner_of.get(name) == owner_of.get(move_name)
         and move_name in action.get("runAfter", {})
     ]
-    ok(len(dependents) == 1 and dependents[0][1].get("type") == "Terminate",
-       f"{move_name} has exactly one same-scope Terminate continuation")
-    if dependents:
-        ok(set(dependents[0][1].get("runAfter", {}).get(move_name, [])) ==
+    terminates = [(n, a) for n, a in dependents if a.get("type") == "Terminate"]
+    alert_name = "Notify_" + move_name.lower() + "_failed"
+    others = [n for n, a in dependents if a.get("type") != "Terminate" and n != alert_name]
+    ok(len(terminates) == 1 and not others,
+       f"{move_name} has exactly one same-scope Terminate continuation (plus its alert only)")
+    ok(any(n == alert_name for n, _ in dependents),
+       f"{move_name} has its cleanup-failure alert {alert_name}")
+    if terminates:
+        ok(set(terminates[0][1].get("runAfter", {}).get(move_name, [])) ==
            {"Succeeded", "Failed", "Skipped", "TimedOut"},
            f"{move_name} continuation handles every terminal status")
 
@@ -1385,7 +1495,9 @@ def route(m):
     hay  = " ".join([subj, body] + atts) + " "
     cv   = m.get("cv_attempts", 0)
     cap  = 5  # max replies before silence
-    pdf_docx   = [a for a in atts if a.endswith(".pdf") or a.endswith(".docx")]
+    # Mirrors build_zip.py _RESUME_EXTENSIONS. Legacy .doc joined on 2026-09-11; this model
+    # still said .pdf/.docx only, so it kept "proving" .doc was a wrong format.
+    pdf_docx   = [a for a in atts if a.endswith((".pdf", ".docx", ".doc"))]
     has_valid_resume_early = len(pdf_docx) > 0
 
     # Gate 1 — bad sender
@@ -1608,9 +1720,9 @@ fixtures = [
     ("no-CV with keyword in body only",
      {"from":"bob@gmail.com","subject":"Hello","body":"I would like to apply for a role"},
      "EMAIL3"),
-    ("wrong format (.doc)",
+    ("legacy Word (.doc) is a resume, not a wrong format",
      {"from":"amy@gmail.com","subject":"resume","body":"pfa","atts":["cv.doc"]},
-     "EMAIL4"),
+     "EMAIL1"),
     ("wrong format (.txt)",
      {"from":"amy@gmail.com","subject":"resume","body":"pfa","atts":["cv.txt"]},
      "EMAIL4"),
@@ -1767,10 +1879,26 @@ for _alert, _patch in _PATCH_ALERTS_EXPECTED.items():
     ok(_alert_depths.get(_alert) == _alert_depths.get(_patch),
        f"{_alert} is a SIBLING of {_patch} at depth {_alert_depths.get(_patch)} (adds no nesting)")
 
-_alert_dependents = [n for n, a in actions.items()
-                     if set(a.get("runAfter") or {}) & set(_PATCH_ALERTS_EXPECTED)]
-ok(not _alert_dependents,
-   f"nothing runs after a patch-failure alert, so they are inert (got {_alert_dependents})")
+# Only Terminates may depend on a patch-failure alert, and only unconditionally (all four
+# statuses): they WAIT for it so ending the run cannot cancel the send mid-flight (2026-09-14
+# dry-run finding - Terminate_update/_noreply and Terminate_noted/_noreply used to race it).
+# Anything else depending on an alert would make the alert load-bearing.
+_alert_dependents = {n: a for n, a in actions.items()
+                     if set(a.get("runAfter") or {}) & set(_PATCH_ALERTS_EXPECTED)}
+ok(all(a.get("type") == "Terminate" for a in _alert_dependents.values()),
+   f"only Terminates wait for a patch-failure alert (got {sorted(_alert_dependents)})")
+for _n, _a in _alert_dependents.items():
+    for _dep, _st in _a["runAfter"].items():
+        if _dep in _PATCH_ALERTS_EXPECTED:
+            ok(sorted(_st) == ["Failed", "Skipped", "Succeeded", "TimedOut"],
+               f"{_n} waits for {_dep} unconditionally, so a failed alert cannot block it")
+for _patch in _PATCH_ALERTS_EXPECTED.values():
+    _alert = "Notify_" + _patch.replace("Patch_", "") + "_failed"
+    _terms = [n for n, a in actions.items() if a.get("type") == "Terminate"
+              and owner_of.get(n) == owner_of.get(_patch) and _patch_reaches(_patch, n)]
+    for _t in _terms:
+        ok(_alert in (actions[_t].get("runAfter") or {}),
+           f"{_t} (downstream of {_patch}) waits for {_alert}, so the alert is never cancelled")
 
 # ── O3b. INTAKE-WRITE FAILURE ALERTS (added 2026-08-24) ──────────────────────
 # O3 covers every PATCH of an EXISTING row. The two writes that CREATE a candidate had no
@@ -1819,8 +1947,13 @@ for _alert, _write in _WRITE_ALERTS_EXPECTED.items():
     else:
         ok(_a.get("type") == "Compose",
            f"{_alert} is suppressed to a no-op exactly as configured")
-    ok(_a.get("runAfter") == {_write: ["Failed", "TimedOut"]},
-       f"{_alert} fires ONLY on {_write} Failed/TimedOut")
+    # The three resume-save alerts watch their LOOP and include Skipped: a loop skipped
+    # because the folder step before it timed out used to shelve the applicant with no
+    # alert (2026-09-14 dry-run finding). Add_row still fires on Failed/TimedOut only.
+    _want = (["Failed", "TimedOut"] if _write == "Add_row"
+             else ["Failed", "TimedOut", "Skipped"])
+    ok(_a.get("runAfter") == {_write: _want},
+       f"{_alert} fires ONLY when {_write} does not complete ({'/'.join(_want)})")
     ok(_alert_depths.get(_alert) == _alert_depths.get(_write),
        f"{_alert} is a SIBLING of {_write} (adds no nesting)")
 
@@ -1893,8 +2026,7 @@ for _patch, _want_swallowed in _EXPECTED_SWALLOWED.items():
 # The wording itself must match the classification.
 for _patch, _want_swallowed in _EXPECTED_SWALLOWED.items():
     _alert = "Notify_" + _patch.replace("Patch_", "") + "_failed"
-    _body = str(actions.get(_alert, {}).get("inputs", {})
-                .get("parameters", {}).get("emailMessage/Body", ""))
+    _body = _alert_body(_alert)
     if not _body:
         continue   # suppressed to Compose when admin alerts are off
     if _want_swallowed:
@@ -2237,16 +2369,125 @@ for _term, _alert in (("Terminate_new_save_failed", "Notify_create_file_failed")
     ok(sorted(_after.get(_alert, [])) == ["Failed", "Skipped", "Succeeded", "TimedOut"],
        f"{_term} accepts every {_alert} outcome so a failed alert still ends the run green")
 
+# R3b-2. The terminate must NEVER run when the save succeeded. Move is skipped on success,
+# so accepting Skipped from the move terminates a successful intake before it can mark
+# the email read or move it to Archive.
+for _term, _move in (("Terminate_new_save_failed", "Move_new_save_failed_unread"),
+                     ("Terminate_dup_save_failed", "Move_dup_save_failed_unread"),
+                     ("Terminate_update_save_failed", "Move_update_save_failed_unread")):
+    _after = actions.get(_term, {}).get("runAfter", {})
+    ok("Skipped" not in _after.get(_move, []),
+       f"{_term} must NEVER accept Skipped from {_move} (would kill successful runs)")
+    ok(sorted(_after.get(_move, [])) == ["Failed", "Succeeded", "TimedOut"],
+       f"{_term} waits for {_move} outcomes on failure only")
+
+
 # R3c. The alert body rewrite is idempotent: a rebuild over an already-fixed definition
 # must not append the recovery copy (or a second </div>) a second time.
 for _alert in ("Notify_create_file_failed", "Notify_create_dup_update_file_failed",
                "Notify_create_update_file_failed"):
-    _body = actions.get(_alert, {}).get("inputs", {}).get("parameters", {}).get(
-        "emailMessage/Body", "")
+    _body = _alert_body(_alert)
+    if not _send_admin_alerts:
+        ok(not _body and actions.get(_alert, {}).get("type") == "Compose",
+           f"{_alert} is fully suppressed when admin alerts are off (no stale live copy)")
+        continue
     ok(_body.count("The resume was <strong>not saved</strong>") == 1,
        f"{_alert} carries the lost-resume copy exactly once (idempotent rewrite)")
     ok(_body.count("</div>") == 1,
        f"{_alert} body closes exactly one div (no duplicated append)")
+
+# R3d. The alert must not contradict the save gate it sits behind (2026-09-14 review).
+# The consequence paragraphs pre-dated require_saved_resume and still claimed Add_row ran
+# and the applicant had been told - directly above R3c's "nothing downstream was allowed".
+_STALE_CLAIMS = ("Add_row still runs", "already been told", "patched as though",
+                 "patched as an update", "claims a resume that does not exist")
+for _alert in ("Notify_create_file_failed", "Notify_create_dup_update_file_failed",
+               "Notify_create_update_file_failed"):
+    _body = _alert_body(_alert)
+    if not _body:
+        continue   # suppressed to Compose when admin alerts are off
+    _stale = [c for c in _STALE_CLAIMS if c in _body]
+    ok(not _stale, f"{_alert} makes no pre-gate claim that contradicts the save gate (got {_stale})")
+_ms_body = _alert_body("Notify_mail_sent_failed")
+if _ms_body:
+    ok("Mail Sent stamp was NOT written" in _ms_body and "counter" not in _ms_body,
+       "Notify_mail_sent_failed describes the stamp, not a counter Patch_mail_sent never touches")
+
+# R3e. Notify_ignored_mail covers TWO kinds of mail. Has_application_keyword is
+# and(no attachments, keyword), so its else branch also receives every email that has
+# attachments but no PDF/Word resume - an application HasWrongFormat handles in parallel.
+# Calling that "not an application ... sent no reply" was wrong; the wording must follow
+# the attachment count, and the reply sentence must follow the applicant-mail setting.
+_ig = actions.get("Notify_ignored_mail", {})
+_ig_params = _ig.get("inputs", {}).get("parameters", {}) if isinstance(_ig.get("inputs"), dict) else {}
+if _ig.get("type") == "OpenApiConnection":
+    _ig_subject, _ig_body = str(_ig_params.get("emailMessage/Subject", "")), str(_ig_params.get("emailMessage/Body", ""))
+    _att_test = "greater(length(coalesce(outputs('CurrentEmail')?['attachments'], json('[]'))), 0)"
+    ok(_att_test in _ig_subject and "Resume not in PDF or Word" in _ig_subject
+       and "Non-application mail archived" in _ig_subject,
+       "Notify_ignored_mail subject distinguishes a wrong-format resume from non-application mail")
+    ok(_att_test in _ig_body and "join(body('AttachNames')" in _ig_body,
+       "Notify_ignored_mail body names the unsupported attachments when there are any")
+    ok("no Application ID that matches a candidate row" in _ig_body
+       and "no application reference" not in _ig_body,
+       "Notify_ignored_mail no longer claims 'no reference' (an unmatched ref reaches this branch)")
+    ok(("has not been told" in _ig_body) == (not _send_applicant_mail),
+       "Notify_ignored_mail states whether a wrong-format sender was told, per applicant-mail config")
+    ok(actions.get("HasWrongFormat", {}).get("runAfter", {}).get("Has_application_keyword")
+       == ["Succeeded", "Failed", "Skipped"],
+       "HasWrongFormat still evaluates after the keyword branch, so the two cases stay parallel")
+
+# R3f. INBOX-CLEANUP AND DUPLICATE-LOOKUP ALERTS (build_zip.py 16e, 2026-09-14).
+_CLEANUP_MOVES = ["Move_to_processed"] + [f"Move_to_processed_{s}" for s in
+                  ("spam_sender", "spam_subject", "spam_body", "update", "update_noreply",
+                   "update_cap", "followup", "followup_noreply", "followup_cap")]
+_cleanup_alerts = {"Notify_" + m.lower() + "_failed": m for m in _CLEANUP_MOVES}
+_ALL4 = ["Failed", "Skipped", "Succeeded", "TimedOut"]
+_review_depths = dict(_action_depths(defn.get("actions", {})))
+for _alert, _watched in list(_cleanup_alerts.items()) + [("Notify_get_rows_failed", "Get_rows")]:
+    _a = actions.get(_alert)
+    ok(_a is not None, f"{_alert} exists")
+    if _a is None:
+        continue
+    if _send_admin_alerts:
+        ok(_a.get("type") == "OpenApiConnection"
+           and _a["inputs"]["host"]["operationId"] == "SendEmailV2"
+           and _a["inputs"]["parameters"]["emailMessage/To"] == cfg["email"]["admin_email"],
+           f"{_alert} is a real admin send to the configured admin")
+        ok(_a.get("runtimeConfiguration", {}).get("retryPolicy", {}).get("type") == "exponential",
+           f"{_alert} retries on a transient send failure")
+    else:
+        ok(_a.get("type") == "Compose", f"{_alert} is suppressed to a no-op exactly as configured")
+    ok(_a.get("runAfter") == {_watched: ["Failed", "TimedOut"]},
+       f"{_alert} fires ONLY when {_watched} fails or times out")
+    ok(owner_of.get(_alert) == owner_of.get(_watched)
+       and _review_depths.get(_alert) == _review_depths.get(_watched),
+       f"{_alert} is a same-depth SIBLING of {_watched} (adds no nesting)")
+    _waiters = {n: a["runAfter"][_alert] for n, a in actions.items()
+                if _alert in (a.get("runAfter") or {})}
+    ok(len(_waiters) == 1 and all(sorted(s) == _ALL4 for s in _waiters.values()),
+       f"exactly one action waits for {_alert}, unconditionally (got {sorted(_waiters)})")
+    if _waiters:
+        _w = next(iter(_waiters))
+        ok(actions[_w].get("type") in ("Terminate", "Compose"),
+           f"{_alert} is caught by a Terminate or catch Compose, so a failed send ends green")
+        if actions[_w].get("type") == "Terminate":
+            ok(_watched in actions[_w].get("runAfter", {}),
+               f"{_w} waits for both {_watched} and its alert, so the alert is never cancelled")
+    if _watched.startswith("Move_to_processed_spam"):
+        ok("AppRef" not in json.dumps(_a),
+           f"{_alert} does not reference AppRef, which the spam gates run before")
+ok(actions.get("Processed_cleanup_alert_done", {}).get("runAfter")
+   == {"Notify_move_to_processed_failed": ["Succeeded", "Failed", "TimedOut", "Skipped"]},
+   "top-level cleanup alert has its catch Compose")
+ok(actions.get("Get_rows_alert_done", {}).get("runAfter")
+   == {"Notify_get_rows_failed": ["Succeeded", "Failed", "TimedOut", "Skipped"]},
+   "duplicate-lookup alert has its catch Compose")
+ok(actions.get("Filter_submitted", {}).get("runAfter", {}).get("Get_rows")
+   == ["Succeeded", "Failed", "Skipped"],
+   "a failed duplicate lookup still does not block intake (the alert only reports it)")
+ok(max(_review_depths.values()) <= 8,
+   f"cleanup/lookup alerts kept nesting within the PA limit of 8 (got {max(_review_depths.values())})")
 
 # R4. The row that gets patched must be the row the duplicate decision measured.
 for _pick in ("Latest_submitted", "Latest_ref"):

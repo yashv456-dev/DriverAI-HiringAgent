@@ -205,7 +205,7 @@ python test_p1.py
 ```
 
 Structural validation of the built package plus a routing simulation over ~55 real
-scenarios. Expect `797 passed, 0 failed`. **Always rebuild and re-run this before
+scenarios. Expect `947 passed, 0 failed`. **Always rebuild and re-run this before
 importing** — a committed package can silently disagree with the config.
 
 ### 4. Import

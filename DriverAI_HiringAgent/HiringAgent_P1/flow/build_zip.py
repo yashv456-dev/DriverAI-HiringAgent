@@ -285,6 +285,18 @@ def _deep_find(tree, name):
     return None
 
 
+def _deep_find_all(tree, name):
+    """Every action dict called `name`, at any depth - not just the first one found."""
+    found = []
+    if isinstance(tree, dict):
+        if isinstance(tree.get(name), dict):
+            found.append(tree[name])
+        for key, v in tree.items():
+            if key != name:
+                found.extend(_deep_find_all(v, name))
+    return found
+
+
 def _find_owner_actions(tree, name):
     """Return the `actions` dict that DIRECTLY contains `name`, or None.
 
@@ -507,6 +519,35 @@ actions["IsSystem"]["else"]["actions"]["IsSubject"]["expression"] = {"and": [
 actions.pop("ResumeFilesEarly", None)
 actions.pop("HasValidResumeEarly", None)
 
+def _or_chain(terms: list) -> str:
+    """Right-fold a list of boolean expressions into nested BINARY or() calls: or(a, or(b, c))."""
+    if len(terms) == 1:
+        return terms[0]
+    return "or(%s, %s)" % (terms[0], _or_chain(terms[1:]))
+
+
+# The resume-attachment test, written ONCE. It is evaluated in two places - the early
+# spam-gate probe and the real save loop - and the two MUST agree: if the early probe
+# accepts a file the save loop rejects, the message is treated as an application and
+# then saves nothing. They were separate copies of the same literal until .doc was
+# added (2026-09-11), which is exactly the edit that would have desynchronised them.
+#
+# '.doc' cannot match a '.docx' name: "resume.docx" does not end in ".doc". Legacy Word
+# is accepted because applicants on older installs still send it and were being bounced
+# with a wrong-format reply; P2 reads it via hiring_agent/extraction.py::_word97_text.
+#
+# Logic Apps / Power Automate WDL or() is strictly BINARY - or(a, b). A unary or(c) or
+# flat or(a, b, c) fails at runtime. Right-folding through _or_chain gives exactly:
+# or(endsWith(..., '.pdf'), or(endsWith(..., '.docx'), endsWith(..., '.doc'))).
+_RESUME_EXTENSIONS = (".pdf", ".docx", ".doc")
+_IS_RESUME_FILE = (
+    "@and("
+    + _or_chain([f"endsWith(toLower(item()?['name']), '{ext}')"
+                 for ext in _RESUME_EXTENSIONS])
+    + ", not(empty(item()?['contentBytes'])))"
+)
+
+
 # ── navigate to the spam-gate scope and the post-spam work branch ────────────
 # NOTE (fixed 2026-07-03, 2nd attempt): runAfter can ONLY reference actions at the exact same
 # nesting level - PA's validator rejected referencing the top-level HasValidResumeEarly from the
@@ -519,9 +560,7 @@ spam_gate["ResumeFilesEarly"] = {
     "type": "Query",
     "inputs": {
         "from": "@coalesce(triggerOutputs()?['body/attachments'], json('[]'))",
-        "where": "@and(or(endsWith(toLower(item()?['name']), '.pdf'), "
-                 "endsWith(toLower(item()?['name']), '.docx')), "
-                 "not(empty(item()?['contentBytes'])))",
+        "where": _IS_RESUME_FILE,
     },
 }
 spam_gate["HasValidResumeEarly"] = {
@@ -623,13 +662,15 @@ spam["FileRef"] = {
 # The fallback is the safety property: if the exclusion would leave nothing, the unfiltered
 # list is used, so an applicant whose ONLY attachment is called portfolio.pdf is still a
 # normal application rather than a "please attach your resume" reply.
-_ATTACH_EXCLUDE = [str(p).strip().lower()
+# rstrip only. A LEADING space is meaningful here: ' cl.' is the separator-anchored form
+# that matches 'Qazafi Sheikh - CL.pdf' without also matching 'JohnCL.pdf', and it sits in
+# the config beside '-cl.' and '_cl.' precisely to cover the third separator style. A plain
+# .strip() deleted that space and compiled the bare substring 'cl.' into the package, which
+# both widened the filter past what the config asked for and made its two siblings dead
+# weight (found 2026-09-11 by diffing the config terms against the built definition).
+_ATTACH_EXCLUDE = [str(p).rstrip().lower()
                    for p in (cfg.get("resume_attachments") or {}).get("exclude_name_phrases", [])
                    if str(p).strip()]
-
-_IS_RESUME_FILE = ("@and(or(endsWith(toLower(item()?['name']), '.pdf'), "
-                   "endsWith(toLower(item()?['name']), '.docx')), "
-                   "not(empty(item()?['contentBytes'])))")
 
 spam["ResumeFilesAll"] = {
     "type": "Query",
@@ -778,6 +819,39 @@ kw["actions"] = {"Send_CV_request": _send_cv}
 # Inbox, and - because the Inbox IS the queue - have it re-processed and re-alerted every
 # minute. The trailing Compose absorbs Failed/TimedOut so the branch always closes clean,
 # the same catch pattern already used by Ack_stamp_done and Dup_patch_done.
+#
+# TWO kinds of mail reach this else branch, not one (found 2026-09-14). Has_application_keyword
+# is and(no attachments, keyword), so its else also catches EVERY email that has attachments
+# but no PDF/Word resume - a .jpg or .txt resume, even with "resume" in the subject. That mail
+# is an application: HasWrongFormat handles it in parallel (Send_wrong_format). The alert used
+# to call it "not an application ... sent no reply" regardless. With applicant mail off it is
+# the ONLY trace that such an applicant existed, so the wording is chosen at run time from the
+# attachment count instead of being dropped.
+def _pa_str(text: str) -> str:
+    """A Power Automate expression string literal (single quotes doubled)."""
+    return "'" + text.replace("'", "''") + "'"
+
+
+_HAS_ATTACHMENTS = "greater(length(coalesce(outputs('CurrentEmail')?['attachments'], json('[]'))), 0)"
+_WRONG_FORMAT_REPLY = (
+    "They were sent the <em>Please Resend Your Resume as PDF or Word</em> reply."
+    if send_applicant_emails else
+    "Applicant email is switched off, so <strong>the sender has not been told</strong>. If "
+    "this is a real applicant, ask them to resend their resume as a PDF or Word file."
+)
+_IGNORED_INTRO = (
+    "@{if(" + _HAS_ATTACHMENTS + ", concat("
+    + _pa_str("<p><strong>An email with attachments reached the hiring mailbox, but none of "
+              "them is a PDF or Word resume</strong> (attached: ")
+    + ", join(body('AttachNames'), ', '), "
+    + _pa_str("), so P1 created no candidate row. " + _WRONG_FORMAT_REPLY + "</p>")
+    + "), "
+    + _pa_str("<p><strong>An email reached the hiring mailbox that is not an "
+              "application.</strong> It passed every spam screen, but carried no attachment, "
+              "no application keyword and no Application ID that matches a candidate row, so "
+              "P1 created no row and sent no reply.</p>")
+    + ")}"
+)
 if send_admin_failure_alerts:
     _notify_ignored = {
         "type": "OpenApiConnection",
@@ -788,15 +862,14 @@ if send_admin_failure_alerts:
             "parameters": {
                 "emailMessage/To": email["admin_email"],
                 "emailMessage/Subject": (
-                    "[Hiring Auto-Reply] Non-application mail archived: "
+                    "[Hiring Auto-Reply] @{if(" + _HAS_ATTACHMENTS + ", "
+                    "'Resume not in PDF or Word - no row created: ', "
+                    "'Non-application mail archived: ')}"
                     "@{coalesce(outputs('CurrentEmail')?['subject'],'(no subject)')}"
                 ),
                 "emailMessage/Body": (
                     '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;">'
-                    '<p><strong>An email reached the hiring mailbox that is not an '
-                    'application.</strong> It passed every spam screen, but carried no resume, '
-                    'no application keyword and no application reference, so P1 created no row '
-                    'and sent no reply.</p>'
+                    + _IGNORED_INTRO +
                     '<p><strong>From:</strong> '
                     "@{coalesce(outputs('CurrentEmail')?['from'],'(unknown)')}<br>"
                     '<strong>Subject:</strong> '
@@ -1949,7 +2022,8 @@ _set_email(
     '<p>Thanks for your interest in <strong>DriverAI</strong>. We didn\'t see a resume '
     'attached, so your application isn\'t complete yet.</p>'
 
-    '<p>Please reply with your resume attached in <strong>PDF or Word (.docx)</strong> '
+    '<p>Please reply with your resume attached in <strong>PDF (.pdf) or Word '
+    '(.docx, .doc)</strong> '
     'format. Once we have it, your application goes under review, and if you are selected, '
     'a member of our team will contact you to discuss next steps.</p>'
 
@@ -1957,7 +2031,7 @@ _set_email(
     '<p>Warm regards,<br><strong>The DriverAI Recruiting Team</strong></p>',
 )
 
-# ── Email 4: Wrong file format (attachment is not PDF/DOCX)
+# ── Email 4: Wrong file format (attachment is not PDF/DOCX/DOC)
 _set_email(
     _deep_find(hr["else"]["actions"], "Send_wrong_format"),
     "Please Resend Your Resume as PDF or Word - DriverAI",
@@ -1968,7 +2042,7 @@ _set_email(
     'submission, but we couldn\'t open the attached file.</p>'
 
     '<p>Please reply with your resume as a <strong>PDF (.pdf)</strong> or '
-    '<strong>Word (.docx)</strong> file and we\'ll process it right away. If you are '
+    '<strong>Word (.docx or .doc)</strong> file and we\'ll process it right away. If you are '
     'selected, a member of our team will contact you to discuss next steps.</p>'
 
     '<p>Good luck on your next journey.</p>'
@@ -2304,10 +2378,14 @@ def _make_patch_alert(patch_name: str, what: str, swallowed: bool = True) -> dic
                     'color:#222;line-height:1.6;">'
                     '<p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p>'
                     '<p>The incoming email was handled and filed normally, but <strong>'
-                    + patch_name + '</strong> (' + what + ') did not commit. The '
-                    'Application Updates counter was NOT incremented'
-                    + (', and the row was NOT re-queued for Phase 2 scoring'
-                       if "dup" in patch_name or "update" in patch_name else '')
+                    + patch_name + '</strong> (' + what + ') did not commit. '
+                    # Patch_mail_sent writes only the Mail Sent stamp; it never touches the
+                    # counter, so saying the counter was not incremented was simply false.
+                    + ('The Mail Sent stamp was NOT written on the new row'
+                       if patch_name == "Patch_mail_sent" else
+                       'The Application Updates counter was NOT incremented'
+                       + (', and the row was NOT re-queued for Phase 2 scoring'
+                          if "dup" in patch_name or "update" in patch_name else ''))
                     + '.</p>'
                     '<ul>'
                     '<li>Reference: <strong>' + _ref_any + '</strong></li>'
@@ -2352,6 +2430,22 @@ for _patch_name, (_what, _swallowed) in _PATCH_ALERTS.items():
     _owner.pop(_alert_name, None)
     _owner[_alert_name] = _make_patch_alert(_patch_name, _what, _swallowed)
     _patch_alert_names.append(_alert_name)
+    # A Terminate downstream of the patch must WAIT for this alert. On the update and
+    # follow-up paths the failed patch hands straight on to Mark_as_read -> Move ->
+    # Terminate, which runs in parallel with the alert; a MoveV2 finishes well inside an
+    # Office365 send, so the Terminate ended the run and cancelled the alert mid-send - the
+    # race R3b guards for the save failures. Found 2026-09-14 by the definition dry-run.
+    # All four statuses, so a failed alert can never stop the run ending green.
+    _downstream, _frontier = set(), [_patch_name]
+    while _frontier:
+        _cur = _frontier.pop()
+        for _n, _a in _owner.items():
+            if _cur in (_a.get("runAfter") or {}) and _n not in _downstream:
+                _downstream.add(_n)
+                _frontier.append(_n)
+    for _t in sorted(_downstream):
+        if _owner[_t].get("type") == "Terminate":
+            _owner[_t]["runAfter"][_alert_name] = ["Succeeded", "Failed", "TimedOut", "Skipped"]
 
 # ── 16b. INTAKE-WRITE FAILURE ALERTS (Add_row / Create_file) ─────────────────
 # The 7 alerts above cover every PATCH of an EXISTING row. The two writes that CREATE a
@@ -2378,37 +2472,34 @@ _WRITE_ALERTS = {
         "succeeding, so it was skipped. Their resume may still have been saved to "
         "SharePoint, which leaves an orphan file with nothing pointing at it.",
     ),
+    # The three resume-save consequences below describe the flow AFTER
+    # integrity_fixes.require_saved_resume (2026-09-08), which gates Add_row and both reply
+    # branches on the save loop Succeeding and ends a failed save with an unread move. Their
+    # original text described the pre-gate flow ("Add_row still runs", "the applicant has
+    # already been told") and sat directly above that fix's own "nothing downstream was
+    # allowed to run" paragraph, so the same email contradicted itself (found 2026-09-14).
     "Create_file": (
         "the resume file was never saved",
-        "Add_row still runs when the save fails and always writes Has Resume = 'Yes', so "
-        "the row now <strong>claims a resume that does not exist</strong> in SharePoint. "
-        "Phase 2 cannot score it and will not be able to read the file.",
+        "Nothing that depends on the file was allowed to run. If the email carried more "
+        "than one resume attachment, any that did save are now <strong>orphan files</strong> "
+        "with no candidate row pointing at them.",
     ),
     # The other TWO resume writes. Create_file above only covers the NEW-applicant path;
-    # a resend (duplicate) and a ref-quoted update each have their own CreateFile, and both
-    # were silent for exactly the same reason the patch failures were: nothing runs after
-    # them inside their Foreach, so the Foreach fails - and the sibling that follows the
-    # Foreach (IsUnderReplyCap_dup / IsUnderReplyCap_update) lists Failed in its runAfter,
-    # which ABSORBS it. The run then continues normally: the reply is sent, Application
-    # Updates increments, Last Updated Date bumps, Status resets to 'New Email Received',
-    # the mail is marked read and archived, and the run reports Succeeded. The candidate is
-    # told their new resume arrived while the old file is still the one on disk - and P2
-    # re-scores the STALE document. Found 2026-08-26 by the pre-import branch audit.
+    # a resend (duplicate) and a ref-quoted update each have their own CreateFile. Before
+    # the save gate, nothing ran after them inside their Foreach, the follow-on sibling
+    # absorbed the failed loop, and the run continued as though the new resume had landed.
+    # Found 2026-08-26 by the pre-import branch audit.
     "Create_dup_update_file": (
         "a repeat applicant's NEW resume was never saved",
-        "This was a duplicate/resend, so the row was patched as though the new resume "
-        "landed - <strong>Application Updates was incremented and Status reset to 'New "
-        "Email Received'</strong> - but the file on disk is still the PREVIOUS version. "
-        "Phase 2 will re-score the stale document, and the applicant has already been told "
-        "their update was received.",
+        "This sender already has a candidate row. That row and its resume file were left "
+        "exactly as they were - <strong>still the PREVIOUS version</strong> - and "
+        "Application Updates did not change.",
     ),
     "Create_update_file": (
         "a ref-quoted update's NEW resume was never saved",
-        "The applicant quoted their Application ID, so the row was patched as an update - "
-        "<strong>Application Updates was incremented and Status reset to 'New Email "
-        "Received'</strong> - but the file on disk is still the PREVIOUS version. Phase 2 "
-        "will re-score the stale document, and the applicant has already been told their "
-        "update was received.",
+        "The sender quoted their Application ID. Their candidate row and resume file were "
+        "left exactly as they were - <strong>still the PREVIOUS version</strong> - and "
+        "Application Updates did not change.",
     ),
 }
 
@@ -2429,7 +2520,10 @@ def _make_write_alert(action_name: str, what: str, consequence: str) -> dict:
                     '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;'
                     'color:#222;line-height:1.6;">'
                     '<p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p>'
-                    '<p><strong>' + action_name + '</strong> failed, so ' + what + '.</p>'
+                    # "did not complete", not "failed": the three resume-save alerts also
+                    # fire when their save loop was SKIPPED because the step before it
+                    # failed or timed out (see integrity_fixes.require_saved_resume).
+                    '<p><strong>' + action_name + '</strong> did not complete, so ' + what + '.</p>'
                     '<p>' + consequence + '</p>'
                     '<ul>'
                     '<li>Reference: <strong>' + _ref_any + '</strong></li>'
@@ -2468,6 +2562,152 @@ for _write_name, (_what, _consequence) in _WRITE_ALERTS.items():
     _owner.pop(_alert_name, None)
     _owner[_alert_name] = _make_write_alert(_write_name, _what, _consequence)
     _write_alert_names.append(_alert_name)
+
+# ── 16e. INBOX-CLEANUP AND DUPLICATE-LOOKUP FAILURE ALERTS (added 2026-09-14) ─
+# Two failures were still completely silent after 16b/16d.
+#
+# (1) A terminal MoveV2 that fails. Every outcome move is caught on purpose - by a Terminate
+# (Succeeded) in the nine nested branches, by Finalize_processed_cleanup at the top - so a
+# rejected cleanup cannot turn a fully processed intake red. But nothing SAID so. The message
+# stays in the Inbox, and the Inbox is the queue (fetch_only_unread=false), so the next poll
+# reads it again: a new application comes back as a duplicate of the row it just created, an
+# update or follow-up counts twice. The connector also serves the Inbox newest-first, so while
+# it is stuck it is picked ahead of every older message behind it.
+#
+# (2) Get_rows, the duplicate lookup. Filter_submitted deliberately runs on its failure with an
+# empty list, so a table read that fails does not block intake - it proceeds as a NEW
+# application. If the sender already had a row, that is a second row for the same person, and
+# the first sign of it was the duplicate turning up later in P2.
+#
+# Wiring follows the existing alert rules. Each alert is a plain sibling of the action it
+# watches, on [Failed, TimedOut] only, so it adds no nesting and is skipped on success. A
+# Terminate that already follows the move must also WAIT for the alert (all four statuses),
+# or it ends the run and cancels the send mid-flight - the race R3b guards for the save
+# failures. Where no Terminate follows, a catch Compose absorbs a failed send so the alert
+# can never flip its enclosing If to Failed (the Ignored_alert_done pattern).
+_CLEANUP_HOLDUP = ("While it stays in the Inbox it is picked ahead of the older emails "
+                   "waiting behind it, so they are not processed.")
+_SCREENED_AGAIN = "It will be screened again on every poll. No row is created."
+_COUNTS_TWICE_UPDATE = ("Read again, it counts as another resume update: Application Updates "
+                        "goes up again and the row is re-queued for Phase 2 again.")
+_COUNTS_TWICE_FOLLOWUP = ("Read again, it counts as another follow-up and Application Updates "
+                          "goes up again.")
+_NO_CHANGE_AT_CAP = "Read again, it changes nothing, because the limit is still reached."
+_CLEANUP_MOVES = {
+    # move: (what P1 had already done, consequence of reading it again, has an AppRef)
+    # The spam gates run before AppRef exists, so their alerts carry no reference.
+    "Move_to_processed": (
+        "finished handling it",
+        "If it was a new application, reading it again treats it as a duplicate of the row "
+        "just created: Application Updates goes up, the resume is saved again and the row is "
+        "re-queued for Phase 2.", True),
+    "Move_to_processed_spam_sender":      ("screened it out by sender", _SCREENED_AGAIN, False),
+    "Move_to_processed_spam_subject":     ("screened it out by subject", _SCREENED_AGAIN, False),
+    "Move_to_processed_spam_body":        ("screened it out as spam", _SCREENED_AGAIN, False),
+    "Move_to_processed_update":           ("recorded the updated resume", _COUNTS_TWICE_UPDATE, True),
+    "Move_to_processed_update_noreply":   ("recorded the updated resume", _COUNTS_TWICE_UPDATE, True),
+    "Move_to_processed_update_cap":       ("set it aside because the update limit was reached",
+                                           _NO_CHANGE_AT_CAP, True),
+    "Move_to_processed_followup":         ("recorded the follow-up", _COUNTS_TWICE_FOLLOWUP, True),
+    "Move_to_processed_followup_noreply": ("recorded the follow-up", _COUNTS_TWICE_FOLLOWUP, True),
+    "Move_to_processed_followup_cap":     ("set it aside because the follow-up limit was reached",
+                                           _NO_CHANGE_AT_CAP, True),
+}
+_ALERT_ALL_STATUSES = ["Succeeded", "Failed", "TimedOut", "Skipped"]
+_EMAIL_DETAILS = (
+    "<li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li>"
+    "<li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li>"
+    "<li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li>"
+)
+
+
+def _make_admin_send(watched: str, subject: str, body_html: str) -> dict:
+    """An admin alert that fires only when `watched` (a sibling) fails or times out."""
+    return {
+        "type": "OpenApiConnection",
+        "runAfter": {watched: ["Failed", "TimedOut"]},
+        "runtimeConfiguration": {"retryPolicy": {"type": "exponential", "count": 2,
+                                                 "interval": "PT10S"}},
+        "inputs": {
+            "parameters": {
+                "emailMessage/To": email["admin_email"],
+                "emailMessage/Subject": subject,
+                "emailMessage/Body": (
+                    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;'
+                    'color:#222;line-height:1.6;">' + body_html + '</div>'),
+                "emailMessage/Importance": "High",
+            },
+            "host": {"apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                     "connectionName": "shared_office365",
+                     "operationId": "SendEmailV2"},
+            "authentication": "@parameters('$authentication')",
+        },
+    }
+
+
+_cleanup_alert_names = []
+for _move_name, (_done, _again, _has_ref) in _CLEANUP_MOVES.items():
+    _owner = _find_owner_actions(actions, _move_name)
+    if _owner is None:
+        continue
+    _dest = _owner[_move_name]["inputs"]["parameters"]["folderPath"]
+    _alert_name = "Notify_" + _move_name.lower() + "_failed"
+    _subject = ("[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again "
+                + ("(Ref %s)" % _ref_any if _has_ref else
+                   "(@{coalesce(outputs('CurrentEmail')?['subject'],'no subject')})"))
+    _body = (
+        '<p><strong>Hiring Auto-Reply: a handled email could not be moved out of the '
+        'Inbox.</strong></p>'
+        '<p>P1 had already ' + _done + ', but <strong>' + _move_name + '</strong> (to '
+        + _dest + ') failed. The email is most likely still in the Inbox, and the Inbox is '
+        'the queue, so the next poll will pick it up again.</p>'
+        '<p>' + _again + ' ' + _CLEANUP_HOLDUP + '</p>'
+        '<ul>' + ('<li>Reference: <strong>' + _ref_any + '</strong></li>' if _has_ref else '')
+        + _EMAIL_DETAILS + '</ul>'
+        '<p><strong>To fix:</strong> find the email in the ' + email["trigger_mailbox"]
+        + ' Inbox and move it to <strong>' + _dest + '</strong> by hand. If it is no longer '
+        'in the Inbox, the move completed after timing out and nothing needs doing. If this '
+        'alert keeps arriving every minute, the move is failing every time: check that the '
+        + _dest + ' folder exists and that the Outlook connection still has access.</p>'
+    )
+    _owner.pop(_alert_name, None)
+    _owner[_alert_name] = _make_admin_send(_move_name, _subject, _body)
+    _cleanup_alert_names.append(_alert_name)
+    _terminates = [n for n, a in _owner.items()
+                   if a.get("type") == "Terminate" and _move_name in (a.get("runAfter") or {})]
+    for _t in _terminates:
+        _owner[_t]["runAfter"][_alert_name] = list(_ALERT_ALL_STATUSES)
+    if not _terminates:
+        # Not "<move>_alert_done": every name starting Move_to_processed is counted as a move.
+        _catch = "Processed_cleanup_alert_done"
+        _owner.pop(_catch, None)
+        _owner[_catch] = {"type": "Compose",
+                          "runAfter": {_alert_name: list(_ALERT_ALL_STATUSES)},
+                          "inputs": "cleanup-failure alert best-effort"}
+
+_lookup_alert_names = []
+_owner = _find_owner_actions(actions, "Get_rows")
+if _owner is not None:
+    _owner.pop("Notify_get_rows_failed", None)
+    _owner["Notify_get_rows_failed"] = _make_admin_send(
+        "Get_rows",
+        "[Hiring Auto-Reply] Duplicate check failed - possible duplicate row (Ref %s)" % _ref_any,
+        '<p><strong>Hiring Auto-Reply: the duplicate check could not read the candidate '
+        'table.</strong></p>'
+        '<p><strong>Get_rows</strong> failed, so P1 could not tell whether this sender had '
+        'already applied and handled the email as a <strong>new application</strong>. If they '
+        'already had a row, the table now has <strong>two rows for the same person</strong>. '
+        'If the table itself could not be reached, the row write usually fails too and a '
+        'separate APPLICANT LOST alert follows.</p>'
+        '<ul><li>Reference: <strong>' + _ref_any + '</strong></li>' + _EMAIL_DETAILS + '</ul>'
+        '<p><strong>To check:</strong> search the candidate table for the From address above. '
+        'If it is on more than one row, keep one and remove the other together with its '
+        'resume file.</p>')
+    _owner.pop("Get_rows_alert_done", None)
+    _owner["Get_rows_alert_done"] = {"type": "Compose",
+                                     "runAfter": {"Notify_get_rows_failed": list(_ALERT_ALL_STATUSES)},
+                                     "inputs": "duplicate-lookup alert best-effort"}
+    _lookup_alert_names.append("Notify_get_rows_failed")
 
 # ── 17. enable PA-level failure alert as a backup (Notify_failure is primary) ─
 defn["properties"]["flowFailureAlertSubscribed"] = True
@@ -2509,17 +2749,22 @@ if not send_admin_failure_alerts:
     # Notify_failure plus every patch-failure alert from section 16d. Same treatment as the
     # applicant sends: swapped for a no-op Compose that keeps the runAfter wiring intact, so
     # the surrounding graph behaves identically whether alerts are on or off.
-    for _alert in ["Notify_failure"] + _patch_alert_names + _write_alert_names:
-        _act = _deep_find(actions, _alert)
-        if _act is None:
-            continue
-        _run_after = _act.get("runAfter", {})
-        _act.clear()
-        _act["type"] = "Compose"
-        _act["runAfter"] = _run_after
-        _act["inputs"] = f"Admin failure alert disabled: {_alert} suppressed"
+    _all_failure_alerts = (["Notify_failure"] + _patch_alert_names + _write_alert_names
+                           + _cleanup_alert_names + _lookup_alert_names)
+    # ALL copies, not the first. The zip is the next build's base, and the three save-failure
+    # alerts exist twice at this point: freshly added inside their save loop, and the copy a
+    # previous build's integrity_fixes lifted out beside it. _deep_find converted whichever it
+    # met first - the stale copy - and integrity_fixes then kept the untouched live one, so
+    # with alerts "off" those three still sent mail (found 2026-09-14).
+    for _alert in _all_failure_alerts:
+        for _act in _deep_find_all(actions, _alert):
+            _run_after = _act.get("runAfter", {})
+            _act.clear()
+            _act["type"] = "Compose"
+            _act["runAfter"] = _run_after
+            _act["inputs"] = f"Admin failure alert disabled: {_alert} suppressed"
     print(f"  [WARNING] Admin failure alerts SUPPRESSED "
-          f"({1 + len(_patch_alert_names) + len(_write_alert_names)} alert actions).")
+          f"({len(_all_failure_alerts)} alert actions).")
 
 # -- 19. unread-Inbox production wrapper ------------------------------------
 # Every expression in the historical processing graph reads one message directly from
@@ -2741,7 +2986,8 @@ print(f"  workbook self-heal  : OFF (non-destructive) - never auto-creates/overw
 print(f"  admin alerts        : {'ON' if send_admin_failure_alerts else 'OFF'} - "
       f"Notify_failure + Notify_poll_failure + {len(_patch_alert_names)} patch-failure alerts "
       f"+ {len(_write_alert_names)} intake-write alerts ({', '.join(_WRITE_ALERTS)}) "
-      f"(retry: exponential x2)")
+      f"+ {len(_cleanup_alert_names)} inbox-cleanup alerts + {len(_lookup_alert_names)} "
+      f"duplicate-lookup alert + non-application/wrong-format notice (retry: exponential x2)")
 print(f"  resume folder create: ON (Ensure_*_resume_folder, safe no-op if exists) - no delays")
 print(f"  resume overwrite    : update/resend always saves under the legacy <Name>_<AppID> shape "
       f"(true in-place overwrite pre-scoring; post-scoring, P2 reconciles it against the "

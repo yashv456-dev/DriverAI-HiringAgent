@@ -586,7 +586,12 @@ Six applicant emails, matched to the situation. **The full text of each is in th
 
 **Repeat contacts are capped.** Emails 2, 5 and 6 share one counter per candidate: contacts 1–3 get a reply (the 3rd says it is the last one), contacts 4–5 still update the row and résumé but send **nothing**, and from the 6th everything stops. Emails 1, 3 and 4 are not capped.
 
-**Admin alerts** go to `yashv@driverai.io` — 14 alert actions across five kinds (core failure, poll failure, seven row-patch failures, four intake-write failures, and one for mail that was not an application). You do not need to know them individually; what matters is that **an alert email means something needs a human**, and the alert names the exact step.
+**Admin alerts** go to `yashv@driverai.io` — 25 alert actions across seven kinds (core failure, poll failure, seven row-patch failures, four intake-write failures, ten inbox-cleanup failures, one duplicate-lookup failure, and one notice for mail that arrived without a usable resume). You do not need to know them individually; what matters is that **an alert email means something needs a human**, and the alert names the exact step.
+
+Two of them deserve a specific note (added 2026-09-14):
+
+- **"Inbox cleanup failed - email may be processed again"** — P1 finished with an email but could not move it out of the Inbox. It will be read again on the next poll and holds up older mail behind it. Move it by hand; if the alert repeats every minute, the destination folder or the Outlook connection is broken.
+- **"Resume not in PDF or Word - no row created"** — someone applied with an unsupported file (an image, a .txt). With applicant mail off they are not told, so this alert is the only trace of them. The same alert with the subject **"Non-application mail archived"** is ordinary mail that is not an application.
 
 ## C.2 Checking it is healthy
 
@@ -654,7 +659,7 @@ The settings you are most likely to touch:
 | Key | Current | Effect |
 |---|---|---|
 | `email.send_applicant_emails` | `true` | All 6 applicant emails. `false` = silent intake, everything else still runs |
-| `email.send_admin_failure_alerts` | `true` | All 14 admin alerts |
+| `email.send_admin_failure_alerts` | `true` | All 25 admin alerts |
 | `trigger.interval_min` | `1` | Poll interval in minutes. `2` halves the daily action usage |
 | `business_rules.reply_cap` | `3` | How many contacts actually get an email |
 | `business_rules.duplicate_check_days` | `90` | The re-application window |

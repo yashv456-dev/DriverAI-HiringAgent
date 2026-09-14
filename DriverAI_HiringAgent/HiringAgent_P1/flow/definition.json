@@ -298,7 +298,11 @@
             "sexual favors",
             "blowjob",
             "blow job",
-            "horny",
+            "horny singles",
+            "horny girls",
+            "feeling horny",
+            "im horny",
+            "i'm horny",
             "pornography",
             "porn site",
             "child porn",
@@ -408,6 +412,12 @@
                   "Failed",
                   "Skipped",
                   "TimedOut"
+                ],
+                "Notify_move_to_processed_spam_sender_failed": [
+                  "Succeeded",
+                  "Failed",
+                  "TimedOut",
+                  "Skipped"
                 ]
               }
             },
@@ -429,6 +439,41 @@
                   "operationId": "MoveV2"
                 },
                 "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Notify_move_to_processed_spam_sender_failed": {
+              "type": "OpenApiConnection",
+              "runAfter": {
+                "Move_to_processed_spam_sender": [
+                  "Failed",
+                  "TimedOut"
+                ]
+              },
+              "runtimeConfiguration": {
+                "retryPolicy": {
+                  "type": "exponential",
+                  "count": 2,
+                  "interval": "PT10S"
+                }
+              },
+              "inputs": {
+                "parameters": {
+                  "emailMessage/To": "yashv@driverai.io",
+                  "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (@{coalesce(outputs('CurrentEmail')?['subject'],'no subject')})",
+                  "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already screened it out by sender, but <strong>Move_to_processed_spam_sender</strong> (to Junk Email) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>It will be screened again on every poll. No row is created. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Junk Email</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Junk Email folder exists and that the Outlook connection still has access.</p></div>",
+                  "emailMessage/Importance": "High"
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                  "connectionName": "shared_office365",
+                  "operationId": "SendEmailV2"
+                },
+                "authentication": "@parameters('$authentication')",
+                "retryPolicy": {
+                  "type": "exponential",
+                  "count": 2,
+                  "interval": "PT10S"
+                }
               }
             }
           },
@@ -459,6 +504,12 @@
                         "Failed",
                         "Skipped",
                         "TimedOut"
+                      ],
+                      "Notify_move_to_processed_spam_subject_failed": [
+                        "Succeeded",
+                        "Failed",
+                        "TimedOut",
+                        "Skipped"
                       ]
                     }
                   },
@@ -480,6 +531,41 @@
                         "operationId": "MoveV2"
                       },
                       "authentication": "@parameters('$authentication')"
+                    }
+                  },
+                  "Notify_move_to_processed_spam_subject_failed": {
+                    "type": "OpenApiConnection",
+                    "runAfter": {
+                      "Move_to_processed_spam_subject": [
+                        "Failed",
+                        "TimedOut"
+                      ]
+                    },
+                    "runtimeConfiguration": {
+                      "retryPolicy": {
+                        "type": "exponential",
+                        "count": 2,
+                        "interval": "PT10S"
+                      }
+                    },
+                    "inputs": {
+                      "parameters": {
+                        "emailMessage/To": "yashv@driverai.io",
+                        "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (@{coalesce(outputs('CurrentEmail')?['subject'],'no subject')})",
+                        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already screened it out by subject, but <strong>Move_to_processed_spam_subject</strong> (to Junk Email) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>It will be screened again on every poll. No row is created. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Junk Email</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Junk Email folder exists and that the Outlook connection still has access.</p></div>",
+                        "emailMessage/Importance": "High"
+                      },
+                      "host": {
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                        "connectionName": "shared_office365",
+                        "operationId": "SendEmailV2"
+                      },
+                      "authentication": "@parameters('$authentication')",
+                      "retryPolicy": {
+                        "type": "exponential",
+                        "count": 2,
+                        "interval": "PT10S"
+                      }
                     }
                   }
                 },
@@ -510,6 +596,12 @@
                               "Failed",
                               "Skipped",
                               "TimedOut"
+                            ],
+                            "Notify_move_to_processed_spam_body_failed": [
+                              "Succeeded",
+                              "Failed",
+                              "TimedOut",
+                              "Skipped"
                             ]
                           }
                         },
@@ -531,6 +623,41 @@
                               "operationId": "MoveV2"
                             },
                             "authentication": "@parameters('$authentication')"
+                          }
+                        },
+                        "Notify_move_to_processed_spam_body_failed": {
+                          "type": "OpenApiConnection",
+                          "runAfter": {
+                            "Move_to_processed_spam_body": [
+                              "Failed",
+                              "TimedOut"
+                            ]
+                          },
+                          "runtimeConfiguration": {
+                            "retryPolicy": {
+                              "type": "exponential",
+                              "count": 2,
+                              "interval": "PT10S"
+                            }
+                          },
+                          "inputs": {
+                            "parameters": {
+                              "emailMessage/To": "yashv@driverai.io",
+                              "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (@{coalesce(outputs('CurrentEmail')?['subject'],'no subject')})",
+                              "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already screened it out as spam, but <strong>Move_to_processed_spam_body</strong> (to Junk Email) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>It will be screened again on every poll. No row is created. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Junk Email</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Junk Email folder exists and that the Outlook connection still has access.</p></div>",
+                              "emailMessage/Importance": "High"
+                            },
+                            "host": {
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                              "connectionName": "shared_office365",
+                              "operationId": "SendEmailV2"
+                            },
+                            "authentication": "@parameters('$authentication')",
+                            "retryPolicy": {
+                              "type": "exponential",
+                              "count": 2,
+                              "interval": "PT10S"
+                            }
                           }
                         }
                       },
@@ -849,7 +976,8 @@
                                         "runAfter": {
                                           "Save_dup_update_resume": [
                                             "Failed",
-                                            "TimedOut"
+                                            "TimedOut",
+                                            "Skipped"
                                           ]
                                         },
                                         "runtimeConfiguration": {
@@ -863,7 +991,7 @@
                                           "parameters": {
                                             "emailMessage/To": "yashv@driverai.io",
                                             "emailMessage/Subject": "[Hiring Auto-Reply] APPLICANT LOST - a repeat applicant's NEW resume was never saved (Ref @{coalesce(outputs('AppRef'),'n/a')})",
-                                            "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Create_dup_update_file</strong> failed, so a repeat applicant's NEW resume was never saved.</p><p>This was a duplicate/resend, so the row was patched as though the new resume landed - <strong>Application Updates was incremented and Status reset to 'New Email Received'</strong> - but the file on disk is still the PREVIOUS version. Phase 2 will re-score the stale document, and the applicant has already been told their update was received.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The resume was <strong>not saved</strong>, so nothing downstream was allowed to run: no candidate row was created or re-queued, and <strong>no acknowledgment was sent</strong>. The message has been moved to Archive and left <strong>unread</strong>, which is this system's marker for \"failed, needs a replay\".</p><p><strong>To recover:</strong> find it in Archive by the From and Received values above and move it back to the Inbox, still unread. The next poll re-runs the whole intake for it, including the applicant reply if applicant mail is on.</p></div>",
+                                            "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Create_dup_update_file</strong> did not complete, so a repeat applicant's NEW resume was never saved.</p><p>This sender already has a candidate row. That row and its resume file were left exactly as they were - <strong>still the PREVIOUS version</strong> - and Application Updates did not change.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The resume was <strong>not saved</strong>, so nothing downstream was allowed to run: no candidate row was created or re-queued, and <strong>no acknowledgment was sent</strong>. The message has been moved to Archive and left <strong>unread</strong>, which is this system's marker for \"failed, needs a replay\".</p><p><strong>To recover:</strong> find it in Archive by the From and Received values above and move it back to the Inbox, still unread. The next poll re-runs the whole intake for it, including the applicant reply if applicant mail is on.</p></div>",
                                             "emailMessage/Importance": "High"
                                           },
                                           "host": {
@@ -916,8 +1044,7 @@
                                           "Move_dup_save_failed_unread": [
                                             "Succeeded",
                                             "Failed",
-                                            "TimedOut",
-                                            "Skipped"
+                                            "TimedOut"
                                           ],
                                           "Notify_create_dup_update_file_failed": [
                                             "Succeeded",
@@ -1127,7 +1254,7 @@
                                         "parameters": {
                                           "emailMessage/To": "yashv@driverai.io",
                                           "emailMessage/Subject": "[Hiring Auto-Reply] Candidate row NOT updated - new applicant - acknowledgment stamp (Ref @{coalesce(outputs('AppRef'),'n/a')})",
-                                          "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p><p>The incoming email was handled and filed normally, but <strong>Patch_mail_sent</strong> (new applicant - acknowledgment stamp) did not commit. The Application Updates counter was NOT incremented.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run itself reports Succeeded because inbox cleanup completed as designed - <strong>this alert is the only signal</strong>. Open run history and inspect <strong>Patch_mail_sent</strong>, then correct the row by hand.</p></div>",
+                                          "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a candidate row failed to update.</strong></p><p>The incoming email was handled and filed normally, but <strong>Patch_mail_sent</strong> (new applicant - acknowledgment stamp) did not commit. The Mail Sent stamp was NOT written on the new row.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run itself reports Succeeded because inbox cleanup completed as designed - <strong>this alert is the only signal</strong>. Open run history and inspect <strong>Patch_mail_sent</strong>, then correct the row by hand.</p></div>",
                                           "emailMessage/Importance": "High"
                                         },
                                         "host": {
@@ -1162,7 +1289,7 @@
                                         "parameters": {
                                           "emailMessage/To": "yashv@driverai.io",
                                           "emailMessage/Subject": "[Hiring Auto-Reply] APPLICANT LOST - the candidate row was never created (Ref @{coalesce(outputs('AppRef'),'n/a')})",
-                                          "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Add_row</strong> failed, so the candidate row was never created.</p><p>This applicant has <strong>no row on either sheet</strong> and received <strong>no acknowledgment</strong> - Send_acknowledgment is gated on Add_row succeeding, so it was skipped. Their resume may still have been saved to SharePoint, which leaves an orphan file with nothing pointing at it.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run reports <strong>Succeeded</strong> because inbox cleanup is deliberately unconditional, and the message has been marked read and moved to Archive as though it were handled - <strong>this alert is the only signal</strong>.</p><p><strong>To recover:</strong> find the message in Archive by the From and Received values above and move it back to the Inbox as unread, so the next poll re-runs the full intake for it. If applicant mail is currently ON, that will also re-send their acknowledgment - which is correct here, because they never received one.</p></div>",
+                                          "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Add_row</strong> did not complete, so the candidate row was never created.</p><p>This applicant has <strong>no row on either sheet</strong> and received <strong>no acknowledgment</strong> - Send_acknowledgment is gated on Add_row succeeding, so it was skipped. Their resume may still have been saved to SharePoint, which leaves an orphan file with nothing pointing at it.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The run reports <strong>Succeeded</strong> because inbox cleanup is deliberately unconditional, and the message has been marked read and moved to Archive as though it were handled - <strong>this alert is the only signal</strong>.</p><p><strong>To recover:</strong> find the message in Archive by the From and Received values above and move it back to the Inbox as unread, so the next poll re-runs the full intake for it. If applicant mail is currently ON, that will also re-send their acknowledgment - which is correct here, because they never received one.</p></div>",
                                           "emailMessage/Importance": "High"
                                         },
                                         "host": {
@@ -1183,7 +1310,8 @@
                                       "runAfter": {
                                         "Save_resumes_to_SharePoint": [
                                           "Failed",
-                                          "TimedOut"
+                                          "TimedOut",
+                                          "Skipped"
                                         ]
                                       },
                                       "runtimeConfiguration": {
@@ -1197,7 +1325,7 @@
                                         "parameters": {
                                           "emailMessage/To": "yashv@driverai.io",
                                           "emailMessage/Subject": "[Hiring Auto-Reply] APPLICANT LOST - the resume file was never saved (Ref @{coalesce(outputs('AppRef'),'n/a')})",
-                                          "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Create_file</strong> failed, so the resume file was never saved.</p><p>Add_row still runs when the save fails and always writes Has Resume = 'Yes', so the row now <strong>claims a resume that does not exist</strong> in SharePoint. Phase 2 cannot score it and will not be able to read the file.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The resume was <strong>not saved</strong>, so nothing downstream was allowed to run: no candidate row was created or re-queued, and <strong>no acknowledgment was sent</strong>. The message has been moved to Archive and left <strong>unread</strong>, which is this system's marker for \"failed, needs a replay\".</p><p><strong>To recover:</strong> find it in Archive by the From and Received values above and move it back to the Inbox, still unread. The next poll re-runs the whole intake for it, including the applicant reply if applicant mail is on.</p></div>",
+                                          "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Create_file</strong> did not complete, so the resume file was never saved.</p><p>Nothing that depends on the file was allowed to run. If the email carried more than one resume attachment, any that did save are now <strong>orphan files</strong> with no candidate row pointing at them.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The resume was <strong>not saved</strong>, so nothing downstream was allowed to run: no candidate row was created or re-queued, and <strong>no acknowledgment was sent</strong>. The message has been moved to Archive and left <strong>unread</strong>, which is this system's marker for \"failed, needs a replay\".</p><p><strong>To recover:</strong> find it in Archive by the From and Received values above and move it back to the Inbox, still unread. The next poll re-runs the whole intake for it, including the applicant reply if applicant mail is on.</p></div>",
                                           "emailMessage/Importance": "High"
                                         },
                                         "host": {
@@ -1250,8 +1378,7 @@
                                         "Move_new_save_failed_unread": [
                                           "Succeeded",
                                           "Failed",
-                                          "TimedOut",
-                                          "Skipped"
+                                          "TimedOut"
                                         ],
                                         "Notify_create_file_failed": [
                                           "Succeeded",
@@ -1351,6 +1478,53 @@
                                   "select": "@ticks(coalesce(item()?['Received Date'], '2000-01-01T00:00:00Z'))"
                                 }
                               },
+                              "Notify_get_rows_failed": {
+                                "type": "OpenApiConnection",
+                                "runAfter": {
+                                  "Get_rows": [
+                                    "Failed",
+                                    "TimedOut"
+                                  ]
+                                },
+                                "runtimeConfiguration": {
+                                  "retryPolicy": {
+                                    "type": "exponential",
+                                    "count": 2,
+                                    "interval": "PT10S"
+                                  }
+                                },
+                                "inputs": {
+                                  "parameters": {
+                                    "emailMessage/To": "yashv@driverai.io",
+                                    "emailMessage/Subject": "[Hiring Auto-Reply] Duplicate check failed - possible duplicate row (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: the duplicate check could not read the candidate table.</strong></p><p><strong>Get_rows</strong> failed, so P1 could not tell whether this sender had already applied and handled the email as a <strong>new application</strong>. If they already had a row, the table now has <strong>two rows for the same person</strong>. If the table itself could not be reached, the row write usually fails too and a separate APPLICANT LOST alert follows.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To check:</strong> search the candidate table for the From address above. If it is on more than one row, keep one and remove the other together with its resume file.</p></div>",
+                                    "emailMessage/Importance": "High"
+                                  },
+                                  "host": {
+                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                    "connectionName": "shared_office365",
+                                    "operationId": "SendEmailV2"
+                                  },
+                                  "authentication": "@parameters('$authentication')",
+                                  "retryPolicy": {
+                                    "type": "exponential",
+                                    "count": 2,
+                                    "interval": "PT10S"
+                                  }
+                                }
+                              },
+                              "Get_rows_alert_done": {
+                                "type": "Compose",
+                                "runAfter": {
+                                  "Notify_get_rows_failed": [
+                                    "Succeeded",
+                                    "Failed",
+                                    "TimedOut",
+                                    "Skipped"
+                                  ]
+                                },
+                                "inputs": "duplicate-lookup alert best-effort"
+                              },
                               "Latest_submitted": {
                                 "type": "Query",
                                 "runAfter": {
@@ -1395,8 +1569,8 @@
                                         "inputs": {
                                           "parameters": {
                                             "emailMessage/To": "yashv@driverai.io",
-                                            "emailMessage/Subject": "[Hiring Auto-Reply] Non-application mail archived: @{coalesce(outputs('CurrentEmail')?['subject'],'(no subject)')}",
-                                            "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;\"><p><strong>An email reached the hiring mailbox that is not an application.</strong> It passed every spam screen, but carried no resume, no application keyword and no application reference, so P1 created no row and sent no reply.</p><p><strong>From:</strong> @{coalesce(outputs('CurrentEmail')?['from'],'(unknown)')}<br><strong>Subject:</strong> @{coalesce(outputs('CurrentEmail')?['subject'],'(no subject)')}<br><strong>Received:</strong> @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</p><p><strong>Preview:</strong><br>@{coalesce(outputs('CurrentEmail')?['bodyPreview'],'(empty)')}</p><p>The message has been marked read and moved to <strong>Archive</strong> - nothing was lost. Reply from the mailbox directly if it needs a human answer. This alert is informational, not a failure.</p></div>",
+                                            "emailMessage/Subject": "[Hiring Auto-Reply] @{if(greater(length(coalesce(outputs('CurrentEmail')?['attachments'], json('[]'))), 0), 'Resume not in PDF or Word - no row created: ', 'Non-application mail archived: ')}@{coalesce(outputs('CurrentEmail')?['subject'],'(no subject)')}",
+                                            "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;\">@{if(greater(length(coalesce(outputs('CurrentEmail')?['attachments'], json('[]'))), 0), concat('<p><strong>An email with attachments reached the hiring mailbox, but none of them is a PDF or Word resume</strong> (attached: ', join(body('AttachNames'), ', '), '), so P1 created no candidate row. Applicant email is switched off, so <strong>the sender has not been told</strong>. If this is a real applicant, ask them to resend their resume as a PDF or Word file.</p>'), '<p><strong>An email reached the hiring mailbox that is not an application.</strong> It passed every spam screen, but carried no attachment, no application keyword and no Application ID that matches a candidate row, so P1 created no row and sent no reply.</p>')}<p><strong>From:</strong> @{coalesce(outputs('CurrentEmail')?['from'],'(unknown)')}<br><strong>Subject:</strong> @{coalesce(outputs('CurrentEmail')?['subject'],'(no subject)')}<br><strong>Received:</strong> @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</p><p><strong>Preview:</strong><br>@{coalesce(outputs('CurrentEmail')?['bodyPreview'],'(empty)')}</p><p>The message has been marked read and moved to <strong>Archive</strong> - nothing was lost. Reply from the mailbox directly if it needs a human answer. This alert is informational, not a failure.</p></div>",
                                             "emailMessage/Importance": "Low"
                                           },
                                           "host": {
@@ -2002,6 +2176,18 @@
                                                     "Failed",
                                                     "Skipped",
                                                     "TimedOut"
+                                                  ],
+                                                  "Notify_update_attempts_failed": [
+                                                    "Succeeded",
+                                                    "Failed",
+                                                    "TimedOut",
+                                                    "Skipped"
+                                                  ],
+                                                  "Notify_move_to_processed_update_failed": [
+                                                    "Succeeded",
+                                                    "Failed",
+                                                    "TimedOut",
+                                                    "Skipped"
                                                   ]
                                                 },
                                                 "inputs": {
@@ -2090,6 +2276,41 @@
                                                     "interval": "PT10S"
                                                   }
                                                 }
+                                              },
+                                              "Notify_move_to_processed_update_failed": {
+                                                "type": "OpenApiConnection",
+                                                "runAfter": {
+                                                  "Move_to_processed_update": [
+                                                    "Failed",
+                                                    "TimedOut"
+                                                  ]
+                                                },
+                                                "runtimeConfiguration": {
+                                                  "retryPolicy": {
+                                                    "type": "exponential",
+                                                    "count": 2,
+                                                    "interval": "PT10S"
+                                                  }
+                                                },
+                                                "inputs": {
+                                                  "parameters": {
+                                                    "emailMessage/To": "yashv@driverai.io",
+                                                    "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already recorded the updated resume, but <strong>Move_to_processed_update</strong> (to Archive) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>Read again, it counts as another resume update: Application Updates goes up again and the row is re-queued for Phase 2 again. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Archive</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Archive folder exists and that the Outlook connection still has access.</p></div>",
+                                                    "emailMessage/Importance": "High"
+                                                  },
+                                                  "host": {
+                                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                    "connectionName": "shared_office365",
+                                                    "operationId": "SendEmailV2"
+                                                  },
+                                                  "authentication": "@parameters('$authentication')",
+                                                  "retryPolicy": {
+                                                    "type": "exponential",
+                                                    "count": 2,
+                                                    "interval": "PT10S"
+                                                  }
+                                                }
                                               }
                                             },
                                             "else": {
@@ -2127,6 +2348,18 @@
                                                       "Failed",
                                                       "Skipped",
                                                       "TimedOut"
+                                                    ],
+                                                    "Notify_update_attempts_noreply_failed": [
+                                                      "Succeeded",
+                                                      "Failed",
+                                                      "TimedOut",
+                                                      "Skipped"
+                                                    ],
+                                                    "Notify_move_to_processed_update_noreply_failed": [
+                                                      "Succeeded",
+                                                      "Failed",
+                                                      "TimedOut",
+                                                      "Skipped"
                                                     ]
                                                   },
                                                   "inputs": {
@@ -2215,6 +2448,41 @@
                                                       "interval": "PT10S"
                                                     }
                                                   }
+                                                },
+                                                "Notify_move_to_processed_update_noreply_failed": {
+                                                  "type": "OpenApiConnection",
+                                                  "runAfter": {
+                                                    "Move_to_processed_update_noreply": [
+                                                      "Failed",
+                                                      "TimedOut"
+                                                    ]
+                                                  },
+                                                  "runtimeConfiguration": {
+                                                    "retryPolicy": {
+                                                      "type": "exponential",
+                                                      "count": 2,
+                                                      "interval": "PT10S"
+                                                    }
+                                                  },
+                                                  "inputs": {
+                                                    "parameters": {
+                                                      "emailMessage/To": "yashv@driverai.io",
+                                                      "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                      "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already recorded the updated resume, but <strong>Move_to_processed_update_noreply</strong> (to Archive) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>Read again, it counts as another resume update: Application Updates goes up again and the row is re-queued for Phase 2 again. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Archive</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Archive folder exists and that the Outlook connection still has access.</p></div>",
+                                                      "emailMessage/Importance": "High"
+                                                    },
+                                                    "host": {
+                                                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                      "connectionName": "shared_office365",
+                                                      "operationId": "SendEmailV2"
+                                                    },
+                                                    "authentication": "@parameters('$authentication')",
+                                                    "retryPolicy": {
+                                                      "type": "exponential",
+                                                      "count": 2,
+                                                      "interval": "PT10S"
+                                                    }
+                                                  }
                                                 }
                                               }
                                             }
@@ -2252,7 +2520,8 @@
                                             "runAfter": {
                                               "Save_update_resume": [
                                                 "Failed",
-                                                "TimedOut"
+                                                "TimedOut",
+                                                "Skipped"
                                               ]
                                             },
                                             "runtimeConfiguration": {
@@ -2266,7 +2535,7 @@
                                               "parameters": {
                                                 "emailMessage/To": "yashv@driverai.io",
                                                 "emailMessage/Subject": "[Hiring Auto-Reply] APPLICANT LOST - a ref-quoted update's NEW resume was never saved (Ref @{coalesce(outputs('AppRef'),'n/a')})",
-                                                "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Create_update_file</strong> failed, so a ref-quoted update's NEW resume was never saved.</p><p>The applicant quoted their Application ID, so the row was patched as an update - <strong>Application Updates was incremented and Status reset to 'New Email Received'</strong> - but the file on disk is still the PREVIOUS version. Phase 2 will re-score the stale document, and the applicant has already been told their update was received.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The resume was <strong>not saved</strong>, so nothing downstream was allowed to run: no candidate row was created or re-queued, and <strong>no acknowledgment was sent</strong>. The message has been moved to Archive and left <strong>unread</strong>, which is this system's marker for \"failed, needs a replay\".</p><p><strong>To recover:</strong> find it in Archive by the From and Received values above and move it back to the Inbox, still unread. The next poll re-runs the whole intake for it, including the applicant reply if applicant mail is on.</p></div>",
+                                                "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: an applicant was not recorded.</strong></p><p><strong>Create_update_file</strong> did not complete, so a ref-quoted update's NEW resume was never saved.</p><p>The sender quoted their Application ID. Their candidate row and resume file were left exactly as they were - <strong>still the PREVIOUS version</strong> - and Application Updates did not change.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p>The resume was <strong>not saved</strong>, so nothing downstream was allowed to run: no candidate row was created or re-queued, and <strong>no acknowledgment was sent</strong>. The message has been moved to Archive and left <strong>unread</strong>, which is this system's marker for \"failed, needs a replay\".</p><p><strong>To recover:</strong> find it in Archive by the From and Received values above and move it back to the Inbox, still unread. The next poll re-runs the whole intake for it, including the applicant reply if applicant mail is on.</p></div>",
                                                 "emailMessage/Importance": "High"
                                               },
                                               "host": {
@@ -2319,8 +2588,7 @@
                                               "Move_update_save_failed_unread": [
                                                 "Succeeded",
                                                 "Failed",
-                                                "TimedOut",
-                                                "Skipped"
+                                                "TimedOut"
                                               ],
                                               "Notify_create_update_file_failed": [
                                                 "Succeeded",
@@ -2344,6 +2612,12 @@
                                                   "Failed",
                                                   "Skipped",
                                                   "TimedOut"
+                                                ],
+                                                "Notify_move_to_processed_update_cap_failed": [
+                                                  "Succeeded",
+                                                  "Failed",
+                                                  "TimedOut",
+                                                  "Skipped"
                                                 ]
                                               },
                                               "inputs": {
@@ -2391,6 +2665,41 @@
                                                   "operationId": "MoveV2"
                                                 },
                                                 "authentication": "@parameters('$authentication')"
+                                              }
+                                            },
+                                            "Notify_move_to_processed_update_cap_failed": {
+                                              "type": "OpenApiConnection",
+                                              "runAfter": {
+                                                "Move_to_processed_update_cap": [
+                                                  "Failed",
+                                                  "TimedOut"
+                                                ]
+                                              },
+                                              "runtimeConfiguration": {
+                                                "retryPolicy": {
+                                                  "type": "exponential",
+                                                  "count": 2,
+                                                  "interval": "PT10S"
+                                                }
+                                              },
+                                              "inputs": {
+                                                "parameters": {
+                                                  "emailMessage/To": "yashv@driverai.io",
+                                                  "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                  "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already set it aside because the update limit was reached, but <strong>Move_to_processed_update_cap</strong> (to Archive) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>Read again, it changes nothing, because the limit is still reached. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Archive</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Archive folder exists and that the Outlook connection still has access.</p></div>",
+                                                  "emailMessage/Importance": "High"
+                                                },
+                                                "host": {
+                                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                  "connectionName": "shared_office365",
+                                                  "operationId": "SendEmailV2"
+                                                },
+                                                "authentication": "@parameters('$authentication')",
+                                                "retryPolicy": {
+                                                  "type": "exponential",
+                                                  "count": 2,
+                                                  "interval": "PT10S"
+                                                }
                                               }
                                             }
                                           }
@@ -2463,6 +2772,18 @@
                                                       "Failed",
                                                       "Skipped",
                                                       "TimedOut"
+                                                    ],
+                                                    "Notify_followup_attempts_failed": [
+                                                      "Succeeded",
+                                                      "Failed",
+                                                      "TimedOut",
+                                                      "Skipped"
+                                                    ],
+                                                    "Notify_move_to_processed_followup_failed": [
+                                                      "Succeeded",
+                                                      "Failed",
+                                                      "TimedOut",
+                                                      "Skipped"
                                                     ]
                                                   },
                                                   "inputs": {
@@ -2551,6 +2872,41 @@
                                                       "interval": "PT10S"
                                                     }
                                                   }
+                                                },
+                                                "Notify_move_to_processed_followup_failed": {
+                                                  "type": "OpenApiConnection",
+                                                  "runAfter": {
+                                                    "Move_to_processed_followup": [
+                                                      "Failed",
+                                                      "TimedOut"
+                                                    ]
+                                                  },
+                                                  "runtimeConfiguration": {
+                                                    "retryPolicy": {
+                                                      "type": "exponential",
+                                                      "count": 2,
+                                                      "interval": "PT10S"
+                                                    }
+                                                  },
+                                                  "inputs": {
+                                                    "parameters": {
+                                                      "emailMessage/To": "yashv@driverai.io",
+                                                      "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                      "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already recorded the follow-up, but <strong>Move_to_processed_followup</strong> (to Archive) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>Read again, it counts as another follow-up and Application Updates goes up again. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Archive</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Archive folder exists and that the Outlook connection still has access.</p></div>",
+                                                      "emailMessage/Importance": "High"
+                                                    },
+                                                    "host": {
+                                                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                      "connectionName": "shared_office365",
+                                                      "operationId": "SendEmailV2"
+                                                    },
+                                                    "authentication": "@parameters('$authentication')",
+                                                    "retryPolicy": {
+                                                      "type": "exponential",
+                                                      "count": 2,
+                                                      "interval": "PT10S"
+                                                    }
+                                                  }
                                                 }
                                               },
                                               "else": {
@@ -2587,6 +2943,18 @@
                                                         "Failed",
                                                         "Skipped",
                                                         "TimedOut"
+                                                      ],
+                                                      "Notify_followup_attempts_noreply_failed": [
+                                                        "Succeeded",
+                                                        "Failed",
+                                                        "TimedOut",
+                                                        "Skipped"
+                                                      ],
+                                                      "Notify_move_to_processed_followup_noreply_failed": [
+                                                        "Succeeded",
+                                                        "Failed",
+                                                        "TimedOut",
+                                                        "Skipped"
                                                       ]
                                                     },
                                                     "inputs": {
@@ -2675,6 +3043,41 @@
                                                         "interval": "PT10S"
                                                       }
                                                     }
+                                                  },
+                                                  "Notify_move_to_processed_followup_noreply_failed": {
+                                                    "type": "OpenApiConnection",
+                                                    "runAfter": {
+                                                      "Move_to_processed_followup_noreply": [
+                                                        "Failed",
+                                                        "TimedOut"
+                                                      ]
+                                                    },
+                                                    "runtimeConfiguration": {
+                                                      "retryPolicy": {
+                                                        "type": "exponential",
+                                                        "count": 2,
+                                                        "interval": "PT10S"
+                                                      }
+                                                    },
+                                                    "inputs": {
+                                                      "parameters": {
+                                                        "emailMessage/To": "yashv@driverai.io",
+                                                        "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                        "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already recorded the follow-up, but <strong>Move_to_processed_followup_noreply</strong> (to Archive) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>Read again, it counts as another follow-up and Application Updates goes up again. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Archive</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Archive folder exists and that the Outlook connection still has access.</p></div>",
+                                                        "emailMessage/Importance": "High"
+                                                      },
+                                                      "host": {
+                                                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                        "connectionName": "shared_office365",
+                                                        "operationId": "SendEmailV2"
+                                                      },
+                                                      "authentication": "@parameters('$authentication')",
+                                                      "retryPolicy": {
+                                                        "type": "exponential",
+                                                        "count": 2,
+                                                        "interval": "PT10S"
+                                                      }
+                                                    }
                                                   }
                                                 }
                                               }
@@ -2690,6 +3093,12 @@
                                                     "Failed",
                                                     "Skipped",
                                                     "TimedOut"
+                                                  ],
+                                                  "Notify_move_to_processed_followup_cap_failed": [
+                                                    "Succeeded",
+                                                    "Failed",
+                                                    "TimedOut",
+                                                    "Skipped"
                                                   ]
                                                 },
                                                 "inputs": {
@@ -2737,6 +3146,41 @@
                                                     "operationId": "MoveV2"
                                                   },
                                                   "authentication": "@parameters('$authentication')"
+                                                }
+                                              },
+                                              "Notify_move_to_processed_followup_cap_failed": {
+                                                "type": "OpenApiConnection",
+                                                "runAfter": {
+                                                  "Move_to_processed_followup_cap": [
+                                                    "Failed",
+                                                    "TimedOut"
+                                                  ]
+                                                },
+                                                "runtimeConfiguration": {
+                                                  "retryPolicy": {
+                                                    "type": "exponential",
+                                                    "count": 2,
+                                                    "interval": "PT10S"
+                                                  }
+                                                },
+                                                "inputs": {
+                                                  "parameters": {
+                                                    "emailMessage/To": "yashv@driverai.io",
+                                                    "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                                    "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already set it aside because the follow-up limit was reached, but <strong>Move_to_processed_followup_cap</strong> (to Archive) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>Read again, it changes nothing, because the limit is still reached. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Archive</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Archive folder exists and that the Outlook connection still has access.</p></div>",
+                                                    "emailMessage/Importance": "High"
+                                                  },
+                                                  "host": {
+                                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                                    "connectionName": "shared_office365",
+                                                    "operationId": "SendEmailV2"
+                                                  },
+                                                  "authentication": "@parameters('$authentication')",
+                                                  "retryPolicy": {
+                                                    "type": "exponential",
+                                                    "count": 2,
+                                                    "interval": "PT10S"
+                                                  }
                                                 }
                                               }
                                             }
@@ -2802,7 +3246,7 @@
                             },
                             "inputs": {
                               "from": "@coalesce(outputs('CurrentEmail')?['attachments'], json('[]'))",
-                              "where": "@and(or(endsWith(toLower(item()?['name']), '.pdf'), endsWith(toLower(item()?['name']), '.docx')), not(empty(item()?['contentBytes'])))"
+                              "where": "@and(or(endsWith(toLower(item()?['name']), '.pdf'), or(endsWith(toLower(item()?['name']), '.docx'), endsWith(toLower(item()?['name']), '.doc'))), not(empty(item()?['contentBytes'])))"
                             }
                           },
                           "ResumeFilesKept": {
@@ -2814,7 +3258,7 @@
                             },
                             "inputs": {
                               "from": "@body('ResumeFilesAll')",
-                              "where": "@not(or(contains(toLower(item()?['name']), 'portfolio'), or(contains(toLower(item()?['name']), 'cover letter'), or(contains(toLower(item()?['name']), 'coverletter'), or(contains(toLower(item()?['name']), 'cover_letter'), or(contains(toLower(item()?['name']), '-cl.'), or(contains(toLower(item()?['name']), '_cl.'), or(contains(toLower(item()?['name']), 'cl.'), or(contains(toLower(item()?['name']), 'transcript'), contains(toLower(item()?['name']), 'certificate'))))))))))"
+                              "where": "@not(or(contains(toLower(item()?['name']), 'portfolio'), or(contains(toLower(item()?['name']), 'cover letter'), or(contains(toLower(item()?['name']), 'coverletter'), or(contains(toLower(item()?['name']), 'cover_letter'), or(contains(toLower(item()?['name']), '-cl.'), or(contains(toLower(item()?['name']), '_cl.'), or(contains(toLower(item()?['name']), ' cl.'), or(contains(toLower(item()?['name']), 'transcript'), contains(toLower(item()?['name']), 'certificate'))))))))))"
                             }
                           },
                           "StoredResumeFiles": {
@@ -2943,6 +3387,53 @@
                               ]
                             },
                             "inputs": "Failed-message terminal cleanup handled. The admin alert is authoritative; inspect the failed move if the message remains in Inbox."
+                          },
+                          "Notify_move_to_processed_failed": {
+                            "type": "OpenApiConnection",
+                            "runAfter": {
+                              "Move_to_processed": [
+                                "Failed",
+                                "TimedOut"
+                              ]
+                            },
+                            "runtimeConfiguration": {
+                              "retryPolicy": {
+                                "type": "exponential",
+                                "count": 2,
+                                "interval": "PT10S"
+                              }
+                            },
+                            "inputs": {
+                              "parameters": {
+                                "emailMessage/To": "yashv@driverai.io",
+                                "emailMessage/Subject": "[Hiring Auto-Reply] Inbox cleanup failed - email may be processed again (Ref @{coalesce(outputs('AppRef'),'n/a')})",
+                                "emailMessage/Body": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;line-height:1.6;\"><p><strong>Hiring Auto-Reply: a handled email could not be moved out of the Inbox.</strong></p><p>P1 had already finished handling it, but <strong>Move_to_processed</strong> (to Archive) failed. The email is most likely still in the Inbox, and the Inbox is the queue, so the next poll will pick it up again.</p><p>If it was a new application, reading it again treats it as a duplicate of the row just created: Application Updates goes up, the resume is saved again and the row is re-queued for Phase 2. While it stays in the Inbox it is picked ahead of the older emails waiting behind it, so they are not processed.</p><ul><li>Reference: <strong>@{coalesce(outputs('AppRef'),'n/a')}</strong></li><li>From: @{coalesce(outputs('CurrentEmail')?['from'],'unknown')}</li><li>Subject: @{coalesce(outputs('CurrentEmail')?['subject'],'(none)')}</li><li>Received: @{coalesce(outputs('CurrentEmail')?['receivedDateTime'],'(unknown)')}</li></ul><p><strong>To fix:</strong> find the email in the apply@driverai.io Inbox and move it to <strong>Archive</strong> by hand. If it is no longer in the Inbox, the move completed after timing out and nothing needs doing. If this alert keeps arriving every minute, the move is failing every time: check that the Archive folder exists and that the Outlook connection still has access.</p></div>",
+                                "emailMessage/Importance": "High"
+                              },
+                              "host": {
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                                "connectionName": "shared_office365",
+                                "operationId": "SendEmailV2"
+                              },
+                              "authentication": "@parameters('$authentication')",
+                              "retryPolicy": {
+                                "type": "exponential",
+                                "count": 2,
+                                "interval": "PT10S"
+                              }
+                            }
+                          },
+                          "Processed_cleanup_alert_done": {
+                            "type": "Compose",
+                            "runAfter": {
+                              "Notify_move_to_processed_failed": [
+                                "Succeeded",
+                                "Failed",
+                                "TimedOut",
+                                "Skipped"
+                              ]
+                            },
+                            "inputs": "cleanup-failure alert best-effort"
                           }
                         }
                       },
@@ -2997,7 +3488,7 @@
                       "type": "Query",
                       "inputs": {
                         "from": "@coalesce(outputs('CurrentEmail')?['attachments'], json('[]'))",
-                        "where": "@and(or(endsWith(toLower(item()?['name']), '.pdf'), endsWith(toLower(item()?['name']), '.docx')), not(empty(item()?['contentBytes'])))"
+                        "where": "@and(or(endsWith(toLower(item()?['name']), '.pdf'), or(endsWith(toLower(item()?['name']), '.docx'), endsWith(toLower(item()?['name']), '.doc'))), not(empty(item()?['contentBytes'])))"
                       }
                     },
                     "HasValidResumeEarly": {

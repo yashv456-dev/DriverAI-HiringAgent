@@ -287,12 +287,17 @@ TRIGGER — recurrence every 1 minute
 │   Sends high-priority admin alert to yashv@driverai.io
 │   Best-effort move of the failed message unread to Archive; admin alert remains authoritative
 │
-└─ ERROR HANDLER — 7 patch-failure alerts (2026-08-03) + 2 intake-write alerts (2026-08-24)
+└─ ERROR HANDLER — 7 patch-failure alerts (2026-08-03) + 4 intake-write alerts (2026-08-24/26)
+                   + 10 inbox-cleanup alerts + 1 duplicate-lookup alert (2026-09-14)
     One SIBLING alert per candidate-row PatchItem, each on [Failed, TimedOut] only
       Patch_mail_sent · Patch_dup_attempts(+_noreply)
       Patch_update_attempts(+_noreply) · Patch_followup_attempts(+_noreply)
     Covers the gap Notify_failure never did: cleanup runs on Failed by design, so a
     failed patch left the run GREEN and the counter silently un-incremented
+    One SIBLING alert per terminal Move_to_processed* (a caught move left the message in the
+    Inbox to be read again, silently) and one on Get_rows (a failed lookup intakes the mail
+    as NEW, possibly a second row). Terminates wait for their alert; catch Composes absorb
+    a failed send, so no alert can turn a run red
     Sibling, not child — the update/follow-up patches are at depth 8 (the PA ceiling)
     Nothing depends on them, so they cannot alter any existing path
 ```
