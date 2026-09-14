@@ -218,7 +218,7 @@ def run_intake(path: str = None, dry_run: bool = False, excel_file=None) -> dict
                 skipped += 1
                 continue
             r1, r2, r3 = res["role_1"], res["role_2"], res.get("role_3", "")
-            category = assign_category(r1, skills)   # never blank — falls back to "General"
+            category = assign_category(r1, skills, role_pref)   # never blank — falls back to "General"
             portfolio_1 = d.get("portfolio_1", "N/A")
             portfolio_2 = d.get("portfolio_2", "N/A")
             portfolio_3 = d.get("portfolio_3", "N/A")

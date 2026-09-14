@@ -390,7 +390,8 @@ def verify_usa_from_context(resume_text: str) -> bool | None:
     universities/employers easily but may miss an obscure regional one - a corroborating
     signal, not an infallible verifier.
     """
-    from hiring_agent.config import OLLAMA_ENABLED, OLLAMA_MODEL, OLLAMA_HOST, OLLAMA_TIMEOUT, AI_TEXT_LIMIT
+    from hiring_agent.config import (OLLAMA_ENABLED, OLLAMA_MODEL, OLLAMA_HOST, OLLAMA_TIMEOUT,
+                                     AI_TEXT_LIMIT, OLLAMA_SEED)
     if not OLLAMA_ENABLED or not (resume_text or "").strip():
         return None
     try:
@@ -403,7 +404,7 @@ def verify_usa_from_context(resume_text: str) -> bool | None:
                 "format": "json",
                 "stream": False,
                 "think": False,
-                "options": {"temperature": 0, "num_predict": 128},
+                "options": {"temperature": 0, "num_predict": 128, "seed": OLLAMA_SEED},
                 "messages": [
                     {"role": "system", "content": _USA_CONTEXT_PROMPT},
                     {"role": "user", "content": resume_text[:AI_TEXT_LIMIT]},

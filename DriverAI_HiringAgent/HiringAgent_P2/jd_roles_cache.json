@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-09-11T09:53:38",
+  "built_at": "2026-09-14T01:28:28",
   "signature": "de52962fa0e71284",
   "folder_fingerprint": "4f75930dd45e2ba3",
   "roles": [
@@ -95,7 +95,6 @@
     {
       "title": "IoT Developer Job Announcement",
       "skills": [
-        "computer vision",
         "data science",
         "python",
         "java",
@@ -131,7 +130,6 @@
     {
       "title": "IoT Developer Position Description",
       "skills": [
-        "computer vision",
         "data science",
         "python",
         "java",
@@ -490,7 +488,6 @@
       "skills": [
         "generative ai",
         "natural language processing",
-        "computer vision",
         "data analysis",
         "python",
         "sql",
@@ -515,7 +512,6 @@
     {
       "title": "AWS Lead Job Announcement",
       "skills": [
-        "computer vision",
         "machine learning",
         "data science",
         "data engineering",
@@ -535,7 +531,6 @@
     {
       "title": "AWS Lead Position Description",
       "skills": [
-        "computer vision",
         "machine learning",
         "data engineering",
         "aws",
@@ -589,7 +584,6 @@
     {
       "title": "Software and AWS Developer Job Announcement",
       "skills": [
-        "computer vision",
         "python",
         "java",
         "javascript",
@@ -609,7 +603,6 @@
     {
       "title": "Software and AWS Developer Position Description",
       "skills": [
-        "computer vision",
         "data science",
         "python",
         "java",
@@ -634,7 +627,6 @@
     {
       "title": "Software Cloud Developer Job Announcement",
       "skills": [
-        "computer vision",
         "machine learning",
         "data science",
         "python",
@@ -672,7 +664,6 @@
     {
       "title": "Software Cloud Developer Position Description",
       "skills": [
-        "computer vision",
         "machine learning",
         "data science",
         "python",
@@ -861,7 +852,6 @@
     {
       "title": "Business Data Analyst Job Announcement",
       "skills": [
-        "computer vision",
         "machine learning",
         "data science",
         "python",
@@ -1010,7 +1000,6 @@
     {
       "title": "Data Engineer Job Announcement",
       "skills": [
-        "computer vision",
         "machine learning",
         "pandas",
         "data science",
@@ -1041,7 +1030,6 @@
     {
       "title": "Data Engineer Position Description",
       "skills": [
-        "computer vision",
         "machine learning",
         "pandas",
         "data science",
@@ -1112,7 +1100,6 @@
     {
       "title": "CISO Job Announcement Updated v2",
       "skills": [
-        "computer vision",
         "machine learning",
         "aws",
         "automation",
@@ -1130,7 +1117,6 @@
     {
       "title": "CISO Position Description Updated v2",
       "skills": [
-        "computer vision",
         "machine learning",
         "automation",
         "cybersecurity",
@@ -1448,7 +1434,6 @@
       "skills": [
         "generative ai",
         "natural language processing",
-        "computer vision",
         "data analysis",
         "python",
         "sql",
@@ -1506,7 +1491,6 @@
     {
       "title": "Marketing Specialist Job Announcement Updated",
       "skills": [
-        "computer vision",
         "automation",
         "adobe",
         "canva",
@@ -1527,7 +1511,6 @@
     {
       "title": "Marketing Specialist Position Description Updated",
       "skills": [
-        "computer vision",
         "automation",
         "adobe",
         "canva",
@@ -1628,7 +1611,6 @@
     {
       "title": "Mobile Application Lead Developer Job Announcement",
       "skills": [
-        "computer vision",
         "java",
         "javascript",
         "typescript",
@@ -1651,7 +1633,8 @@
         "android sdk",
         "xcode",
         "wireframes",
-        "agile"
+        "agile",
+        "oauth"
       ],
       "opening": "Mobile Application Lead Developer",
       "opening_id": "mobile-application-lead-developer",
@@ -1660,7 +1643,6 @@
     {
       "title": "Mobile Application Lead Developer Job Announcement With Overview",
       "skills": [
-        "computer vision",
         "java",
         "javascript",
         "typescript",
@@ -1685,7 +1667,8 @@
         "wireframes",
         "cybersecurity",
         "agile",
-        "jira"
+        "jira",
+        "oauth"
       ],
       "opening": "Mobile Application Lead Developer",
       "opening_id": "mobile-application-lead-developer",
@@ -1694,7 +1677,6 @@
     {
       "title": "Mobile Application Lead Developer Position Description",
       "skills": [
-        "computer vision",
         "java",
         "kotlin",
         "swift",
@@ -1726,7 +1708,6 @@
     {
       "title": "Mobile Application Lead Developer Position Description v2",
       "skills": [
-        "computer vision",
         "java",
         "kotlin",
         "swift",
@@ -1758,7 +1739,6 @@
     {
       "title": "Mobile Application Software Developer Job Announcement",
       "skills": [
-        "computer vision",
         "java",
         "javascript",
         "typescript",
@@ -1782,7 +1762,8 @@
         "xcode",
         "wireframes",
         "agile",
-        "jira"
+        "jira",
+        "oauth"
       ],
       "opening": "Mobile Application Software Developer",
       "opening_id": "mobile-application-software-developer",
@@ -1791,7 +1772,6 @@
     {
       "title": "Mobile Application Software Developer Position Description",
       "skills": [
-        "computer vision",
         "java",
         "kotlin",
         "swift",
@@ -1915,7 +1895,6 @@
     {
       "title": "Satellite Systems Flight Software Engineer Position Description",
       "skills": [
-        "computer vision",
         "machine learning",
         "tensorflow",
         "pytorch",
@@ -1934,7 +1913,6 @@
     {
       "title": "DriverAI Senior Manager AWS Cloud DevOps Agile Job Announcement",
       "skills": [
-        "computer vision",
         "data engineering",
         "aws",
         "kubernetes",
@@ -1955,7 +1933,6 @@
     {
       "title": "DriverAI Senior Manager AWS Cloud DevOps Agile Position Description",
       "skills": [
-        "computer vision",
         "data engineering",
         "aws",
         "kubernetes",
@@ -2025,7 +2002,6 @@
     {
       "title": "Full Stack Web Developer Job Announcement Revised",
       "skills": [
-        "computer vision",
         "python",
         "java",
         "javascript",
@@ -2062,7 +2038,6 @@
     {
       "title": "Full Stack Web Developer Position Description Revised",
       "skills": [
-        "computer vision",
         "data science",
         "python",
         "java",
@@ -2103,7 +2078,6 @@
     {
       "title": "Software and Website Developer Job Announcement",
       "skills": [
-        "computer vision",
         "python",
         "javascript",
         "typescript",
@@ -2131,7 +2105,6 @@
     {
       "title": "Software and Website Developer Position Description",
       "skills": [
-        "computer vision",
         "data science",
         "python",
         "javascript",
@@ -2173,7 +2146,6 @@
     {
       "title": "Software Website Developer Intern PD",
       "skills": [
-        "computer vision",
         "data science",
         "python",
         "javascript",
@@ -2263,7 +2235,6 @@
     {
       "title": "UI UX Mobile Web Developer Job Announcement Final",
       "skills": [
-        "computer vision",
         "python",
         "javascript",
         "typescript",
@@ -2334,7 +2305,6 @@
     {
       "title": "Web Dev  Full Stack Position",
       "skills": [
-        "computer vision",
         "python",
         "java",
         "javascript",
@@ -2390,7 +2360,6 @@
     {
       "title": "Website Developer Lead Developer Full Stack Job Announcement",
       "skills": [
-        "computer vision",
         "python",
         "java",
         "javascript",
@@ -2428,7 +2397,6 @@
     {
       "title": "Website Developer Lead Developer Full Stack Position Description",
       "skills": [
-        "computer vision",
         "python",
         "java",
         "javascript",

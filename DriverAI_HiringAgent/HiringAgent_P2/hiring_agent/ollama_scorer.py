@@ -10,6 +10,7 @@ import json
 
 from hiring_agent.config import (
     OLLAMA_ENABLED, OLLAMA_SCORING, OLLAMA_MODEL, OLLAMA_HOST, OLLAMA_SCORING_TIMEOUT,
+    OLLAMA_SEED,
     AI_TEXT_LIMIT, logger,
 )
 
@@ -87,7 +88,7 @@ def ai_score_roles(skills: str, role_pref: str = "", roles=None,
                 "format": "json",
                 "think": False,
                 "stream": False,
-                "options": {"temperature": 0, "num_predict": 1536},
+                "options": {"temperature": 0, "num_predict": 1536, "seed": OLLAMA_SEED},
                 "messages": [
                     {"role": "system", "content": _SCORE_SYSTEM},
                     {"role": "user", "content": user},

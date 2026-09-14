@@ -21,7 +21,7 @@ from hiring_agent.config import (
 )
 
 _temp_files: list = []
-from hiring_agent.excel_output import _parse_received
+from hiring_agent.excel_output import _parse_received, finish_sheet
 from hiring_agent.extraction import (
     extract_text_from_bytes, extract_candidate_details, extract_candidate_details_smart,
     resolve_full_name,
@@ -394,6 +394,7 @@ def _ensure_schema(client) -> None:
     _reevaluate_missing_scored_fields(client)
     _renormalize_resume_paths(client)
     _renormalize_missing_placeholders(client)
+    _clear_row_highlighting(client)
     _merge_result = _merge_duplicate_candidates(client)
     if _merge_result.get("healed"):
         logger.info(f"            Duplicate healing: {_merge_result['healed']} winner row(s) "
@@ -526,44 +527,19 @@ def _ensure_main_period_separator(client, received_raw) -> bool:
 
 
 def _with_period_separators(rows: list) -> list:
-    """Insert one fully-blank row between calendar months, one after the header, and a
-    LABELED row (e.g. '-- 2025 --') at a year boundary instead of a plain blank.
+    """Prepend the one blank spacer row that sits directly under the header.
 
-    Mirrors the CandidateList sheet's own convention (resort_candidate_sheets.py,
-    2026-07-31) so the client workbook reads the same way - including for rows that were
-    NOT re-sorted here (this function only inserts separators; sort order is the caller's
-    job, see export_client_results). Blank/labeled rows carry no Application ID, so every
-    reader (P1, P2, the audits) skips them.
+    Month blanks and '-- 2025 --' year labels were removed on 2026-09-12 (client
+    instruction): the sheet now reads header / blank spacer / every candidate, with no
+    other gaps. This matches what the two master sheets already do, where the equivalent
+    separators have been disabled no-op stubs since 2026-09-01 - see
+    _ensure_rejected_period_separator. Keeping the leading spacer keeps all three
+    workbooks the same shape.
+
+    The spacer carries no Application ID, so every reader (P1, P2, the audits) skips it.
     """
     blank = {col: "" for col in _CLIENT_EXPORT_COLUMNS}
-    if not rows:
-        return [dict(blank)]              # permanent spacer directly under the header
-
-    def period(r):
-        # A blank/gap Received Date must yield None, not _parse_received's fallback
-        # date - otherwise a single dateless row reads as its own period and injects
-        # a spurious separator on both sides of itself.
-        raw = str(r.get("Received Date") or "").strip()
-        if not raw or _is_gap(raw):
-            return None
-        received = _parse_received(raw)
-        return (received.year, received.month) if received is not None else None
-
-    out = [dict(blank)]          # spacer directly under the header
-    prev = None
-    for r in rows:
-        cur = period(r)
-        if prev is not None and cur is not None and cur != prev:
-            if cur[0] != prev[0]:
-                sep = dict(blank)
-                sep[_YEAR_SEP_LABEL_COLUMN] = _YEAR_SEP_LABEL_FMT.format(year=cur[0])
-                out.append(sep)
-            else:
-                out.append(dict(blank))
-        out.append(r)
-        if cur is not None:
-            prev = cur
-    return out
+    return [dict(blank)] + list(rows)
 
 
 def audit_client_export_integrity(rows: list, source_candidates: list | None = None) -> list[str]:
@@ -615,7 +591,8 @@ def audit_client_export_integrity(rows: list, source_candidates: list | None = N
         # 3. Category must never be blank
         if _is_gap(r.get("Category", "")):
             r["Category"] = assign_category(str(r.get("Suggested Role 1", "") or ""),
-                                            str(r.get("Current Skills", "") or ""))
+                                            str(r.get("Current Skills", "") or ""),
+                                            str(r.get("Looking For Role", "") or ""))
             warns.append(f"{aid}: blank Category healed to '{r['Category']}'")
 
         # 4. Cross-check against source record to guarantee zero mismatch
@@ -689,7 +666,8 @@ def prepare_client_export_rows(value_dicts) -> list:
                 v = _na_if_gap(v)
             elif col == "Category" and _is_gap(v):
                 v = assign_category(str(vals.get("Suggested Role 1", "") or ""),
-                                    str(vals.get("Current Skills", "") or ""))
+                                    str(vals.get("Current Skills", "") or ""),
+                                    str(vals.get("Looking For Role", "") or ""))
             r[col] = v if v is not None else ""
         rows.append(r)
     rows.sort(key=_client_export_sort_key, reverse=True)
@@ -705,8 +683,9 @@ def write_client_export(rows: list, out_path) -> None:
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Candidates")
         ws = writer.book["Candidates"]
-        ws.freeze_panes = "A2"
-        ws.auto_filter.ref = ws.dimensions
+        # Freezes the header, protects the sheet shape, and leaves a filter dropdown on
+        # Category / Location / Received Date only. Every row stays uncoloured.
+        finish_sheet(ws, _CLIENT_EXPORT_COLUMNS)
 
         for cell in ws[1]:
             cell.fill = cell.fill.copy(fgColor="1F4E78", fill_type="solid")
@@ -1167,6 +1146,29 @@ def _renormalize_resume_paths(client) -> None:
     if fixed:
         logger.info(f"            Resume Folder Path renormalize: {fixed} cell(s) rewritten "
                     f"this run (drifted since the last pass - see 'Fixed' lines above for which).")
+
+
+def _clear_row_highlighting(client) -> None:
+    """Strip the retired amber doubt highlight from the live intake sheets.
+
+    P2 used to paint a row #FFF2CC whenever Location, Country, Phone or Education was
+    unconfirmed. All four are stamped 'Missing' when blank, so in practice most of the
+    sheet ended up amber and the colour stopped carrying information. The highlight is
+    gone from every writer, but a fill already on the sheet outlives the code that put
+    it there, so it has to be cleared once here. Runs every startup and is a cheap no-op
+    after the first: clearing an already-clear range is one call and changes nothing.
+    """
+    if not hasattr(client, "clear_table_fill"):
+        return
+    tables = [getattr(client, "table", None)]
+    if hasattr(client, "_rejected_table_name_if_exists"):
+        try:
+            tables.append(client._rejected_table_name_if_exists())
+        except Exception:
+            pass
+    for _tbl in tables:
+        if _tbl and client.clear_table_fill(_tbl):
+            logger.debug(f"            Row highlighting cleared on '{_tbl}'.")
 
 
 def _renormalize_missing_placeholders(client) -> None:
@@ -1957,7 +1959,8 @@ def _validate_all_columns(fields: dict, p1_vals: dict, mail_body: str,
             if _is_gap(fields.get(col, "")):
                 fields[col] = assign_category(
                     str(fields.get("Suggested Role 1", "") or ""),
-                    str(fields.get("Current Skills", "") or ""))
+                    str(fields.get("Current Skills", "") or ""),
+                    str(fields.get("Looking For Role", "") or ""))
                 healed.append(col)
                 logger.info(f"       Healed     : Category was blank → {fields[col]}")
             ok.append(col)
@@ -2281,6 +2284,14 @@ def _resume_name_slots(app_id: str, resume_filename_cell: str, full_name: str = 
             old_cat_part = _legacy_clean_category_for_filename(category)
             if old_cat_part != cat_part:
                 candidates.append(f"{name_part}_{old_cat_part}_{tail}{ext}")
+        # P1 reliability_flow.py (2026-09-10+): deterministic '<clean_stem>_<tail>.<ext>'
+        if have_name and tail:
+            stem, _ = os.path.splitext(original)
+            clean_stem = re.sub(r'["*:<>?/\\|#%,\']', '', stem).strip().replace(' ', '_')
+            if not clean_stem:
+                clean_stem = "resume"
+            clean_stem = clean_stem[:60]
+            candidates.append(f"{clean_stem}_{tail}{ext}")
         # A historical repair may have stored the real P2 canonical filename in the
         # Original Filename cell. Its _<AppIdTail>.<ext> suffix proves it is already a
         # stored name, so try it verbatim rather than creating an impossible AppID prefix.
@@ -2577,7 +2588,8 @@ def _complete_row_before_reject(merged: dict, app_id: str = "") -> dict:
     if _is_gap(merged.get("Category")):
         merged["Category"] = assign_category(
             str(merged.get("Suggested Role 1", "") or ""),
-            str(merged.get("Current Skills", "") or ""))
+            str(merged.get("Current Skills", "") or ""),
+            str(merged.get("Looking For Role", "") or ""))
         logger.info(f"       Pre-reject : Category was blank → {merged['Category']}")
 
     for _num_col in ("Application Updates", "Retry Count"):
@@ -3316,7 +3328,7 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     break
                 continue
             r1, r2, r3 = res["role_1"], res["role_2"], res.get("role_3", "")
-            category = assign_category(r1, skills)   # never blank — falls back to "General"
+            category = assign_category(r1, skills, role_pref)   # never blank — falls back to "General"
 
             if GEO_FILTER_USA_ONLY:
                 geo_decision, usa_reason = _classify_candidate_geo(
@@ -3476,8 +3488,6 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     if _score_attempts_of(vals) != 0:
                         fields["Retry Count"] = 0
                     _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
-                    if hasattr(client, "set_row_fill") and hasattr(client, "table_name"):
-                        client.set_row_fill(client.table_name, index, color_hex="#FFF2CC")
                     logger.info("       Result   : LOCATION REVIEW - kept on Main; "
                                 "no decline email queued.")
                 consecutive_failures = 0
@@ -3504,8 +3514,6 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     logger.info("       Result   : [DRY-RUN] Would mark Needs Review (missing core fields).")
                 else:
                     _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
-                    if hasattr(client, "set_row_fill") and hasattr(client, "table_name"):
-                        client.set_row_fill(client.table_name, index, color_hex="#FFF2CC")
                     logger.info("       Result   : NEEDS REVIEW — kept on Main for manual review.")
                 consecutive_failures = 0
                 processed += 1
@@ -3526,10 +3534,10 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     fields["Retry Count"] = 0
                 _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
                 has_doubt, doubt_reason = is_doubt_candidate(fields)
-                if hasattr(client, "set_row_fill") and hasattr(client, "table_name"):
-                    client.set_row_fill(client.table_name, index, color_hex="#FFF2CC" if has_doubt else None)
                 if has_doubt:
-                    logger.info(f"       HIGHLIGHT : Row highlighted for review ({doubt_reason})")
+                    # No longer coloured on the sheet; the run log is now the only place
+                    # a doubtful row announces itself.
+                    logger.info(f"       REVIEW    : Row has unconfirmed fields ({doubt_reason})")
                 if scorecards:
                     card = (
                         f"Application: {app_id}\nName: {fields['Full Name']}\n"
@@ -4139,7 +4147,8 @@ def _plan_heal(client, vals: dict, roles,
     role1 = heal.get("Suggested Role 1", vals.get("Suggested Role 1", ""))
     if not _is_gap(role1):
         cur_skills = heal.get("Current Skills", vals.get("Current Skills", ""))
-        cat = assign_category(role1, cur_skills)
+        cat = assign_category(role1, cur_skills,
+                              heal.get("Looking For Role", vals.get("Looking For Role", "")))
         cur = str(vals.get("Category", "") or "").strip()
         stale_mobile_miscategorization = (
             cat == "Mobile Apps (Android IOS)" and cur and cur != cat)
@@ -4968,7 +4977,8 @@ def validate_row(app_id: str) -> None:
 
     # Category from the (freshly derived) Suggested Role 1.
     new_role1 = derived.get("Suggested Role 1", "")
-    new_category = assign_category(new_role1, derived.get("Current Skills", "")) if new_role1 else ""
+    new_category = (assign_category(new_role1, derived.get("Current Skills", ""),
+                                    derived.get("Looking For Role", "")) if new_role1 else "")
 
     # USA verdict from the (freshly derived) location + country.
     new_location = derived.get("Location", "")

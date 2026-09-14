@@ -65,7 +65,7 @@ class ExtractionTransportTests(unittest.TestCase):
                 body = request["json"]
                 self.assertIs(body["think"], False)
                 self.assertIs(body["stream"], False)
-                self.assertEqual(body["options"], {"temperature": 0, "num_predict": 512})
+                self.assertEqual(body["options"], {"temperature": 0, "num_predict": 512, "seed": 42})
                 schema = body["format"]
                 self.assertEqual(schema["type"], "object")
                 self.assertFalse(schema["additionalProperties"])

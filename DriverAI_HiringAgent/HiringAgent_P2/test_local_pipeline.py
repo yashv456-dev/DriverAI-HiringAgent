@@ -247,5 +247,145 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(capture[0]['rows'][0][1]['Status'], 'Scored', capture[0])
 
 
+class MasterWriteContract(unittest.TestCase):
+    """P2 may write only MASTER_WRITE_COLUMNS onto P1's intake workbook."""
+
+    P1_ROW = {'Application ID': 'APP-1', 'Email': 'a@b.com',
+              'Received Date': '2026-09-01T10:00:00',
+              'Last Updated Date': '2026-09-01T10:00:00', 'Application Updates': 0,
+              'Original Filename': '', 'Mail Subject': 'Application', 'Mail Body': 'hi',
+              'Has Resume': 'Yes', 'Status': 'New Email Received'}
+
+    def _scored(self):
+        from hiring_agent.extraction import MISSING_VALUE
+        row = dict(self.P1_ROW)
+        row.update({'Status': 'Scored', 'Phone': '(602) 555-0147',
+                    'Resume Link': 'Marcus_Vance_AF6A', 'Resume URL': 'https://x/y.pdf',
+                    'Resume Folder Path': '/a/b', 'Category': 'General',
+                    'Education': MISSING_VALUE,
+                    # the two input columns P2 fills when P1 leaves them blank
+                    'Original Filename': 'resume.pdf',
+                    'Last Updated Date': '2026-09-02T12:00:00'})
+        return row
+
+    def test_main_patch_carries_only_the_two_agreed_columns(self):
+        from hiring_agent.local_pipeline import _master_patch, MASTER_WRITE_COLUMNS
+        patch_body = _master_patch(self._scored())
+        self.assertEqual(set(patch_body), set(MASTER_WRITE_COLUMNS))
+        self.assertEqual(patch_body['Status'], 'Scored')
+        self.assertEqual(patch_body['Resume Link'], 'Marcus_Vance_AF6A')
+
+    def test_main_patch_never_carries_a_p1_input_column(self):
+        from hiring_agent.local_pipeline import _master_patch
+        from hiring_agent.sqlite_store import INPUT_COLUMNS
+        body = _master_patch(self._scored())
+        self.assertFalse(set(body) & set(INPUT_COLUMNS),
+                         'an input column in a master write resets the row on the next poll')
+
+    def test_rejected_row_keeps_p1s_own_input_values(self):
+        from hiring_agent.local_pipeline import _with_original_inputs
+        from hiring_agent.sqlite_store import INPUT_COLUMNS, input_key
+        archived = _with_original_inputs(self._scored(), self.P1_ROW)
+        for col in INPUT_COLUMNS:
+            self.assertEqual(archived[col], self.P1_ROW[col], col)
+        self.assertEqual(input_key(archived), input_key(self.P1_ROW),
+                         'archiving a candidate must not change the input hash')
+        self.assertEqual(archived['Phone'], '(602) 555-0147',
+                         'P2-derived fields still reach the Rejected sheet')
+
+    def test_a_scored_row_survives_the_next_poll(self):
+        """The reset loop, end to end.
+
+        P2 used to PATCH the whole row back, including 'Original Filename' and
+        'Last Updated Date'. Both are hashed as input, so the next sync read the row as a
+        NEW submission, reset it to 'New Email Received', cleared Retry Count and dropped
+        the scored result - which P2 then scored again, rewriting the row every cycle.
+        """
+        import tempfile
+        from hiring_agent.sqlite_store import SQLiteCandidateStore
+        from hiring_agent.local_pipeline import _master_patch
+
+        class Remote:
+            def __init__(self, rows): self.rows = rows
+            def list_rows(self): return [{'values': dict(v)} for v in self.rows]
+            def list_rejected_rows(self): return []
+
+        with patch.dict(os.environ,
+                        {'HIRING_SQLITE_PATH': os.path.join(tempfile.mkdtemp(), 't.db')}):
+            store = SQLiteCandidateStore()
+            try:
+                store.sync_from_client(Remote([self.P1_ROW]))
+                store.save_by_id('APP-1', self._scored())
+                self.assertEqual(store.all_rows('main')[0].values['Status'], 'Scored')
+
+                # The master now holds P1's row plus only what P2 is allowed to write.
+                master = dict(self.P1_ROW)
+                master.update(_master_patch(self._scored()))
+                store.sync_from_client(Remote([master]))
+
+                survived = store.all_rows('main')[0].values
+                self.assertEqual(survived['Status'], 'Scored',
+                                 'a scored row must not be reset by the next poll')
+                self.assertEqual(survived['Phone'], '(602) 555-0147',
+                                 'the scored result must survive the next poll')
+            finally:
+                store.conn.close()
+
+    def test_sync_from_client_deactivates_deleted_remote_records(self):
+        """When an admin wipes/deletes rows remotely, sync_from_client deactivates them in local store."""
+        import tempfile
+        from hiring_agent.sqlite_store import SQLiteCandidateStore
+
+        class Remote:
+            def __init__(self, rows): self.rows = rows
+            def list_rows(self): return [{'values': dict(v)} for v in self.rows]
+            def list_rejected_rows(self): return []
+
+        row1 = dict(self.P1_ROW, **{'Application ID': 'APP-1'})
+        row2 = dict(self.P1_ROW, **{'Application ID': 'APP-2'})
+        with patch.dict(os.environ, {'HIRING_SQLITE_PATH': os.path.join(tempfile.mkdtemp(), 't.db')}):
+            store = SQLiteCandidateStore()
+            try:
+                store.sync_from_client(Remote([row1, row2]))
+                self.assertEqual(len(store.all_rows('main')), 2)
+
+                # Now remote has deleted row2
+                store.sync_from_client(Remote([row1]))
+                active_rows = store.all_rows('main')
+                self.assertEqual(len(active_rows), 1)
+                self.assertEqual(active_rows[0].app_id, 'APP-1')
+            finally:
+                store.conn.close()
+
+    def test_excel_candidate_store_guards_intake_table_against_profile_columns(self):
+        """ExcelCandidateStore must never write candidate profile fields to HiringAgent_P1_Candidates."""
+        from hiring_agent.store import ExcelCandidateStore
+
+        recorded = {}
+
+        class MockClient:
+            table = 'HiringAgent_P1_Candidates'
+            def list_rows(self):
+                return [{'index': 0, 'values': {'Application ID': 'APP-1', 'Status': 'New Email Received'}}]
+            def update_row(self, index, fields, current_values=None):
+                recorded.update(fields)
+
+        sp_store = ExcelCandidateStore(MockClient())
+        sp_store.save_by_id('APP-1', {
+            'Status': 'Scored',
+            'Resume Link': 'test.pdf',
+            'Phone': '(555) 123-4567',
+            'Location': 'San Jose, CA',
+            'Category': 'AI/ML',
+            'Suggested Role 1': 'AI Engineer',
+        })
+        self.assertEqual(recorded.get('Status'), 'Scored')
+        self.assertEqual(recorded.get('Resume Link'), 'test.pdf')
+        self.assertNotIn('Phone', recorded)
+        self.assertNotIn('Location', recorded)
+        self.assertNotIn('Category', recorded)
+        self.assertNotIn('Suggested Role 1', recorded)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -490,9 +490,40 @@ skills:
     - "oracle financials"
     - "pivot tables"
     - "vlookup"
+    # QA / test tooling, cloud and integration terms (added 2026-09-14). A live review of an
+    # SDET resume found Zephyr, Bugzilla, Supertest and DigitalOcean missing from Current
+    # Skills, and an AI resume lost OAuth, RSS and Gmail API: none were in this vocabulary,
+    # so they only survived when the model happened to list them. Deliberately NOT added:
+    # 'postman', 'playwright', 'mocha', 'cucumber' - each is also an ordinary English word
+    # (a job, a writer, a drink, a vegetable), so a word-bounded scan would tag non-tech
+    # resumes with them. The model still reports those from genuine testing resumes.
+    - "testng"
+    - "junit"
+    - "jmeter"
+    - "testrail"
+    - "zephyr"
+    - "bugzilla"
+    - "supertest"
+    - "restassured"     # joined form only: "rest assured" is an everyday idiom in cover letters
+    - "digitalocean"
+    - "oauth"
+    - "gmail api"
+    - "rss"
 
   # Nicer display casing for skills; anything not here falls back to .title().
   display_names:
+    testng: "TestNG"
+    junit: "JUnit"
+    jmeter: "JMeter"
+    testrail: "TestRail"
+    zephyr: "Zephyr"
+    bugzilla: "Bugzilla"
+    supertest: "Supertest"
+    restassured: "RestAssured"
+    digitalocean: "DigitalOcean"
+    oauth: "OAuth"
+    "gmail api": "Gmail API"
+    rss: "RSS"
     postgresql: "PostgreSQL"
     mysql: "MySQL"
     mongodb: "MongoDB"
@@ -4066,6 +4097,9 @@ ai_extraction:
     enabled: true
     model: "qwen3-1.7b-p2:latest"
     host: "http://localhost:11434"
+    # Fixed sampling seed for every model call. temperature 0 alone gave different role
+    # scores on identical input (measured 2026-09-14); with a seed, repeated runs match.
+    seed: 42
     # Give-up threshold per attempt, not a performance setting: about 3x the earlier
     # worst measured extraction (62.1s). Retained at 180 after measuring thinking off,
     # a 512-token output cap, and JSON schemas; see docs/benchmarks/stage2a/REPORT.md.

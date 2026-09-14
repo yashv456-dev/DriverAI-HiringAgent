@@ -292,6 +292,12 @@ OLLAMA_TIMEOUT = int(_ollama.get("timeout", 180))
 # 3.6k-char two-page CV took 62.1s against the then-60s extraction budget. Extraction was
 # exactly the thing that timed out, and the fallback was silent. See config.yaml.
 OLLAMA_SCORING_TIMEOUT = int(_ollama.get("scoring_timeout", 150))
+# Fixed sampling seed for every Ollama call. temperature 0 alone was NOT deterministic:
+# measured 2026-09-14, three identical ai_score_roles calls on the same resume returned
+# different 4th-ranked roles (70% vs 65%), and the same candidate's Suggested Role 3 read 70%
+# in a dry run and 75% live. With a fixed seed all three runs were identical. A published
+# match percentage must not change just because the scorer was run again.
+OLLAMA_SEED = int(_ollama.get("seed", 42))
 
 # Never publish a row the model did not actually read - defer it instead. See config.yaml's
 # ai_extraction.ollama.require_ai for the full reasoning.

@@ -8,11 +8,12 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Font
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.utils import get_column_letter
 
 from . import config as cfg
+from .excel_output import finish_sheet
 from .sqlite_store import BASE
 
 
@@ -66,6 +67,10 @@ def build_master(store, path, generation):
             ('rejected', 'Rejected', cfg.REJECTED_COLUMNS, 'RejectedCandidates')):
         ws = wb.create_sheet(title)
         ws.append(columns)
+        # header / blank spacer / first candidate, matching P1's intake workbook and the
+        # client sheet so all three read the same way. Carries no Application ID, so every
+        # reader already skips it.
+        ws.append([''] * len(columns))
         for row in store.all_rows(sheet):
             if not row.app_id:
                 continue
@@ -78,19 +83,13 @@ def build_master(store, path, generation):
                 if isinstance(cell.value, str):
                     cell.data_type = 's'
                 cell.number_format = '@'
-            if sheet == 'main':
-                from .sharepoint_scoring import is_doubt_candidate
-                is_doubt, _ = is_doubt_candidate(row.values)
-                if is_doubt:
-                    amber_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-                    for cell in ws[ws.max_row]:
-                        cell.fill = amber_fill
-        if ws.max_row == 1:
-            ws.append([''] * len(columns))
         table = Table(displayName=table_name, ref=f'A1:{get_column_letter(len(columns))}{ws.max_row}')
-        table.tableStyleInfo = TableStyleInfo(name='TableStyleMedium9', showRowStripes=True)
+        # showRowStripes drops with the doubt fill: banding is row colour too, and the
+        # brief was that no row carries a colour. The header band stays, so the table
+        # still reads as a table.
+        table.tableStyleInfo = TableStyleInfo(name='TableStyleMedium9', showRowStripes=False)
+        finish_sheet(ws, columns, table=table)
         ws.add_table(table)
-        ws.freeze_panes = 'A2'
         for i, col in enumerate(columns, 1):
             ws.column_dimensions[get_column_letter(i)].width = min(max(len(col) + 3, 18), 42)
         if 'Resume URL' in columns and 'Resume Link' in columns:

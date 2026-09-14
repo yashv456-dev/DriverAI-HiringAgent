@@ -211,9 +211,11 @@ ok(_extract_education_dates(
     "Savitribai\nPhule\nPune\nUniversity\n,\nBachelors\nin\nComputer\nEngineering\nAug\n2019\n"
     "-\nJune\n2023\nSummary\nCybersecurity\nprofessional\n") == ("Sep 2023", "Jun 2025"),
    "Manjeeri Ghanekar: word-fragmented two-degree block still recovers the FIRST pair")
+# The dates are read into Education Start/End Date (asserted just above), so since
+# 2026-09-14 they are no longer repeated inside the Education text itself.
 ok(_extract_education(
     "Education\nSeattle\nUniversity\n,\nMS\nin\nComputer\nScience\nSept\n2023\n-\nJune\n2025\n")
-   == "Seattle University, MS in Computer Science Sept 2023 - June 2025",
+   == "Seattle University, MS in Computer Science",
    "the same word-fragmented block also recovers a readable Education TEXT value, not "
    "just the dates - the regex path should not need to fall back to Ollama for this")
 # GUARD: this is the exact regression that motivated using a NARROW header-word set
@@ -4112,6 +4114,42 @@ try:
 except Exception as e:
     ok(True, f"python-docx not testable in this env ({e})")
 
+# Legacy Word (.doc). P1 accepts these from 2026-09-11; before that an applicant on an
+# older Word install was bounced with a wrong-format reply. The extension is the least
+# reliable thing about them, so the reader routes on magic bytes: a real OLE2 compound
+# file goes to the Word 97 piece-table parser, a renamed .docx to the zip reader, and a
+# "save as .doc" that actually wrote RTF to the RTF stripper.
+_DOC_FIXTURE = __import__("pathlib").Path(__file__).resolve().parent / "test_fixtures" / "legacy_word97_resume.doc"
+if _DOC_FIXTURE.exists():
+    _doc_txt = extract_text_from_bytes(_DOC_FIXTURE.read_bytes(), "legacy_word97_resume.doc")
+    ok("Marcus Vance" in _doc_txt, "extract_text_from_bytes reads a real Word 97 .doc")
+    ok("(602) 555-0147" in _doc_txt, "...including the phone number")
+    ok("Arizona State University" in _doc_txt, "...and the education block")
+    from hiring_agent.extraction import extract_candidate_details as _ecd_doc
+    _doc_fields = _ecd_doc(_doc_txt)
+    ok(_doc_fields.get("full_name") == "Marcus Vance", "full name parsed out of a .doc")
+    ok("602" in str(_doc_fields.get("phone", "")), "phone parsed out of a .doc")
+else:
+    ok(True, "Word 97 .doc fixture absent; binary-.doc reader not exercised here")
+try:
+    import docx as _dx
+    _d3 = _dx.Document(); _d3.add_paragraph("Dana Whitfield\nAustin, TX")
+    _b3 = __import__("io").BytesIO(); _d3.save(_b3)
+    ok("Dana Whitfield" in extract_text_from_bytes(_b3.getvalue(), "renamed.doc"),
+       "a .docx renamed to .doc is still read (routed by magic bytes, not extension)")
+except Exception as e:
+    ok(True, f"python-docx not testable in this env ({e})")
+_rtf = (br"{\rtf1\ansi\deff0{\fonttbl{\f0 Calibri;}}\f0\fs22 "
+        br"Priya Patel\par Denver, CO\par (303) 555-0182\par}")
+_rtf_txt = extract_text_from_bytes(_rtf, "saved_as.doc")
+ok("Priya Patel" in _rtf_txt and "(303) 555-0182" in _rtf_txt,
+   "RTF written under a .doc name is read rather than rejected")
+ok(extract_text_from_bytes(b"this is not a document", "junk.doc") == "",
+   "a .doc that is neither Word nor RTF yields no text, so the row takes the existing "
+   "unreadable-resume path instead of publishing garbage")
+ok(extract_text_from_bytes(b"", "empty.doc") == "",
+   "an empty .doc is handled without raising")
+
 
 # â€”â€” U. GUI / DOC / URL HELPER CONSISTENCY â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”
 print("\n=== U. GUI / DOC / URL HELPER CONSISTENCY ===")
@@ -4191,7 +4229,7 @@ except ValueError:
     _gui_bad_batch_rejected = True
 ok(_gui_bad_batch_rejected, "GUI rejects a zero batch size before starting P2")
 
-app_src = pathlib.Path("app.py").read_text(encoding="utf-8")
+app_src = (pathlib.Path(__file__).resolve().parent / "app.py").read_text(encoding="utf-8")
 app_ast = ast.parse(app_src)
 app_cls = [n for n in app_ast.body if isinstance(n, ast.ClassDef) and n.name == "HiringApp"][0]
 name_counts = collections.Counter(
@@ -4521,7 +4559,11 @@ ok(split_location_country(_loc(_mumbai_text)) == ("Mumbai, Maharashtra", "India"
    f"the stated province resolves the Country instead of leaving it blank "
    f"(got {split_location_country(_loc(_mumbai_text))!r})")
 
-print("\n=== W2. CLIENT EXPORT PERIOD SEPARATORS ===")
+print("\n=== W2. CLIENT EXPORT HEADER SPACER (month/year separators removed 2026-09-12) ===")
+# One blank row under the header and NOTHING else. The month blanks and '-- 2025 --'
+# year labels this used to assert were removed on client instruction so all three
+# workbooks read the same way: header / blank spacer / every candidate. The master
+# sheets' equivalent separators have been disabled since 2026-09-01 (see W3/W4).
 from hiring_agent.sharepoint_scoring import _with_period_separators as _sep
 
 
@@ -4535,20 +4577,15 @@ _sep_out = _sep([
     _xrow("E", "2027-01-03T10:00:00"),
 ])
 _ids = [str(r.get("Application ID") or "") for r in _sep_out]
-_fnames = [str(r.get("Full Name") or "") for r in _sep_out]
 ok(_ids[0] == "", "a blank spacer row sits directly under the header")
-ok(_ids == ["", "A", "B", "", "C", "D", "", "E"],
-   f"one separator row between each calendar month (got {_ids})")
-ok(_ids.count("") == 3,
-   "a year change inserts ONE separator row, not two stacked (Jun-2026 -> Jan-2027)")
-ok(_fnames[6] == "-- 2027 --",
-   f"the Jun-2026 -> Jan-2027 boundary is a LABELED separator, not a plain blank (got {_fnames[6]!r})")
-_year_sep_row = _sep_out[6]
-ok(all((str(v or "") != "") == (col == "Full Name") for col, v in _year_sep_row.items()),
-   "the year-boundary separator has ONLY Full Name set; every other column stays blank")
-ok(all(all(str(v or "") == "" for v in _sep_out[i].values())
-       for i, x in enumerate(_ids) if x == "" and i != 6),
-   "non-year separator rows (header spacer + same-year month gaps) are still fully blank")
+ok(_ids == ["", "A", "B", "C", "D", "E"],
+   f"no month separator survives, even across a year boundary (got {_ids})")
+ok(_ids.count("") == 1,
+   "exactly ONE blank row in the whole sheet - the header spacer")
+ok(all(str(v or "") == "" for v in _sep_out[0].values()),
+   "the spacer is fully blank, carrying no year label and no Application ID")
+ok(not any("--" in str(r.get("Full Name") or "") for r in _sep_out),
+   "no '-- <year> --' label row is emitted any more")
 _empty_sep = _sep([])
 ok(len(_empty_sep) == 1
    and all(str(v or "") == "" for v in _empty_sep[0].values()),
@@ -6826,6 +6863,104 @@ ok(_edu_dates(_z24_present) == ("Aug 2024", "Present"),
 # recency ordering must not invent one.
 ok(_edu_dates("EDUCATION\nMaster of Science, Computer Science") == ("", ""),
    "a resume with no stated dates still yields a blank pair")
+
+# ── Z25. 2026-09-14 LIVE-ROW REVIEW FIXES ────────────────────────────────────
+# Found by opening the resumes behind APP-20260908-1304-MCLA and APP-20260902-2155-MCPA and
+# checking every published column against them.
+print("\n=== Z25. LIVE-ROW REVIEW FIXES (education, skills, seed, JD context) ===")
+from hiring_agent.extraction import complete_education, normalize_education, normalize_skills
+from hiring_agent.scoring import _skill_set
+from hiring_agent.jd_sources import _drop_context_mentions
+from hiring_agent.extraction import _scan_skill_keywords
+import hiring_agent.config as _z25cfg
+
+# Education: the school belongs in the column; the city/country and GPA after it do not.
+_z25_mcla = ("EDUCATION\nBachelor of Science in Computer Science\n"
+             "National University of Computer & Emerging Sciences (FAST-NUCES), Lahore, Pakistan\nSKILLS")
+ok(complete_education("Bachelor of Science in Computer Science", _z25_mcla) ==
+   "Bachelor of Science in Computer Science, National University of Computer & Emerging Sciences (FAST-NUCES)",
+   "a degree-only Education gains its school from the next line, without the city/country")
+ok(complete_education("B.S. Physics", "Education\no B.S. Physics\no Ohio State University, Columbus, OH | 2019 - 2023")
+   == "B.S. Physics, Ohio State University",
+   "an 'o ' bullet is stripped without eating the O of 'Ohio'")
+ok(complete_education("M.S. Computer Science", "EDUCATION\nM.S. Computer Science, Arizona State University (3.72/4) Tempe, AZ")
+   == "M.S. Computer Science, Arizona State University",
+   "a GPA ends the school name, so the campus city after it is not captured")
+ok(complete_education("MBA", "EDUCATION\nMBA\nSKILLS\nPython") == "MBA",
+   "no school is invented when none is near the degree (stops at the next section)")
+ok(complete_education("M.S. Data Science, Arizona State University", "unrelated") ==
+   "M.S. Data Science, Arizona State University", "a value that already names a school is unchanged")
+ok(normalize_education("B.Sc. (Design and Computing), BITS Pilani (WILP) | 2025") ==
+   "B.Sc. (Design and Computing), BITS Pilani (WILP)",
+   "a trailing '| 2025' is removed - the year already lives in Education End Date")
+ok(normalize_education("Master of Science, University of Texas, Aug 2019 - May 2021") ==
+   "Master of Science, University of Texas", "a trailing date range is removed")
+ok(normalize_education("B.Tech in CSE (Expected 2026)") == "B.Tech in CSE", "a trailing (Expected YYYY) is removed")
+ok(normalize_education("Seattle University, MS in Computer Science Sept 2023 - June 2025") ==
+   "Seattle University, MS in Computer Science",
+   "a whole trailing range is removed, never just its second half")
+ok(normalize_education("Bachelor of Arts, Class of 2020 Scholars Program") ==
+   "Bachelor of Arts, Class of 2020 Scholars Program", "a year that is not a trailing date stays")
+
+# Skills: a bracketed group is one skill, the plain duplicate goes, scoring keeps every token.
+ok(normalize_skills("AWS, AWS (EC2, S3, IAM), Docker") == "AWS (EC2/S3/IAM), Docker",
+   "'AWS' beside 'AWS (EC2, S3, IAM)' collapses to the specific form, kept as one skill")
+ok({"aws", "ec2", "s3", "iam", "docker"} <= _skill_set("AWS (EC2/S3/IAM), Docker"),
+   "scoring still reads the base and the bracketed items, so no role match is lost")
+ok(normalize_skills("Excel (Pivot, VLOOKUP") == "Excel (Pivot, VLOOKUP",
+   "an unbalanced bracket never swallows the rest of the list")
+from hiring_agent.extraction import _merge_keyword_skills
+# 33 + 1 group + 3 genuine + 3 new keywords = 40, exactly the cap once the group counts once.
+# Counted the old way (group shredded into 3, plus a re-added plain 'AWS') it is 43, and the
+# cap cut n8n, SQLite and Microservices - the live regression this guards.
+_z25_llm = ", ".join([f"Skill{i}" for i in range(33)] + ["AWS (EC2, S3, IAM)", "Microservices", "SQLite", "n8n"])
+_z25_merged = normalize_skills(_merge_keyword_skills({"skills": _z25_llm}, "AWS OAuth RSS Docker")["skills"]).split(", ")
+ok(all(s in _z25_merged for s in ("Microservices", "SQLite", "n8n")) and "AWS" not in _z25_merged,
+   "the skills cap counts a bracketed group once, so genuine skills are not pushed out "
+   f"(got {len(_z25_merged)}: tail {_z25_merged[-6:]})")
+for _term, _label in (("Zephyr", "Zephyr"), ("Bugzilla", "Bugzilla"), ("DigitalOcean", "DigitalOcean"),
+                      ("OAuth", "OAuth"), ("RSS", "RSS"), ("Gmail API", "Gmail API"), ("Supertest", "Supertest")):
+    ok(_term.lower() in _scan_skill_keywords(f"Tools: {_term}, Git"), f"{_label} is in the skills vocabulary")
+ok("rest assured" not in _scan_skill_keywords("Rest assured, I will deliver on time."),
+   "the everyday idiom 'rest assured' is not scanned as a skill")
+
+# QA guard: a QA/test candidate is 'General' while the catalog has no QA/test opening.
+from hiring_agent import scoring as _z25_scoring
+_z25_qa_skills = "Selenium, Cypress, TestNG, JUnit, TestRail, Java, JavaScript, GitHub Actions, CI/CD"
+_z25_real_cache = _z25_scoring._catalog_has_qa_opening
+try:
+    _z25_scoring._catalog_has_qa_opening = lambda: False
+    ok(assign_category("Mobile Application Software Developer (80%)", _z25_qa_skills,
+                       "Software Development Engineer In Test (SDET)") == "General",
+       "an SDET matched to a developer role is filed under General, not the developer category")
+    ok(assign_category("Full Stack Web Developer (60%)", _z25_qa_skills) == "General",
+       "three or more test tools alone identify a QA profile (no Looking For Role needed)")
+    ok(assign_category("Full Stack Web Developer (60%)", "Java, JUnit, React, Node.js", "QA Automation Engineer") == "General",
+       "a stated QA/SDET role alone identifies a QA profile")
+    ok(assign_category("Full Stack Web Developer (70%)", "Java, Spring Boot, JUnit, React, Node.js",
+                       "Software Engineer") == "Web Team (Full stack/Back end & UI/UX)",
+       "a developer who merely lists JUnit keeps their normal category")
+    _z25_scoring._catalog_has_qa_opening = lambda: True
+    ok(not _z25_scoring.is_unmatched_qa_profile(_z25_qa_skills, "SDET"),
+       "the guard retires itself as soon as the catalog contains a QA/test opening")
+finally:
+    _z25_scoring._catalog_has_qa_opening = _z25_real_cache
+
+# Seed: identical input must give identical scores.
+ok(isinstance(_z25cfg.OLLAMA_SEED, int), "every Ollama call carries a fixed seed from config")
+
+# JD context: company/collaboration mentions of computer vision are not a requirement.
+for _ctx in ("Collaborate with AI/ML and computer vision teams to present detections.",
+             "Integrate computer vision outputs into web applications.",
+             "Collaborate with product, design, mobile, AI/ML, computer vision, cloud, data, and security teams.",
+             "Interest in AI, data analytics, computer vision, cybersecurity, or emerging technology."):
+    ok("computer vision" not in _scan_skill_keywords(_drop_context_mentions(_ctx)),
+       f"context mention dropped: {_ctx[:60]!r}")
+for _req in ("Strong experience in computer vision and deep learning with PyTorch.",
+             "Build computer vision models for product recognition.",
+             "Develop and deploy computer vision pipelines on edge devices."):
+    ok("computer vision" in _scan_skill_keywords(_drop_context_mentions(_req)),
+       f"genuine requirement kept: {_req[:60]!r}")
 
 print(f"\n{'='*64}")
 print(f"  P2 RESULT: {P} passed, {F} failed")

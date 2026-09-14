@@ -592,20 +592,22 @@ class SharePointClient:
         except SharePointError:
             pass
 
-    def set_row_fill(self, table_name: str, row_index: int, color_hex: str | None = "#FFF2CC") -> None:
-        """Set a table row's background fill color via Microsoft Graph (best-effort).
+    def clear_table_fill(self, table_name: str) -> bool:
+        """Strip every background fill from a table's data rows (best-effort).
 
-        Used to visually highlight rows on the Master sheet that need human review or have
-        data doubts (e.g. location unconfirmed, weird phone, missing education).
-        Pass color_hex=None to clear fill.
+        One call against dataBodyRange rather than one per row: the amber doubt highlight
+        this replaces was written row by row, so a sheet can carry hundreds of filled rows
+        and per-row clearing would be hundreds of Graph writes on every startup.
+
+        Returns True when the clear was accepted. A table with no data rows has no
+        dataBodyRange and Graph 404s it, which is a no-op, not a failure worth raising.
         """
         try:
-            body = {"color": color_hex} if color_hex else {"color": None}
-            self._req("PATCH", f"{self._wb_base()}/tables/{table_name}"
-                               f"/rows/itemAt(index={row_index})/range/format/fill",
-                      json=body)
+            self._req("POST", f"{self._wb_base()}/tables/{table_name}"
+                              f"/dataBodyRange/format/fill/clear")
+            return True
         except SharePointError:
-            pass
+            return False
 
     def set_column_number_format(self, table_name: str, col_name: str, code: str) -> None:
         """Set one Excel number-format code (e.g. '@' for Text) down a whole table column.
@@ -680,6 +682,14 @@ class SharePointClient:
         if current_values is None:
             current = next((r for r in self.list_rows() if r["index"] == index), None)
             current_values = current["values"] if current else {}
+        if getattr(self, "table", None) == "HiringAgent_P1_Candidates":
+            _forbidden = {
+                "Category", "Phone", "Location", "Country", "Years Exp", "Current Skills",
+                "Education", "Education Start Date", "Education End Date", "Looking For Role",
+                "Suggested Role 1", "Suggested Role 2", "Suggested Role 3",
+                "Portfolio 1", "Portfolio 2", "Portfolio 3", "Resume URL", "Resume Folder Path",
+            }
+            fields = {k: v for k, v in fields.items() if k not in _forbidden}
         merged = dict(current_values)
         merged.update(fields)
         values = [[merged.get(c, "") for c in cols]]

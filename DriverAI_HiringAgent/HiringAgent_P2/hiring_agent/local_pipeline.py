@@ -277,6 +277,55 @@ RECOVERABLE_FIELDS = ('Phone', 'Location', 'Country', 'Years Exp',
                       'Education', 'Education Start Date', 'Education End Date')
 
 
+#: Everything P2 is allowed to write onto P1's intake workbook.
+#:
+#: The workbook is a STATE fallback, not a data backup. Every field P2 derives lives in the
+#: local database and in the two published reports; sync_from_client compares only
+#: INPUT_COLUMNS and leaves a matching row untouched, so nothing P2 writes here is ever read
+#: back into P2. Two columns is therefore the whole useful contract:
+#:
+#:   Status       the state machine. P2's queue reads it, and on a rebuilt database it is
+#:                what stops every candidate being scored again from scratch. It already
+#:                carries Scored / Needs Review - * / Rejected - *.
+#:   Resume Link  the only route from the sheet to the file, because P2 renames the resume
+#:                after scoring and 'Original Filename' deliberately keeps what the
+#:                APPLICANT sent rather than what is stored.
+MASTER_WRITE_COLUMNS = ('Status', 'Resume Link')
+
+
+def _master_patch(values):
+    """The subset of `values` that may be PATCHed onto a main-sheet row.
+
+    Unlisted columns keep whatever they already hold, so this narrows the write rather
+    than blanking anything.
+    """
+    return {col: values[col] for col in MASTER_WRITE_COLUMNS if col in values}
+
+
+def _with_original_inputs(values, source):
+    """`values` with every P1-owned input column restored from `source`.
+
+    Writing a row back with a CHANGED input column is not a cosmetic problem: the local
+    store hashes exactly those columns to decide whether a submission is new, so a single
+    altered cell makes the next poll read the row as a fresh application, reset it to
+    'New Email Received', clear Retry Count and discard the scored result - which P2 then
+    re-scores, rewriting the row every cycle. P2 fills 'Original Filename' and
+    'Last Updated Date' when P1 leaves them blank, and both are input columns, so this was
+    reachable in normal operation (reproduced 2026-09-11).
+
+    Used on the Rejected-sheet ADD, which has to carry a whole row. The main-sheet path
+    avoids the problem differently, by never sending an input column at all.
+    """
+    from .sqlite_store import INPUT_COLUMNS
+    out = dict(values)
+    for col in INPUT_COLUMNS:
+        if col in source:
+            out[col] = source[col]
+        else:
+            out.pop(col, None)
+    return out
+
+
 def _is_gap(value):
     return str(value or '').strip().lower() in ('', 'missing', 'n/a', 'not extracted')
 
@@ -399,6 +448,13 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
             with store.conn:
                 store.conn.execute("UPDATE attempts SET state='interrupted',finished_at=CURRENT_TIMESTAMP WHERE state='running'")
             summary['imported'] = store.sync_from_client(remote)
+            # The retired amber doubt fill outlives the code that wrote it, so it has to be
+            # cleared off the live sheet once. _ensure_schema does this for the excel
+            # backend, but every sqlite entry point short-circuits to this function long
+            # before that runs, so the sqlite path has to ask for it here or the colour
+            # never goes away. Skipped on a preview: a dry run writes nothing remote.
+            if not dry_run:
+                scoring._clear_row_highlighting(remote)
             if not process:
                 summary['client_export'] = str(publish_results(store, remote, upload=not dry_run,
                                                                output_dir=preview_dir))
@@ -486,7 +542,8 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
                         summary['location_review'] += int(result_values.get('Status') == cfg.STATUS_LOCATION_REVIEW)
                         if not dry_run:
                             try:
-                                _sync_row_to_sharepoint(remote, row.app_id, sheet, result_values)
+                                _sync_row_to_sharepoint(remote, row.app_id, sheet,
+                                                        result_values, row.values)
                             except Exception as sync_err:
                                 cfg.logger.warning('Could not sync row %s back to SharePoint table: %s', row.app_id, sync_err)
                 except Exception as error:
@@ -516,25 +573,26 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
             store.conn.close()
 
 
-def _sync_row_to_sharepoint(remote, app_id, sheet, result_values):
-    """Sync the scored result back to the SharePoint intake table if available."""
+def _sync_row_to_sharepoint(remote, app_id, sheet, result_values, source_values=None):
+    """Sync the scored result back to the SharePoint intake table if available.
+
+    Writes MASTER_WRITE_COLUMNS and nothing else. `source_values` is the row exactly as it
+    was imported; the Rejected ADD restores P1's input columns from it so moving a
+    candidate off the main sheet cannot alter the input hash either.
+    """
     if not hasattr(remote, 'list_rows'):
         return
     from .store import ExcelCandidateStore
-    from .sharepoint_scoring import is_doubt_candidate
     sp_store = ExcelCandidateStore(remote)
     if sheet == 'main':
-        sp_store.save_by_id(app_id, result_values)
-        if hasattr(remote, 'set_row_fill') and hasattr(remote, 'table'):
-            try:
-                row_idx = sp_store._resolve(app_id, sheet='main')
-                is_doubt, _ = is_doubt_candidate(result_values)
-                remote.set_row_fill(remote.table, row_idx, "#FFF2CC" if is_doubt else None)
-            except Exception as fill_err:
-                cfg.logger.warning('Could not set row fill for %s: %s', app_id, fill_err)
+        sp_store.save_by_id(app_id, _master_patch(result_values))
     elif sheet == 'rejected':
         try:
-            sp_store.move_to_rejected(app_id, result_values)
+            # A rejection LEAVES the main sheet, so the Rejected row is the only remaining
+            # record and carries the whole candidate. Input columns are restored from the
+            # imported row so the archived copy still hashes identically.
+            sp_store.move_to_rejected(
+                app_id, _with_original_inputs(result_values, source_values or {}))
         except Exception as rej_err:
             cfg.logger.warning('Could not move %s to rejected in SharePoint: %s', app_id, rej_err)
 

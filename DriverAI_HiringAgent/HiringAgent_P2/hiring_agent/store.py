@@ -289,6 +289,13 @@ class ExcelCandidateStore:
 
     # ---- writes ------------------------------------------------------------
 
+    FORBIDDEN_INTAKE_COLUMNS = frozenset({
+        "Category", "Phone", "Location", "Country", "Years Exp", "Current Skills",
+        "Education", "Education Start Date", "Education End Date", "Looking For Role",
+        "Suggested Role 1", "Suggested Role 2", "Suggested Role 3",
+        "Portfolio 1", "Portfolio 2", "Portfolio 3", "Resume URL", "Resume Folder Path",
+    })
+
     def save_by_id(self, app_id: str, fields: dict, *,
                    current_values: dict | None = None, sheet: Sheet = "main",
                    hint: str | int | None = None) -> None:
@@ -297,6 +304,8 @@ class ExcelCandidateStore:
         if sheet == "rejected":
             self.client.update_rejected_row(index, fields, current_values=current_values)
         else:
+            if getattr(self.client, "table", None) == "HiringAgent_P1_Candidates":
+                fields = {k: v for k, v in fields.items() if k not in self.FORBIDDEN_INTAKE_COLUMNS}
             self.client.update_row(index, fields, current_values=current_values)
 
     def add(self, fields: dict, sheet: Sheet = "main") -> None:

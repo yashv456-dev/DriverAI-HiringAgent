@@ -9,6 +9,7 @@ pypdf>=4.0
 # swallowed as a warning (found 2026-08-02: present in code + docs, absent from the venv).
 pdfplumber>=0.11
 python-docx>=1.1
+olefile>=0.47             # legacy Word 97-2003 .doc (OLE2 compound file) text extraction
 requests>=2.31            # Graph (SharePoint) + optional Nominatim geo
 pyyaml>=6.0              # config.yaml business logic
 # Reads .env, which is where every LOCAL run gets TENANT_ID/CLIENT_ID/CLIENT_SECRET and the

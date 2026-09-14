@@ -283,6 +283,15 @@ class SQLiteCandidateStore:
                 self.conn.execute('DELETE FROM import_conflicts WHERE app_id=?', (app,))
                 self._dirty()
                 changed += 1
+
+            # Deactivate candidates in local store that were deleted from the remote source:
+            active_stored = self.conn.execute('SELECT id, app_id FROM candidates WHERE active=1').fetchall()
+            remote_apps = set(groups.keys())
+            for row in active_stored:
+                if row['app_id'] and row['app_id'] not in remote_apps:
+                    self.conn.execute('UPDATE candidates SET active=0 WHERE id=?', (row['id'],))
+                    self._dirty()
+                    changed += 1
         return changed
 
     def begin_attempt(self, candidate_id):

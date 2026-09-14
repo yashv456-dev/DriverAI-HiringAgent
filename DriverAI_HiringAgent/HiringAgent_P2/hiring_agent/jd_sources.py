@@ -348,12 +348,51 @@ def _strip_company_boilerplate(text: str) -> str:
     return "".join(out)
 
 
+#: Skills that DriverAI job descriptions routinely mention as CONTEXT rather than as a
+#: requirement. Added 2026-09-14: after _strip_company_boilerplate, 35 of 105 cached JDs -
+#: Full Stack, Mobile, Marketing, CISO - still listed 'computer vision', because the role
+#: text itself says "collaborate with AI/ML and computer vision teams", "integrate computer
+#: vision outputs", "familiarity with computer vision platforms". That made every CV
+#: candidate look like a partial match for those roles.
+_CONTEXT_PRONE_SKILLS = ("computer vision",)
+_CONTEXT_NOUNS = (r"(?:teams?|stakeholders?|contributors?|personnel|leadership|objectives?|"
+                  r"outputs?|platforms?|workflows?|capabilities|support)")
+#: Up to ten further list items ("…, cloud, data, and security"), each at most three words.
+_LIST_TAIL = r"(?:\s*,\s*(?:and\s+|or\s+)?[\w/&\-]+(?:\s+[\w/&\-]+){0,2}){0,10}"
+
+
+def _drop_context_mentions(text: str) -> str:
+    """Blank out context-only mentions of the phrases above, before the skill scan.
+
+    A mention is context when the phrase itself, or the short list it sits in, ends in one of
+    the nouns above ('computer vision outputs', '… computer vision, cloud, and data teams').
+    Anything else - 'computer vision models', 'experience in computer vision and deep
+    learning' - is left alone, so a JD that genuinely asks for the skill still lists it.
+    """
+    item = r"[\w/&\-]+(?:\s+[\w/&\-]+){0,2}"
+    for phrase in _CONTEXT_PRONE_SKILLS:
+        p = re.escape(phrase)
+        text = re.sub(
+            rf"(?i)\b{p}\b(?={_LIST_TAIL}\s*,?\s*(?:and\s+|or\s+)?"
+            rf"(?:[\w/&\-]+\s+){{0,2}}{_CONTEXT_NOUNS}\b)",
+            " ", text or "")
+        # One entry in a run of technology areas ("analytics, AI/ML, computer vision,
+        # cybersecurity, and business operations"; "Interest in AI, data analytics, computer
+        # vision, or emerging technology") describes the company or a nice-to-have, not a
+        # requirement. Middle item: a short item and comma on each side. First item: followed
+        # by two more. Last item: preceded by two and an 'and'/'or'.
+        text = re.sub(rf"(?i)(,\s*(?:and\s+|or\s+)?){p}(?=\s*,\s*(?:and\s+|or\s+)?{item})", r"\1 ", text)
+        text = re.sub(rf"(?i)(?<![\w,])\b{p}(?=\s*,\s*{item}\s*,\s*(?:and\s+|or\s+)?{item})", " ", text)
+        text = re.sub(rf"(?i)({item}\s*,\s*{item}\s*,?\s*(?:and|or)\s+){p}\b", r"\1 ", text)
+    return text
+
+
 def parse_jd_text(title: str, text: str) -> dict | None:
     """Turn a pasted (or extracted) JD description into a role dict {title, skills}."""
     title = _normalized_file_jd_title(title, text)
     # Title resolution above still sees the FULL text (the offer-letter/normalisation rules
     # read the opening paragraphs); only the skill scan works on the de-boilerplated copy.
-    skills = _scan_skill_keywords(_strip_company_boilerplate(text))
+    skills = _scan_skill_keywords(_drop_context_mentions(_strip_company_boilerplate(text)))
     if not skills:
         logger.warning(f"   JD text '{title}' had no recognizable skills.")
         return None

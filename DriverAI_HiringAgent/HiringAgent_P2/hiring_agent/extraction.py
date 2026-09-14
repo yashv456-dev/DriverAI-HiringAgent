@@ -3,12 +3,13 @@
 import io
 import json
 import re
+import struct
 from html import unescape
 
 from hiring_agent.config import (
     SKILL_KEYWORDS, SKILL_DISPLAY, SECTION_WORDS, ROLE_WORDS,
     LOCATION_KEYWORDS, AI_TEXT_LIMIT,
-    OLLAMA_ENABLED, OLLAMA_MODEL, OLLAMA_HOST, OLLAMA_TIMEOUT,
+    OLLAMA_ENABLED, OLLAMA_MODEL, OLLAMA_HOST, OLLAMA_TIMEOUT, OLLAMA_SEED,
     REQUIRE_AI,
     SCORING_MAX_SKILLS, US_STATE_ABBREVS, US_STATE_NAMES,
     US_STATE_ABBREV_TO_NAME, US_STATE_NAME_TO_ABBREV, US_TERRITORY_NAMES,
@@ -1191,6 +1192,10 @@ def normalize_education(value: str) -> str:
     text = re.sub(r"\s+([,;])", r"\1", text)
     text = re.sub(r"([,;])(?=\S)", r"\1 ", text)
     text = re.sub(r"\s{2,}", " ", text).strip(" ,;-|")
+    # A trailing date is not part of the degree: Education Start/End Date carry it, and live
+    # row APP-20260902-2155-MCPA published 'B.Sc. (Design and Computing), BITS Pilani (WILP)
+    # | 2025' with the same 2025 already in Education End Date (2026-09-14).
+    text = _EDU_TRAILING_DATE_RE.sub("", text).strip(" ,;-|")
     if text.upper() in {"AND TRAINING", "EDUCATION", "TRAINING", "AND"}:
         return "Not extracted"
     return text or "Not extracted"
@@ -1376,6 +1381,71 @@ _EDU_YEAR2_TOKEN = rf"{_EDU_MONTH_RE}\.?['’]?\s?\d{{2}}\b"
 _EDU_DATE_RANGE_RE_LOOSE = re.compile(
     rf"(?i)\b({_EDU_YEAR2_TOKEN})\s*(?:-|–|—|to)\s*"
     rf"({_EDU_YEAR2_TOKEN}|Present|Current|Currently|Ongoing|Now)\b")
+
+
+#: A date (or date range) at the very END of an Education value, after a separator:
+#: '… | 2025', '…, May 2023', '… – 2019 - 2023', '… (Expected 2026)'. Only a separated,
+#: final date is removed; a year inside a school's name is never touched.
+_EDU_TRAILING_DATE_RE = re.compile(
+    # A full range needs no separator ('… Computer Science Sept 2023 - June 2025'): tried
+    # first, or the dash INSIDE the range would be read as the separator and only
+    # '- June 2025' removed. A single date must follow a separator.
+    rf"(?i)(?:\s+{_EDU_DATE_TOKEN}\s*(?:-|–|—|to)\s*(?:{_EDU_DATE_TOKEN}|present|current|ongoing)"
+    rf"|\s*(?:[|,;]|\s[-–—]\s?|\()\s*"
+    rf"(?:(?:expected|anticipated|graduated|class\s+of)\s*[:\-]?\s*)?"
+    rf"{_EDU_DATE_TOKEN}"
+    rf"(?:\s*(?:-|–|—|to)\s*(?:{_EDU_DATE_TOKEN}|present|current|ongoing))?)"
+    rf"\s*\)?\s*$")
+
+#: Separators between a school's name and what follows it on its own line (city, country,
+#: GPA, dates): commas, pipes, bullets, and a SPACED dash. An unspaced hyphen stays, so
+#: acronyms like 'FAST-NUCES' survive intact.
+_INSTITUTION_SPLIT_RE = re.compile(r"\s*(?:[,|•·;]|\s[-–—]\s)\s*")
+
+
+def _institution_on_line(line: str) -> str:
+    """The school named on one resume line ('National University of … (FAST-NUCES)'), or ""."""
+    # Drop a leading bullet only ('o ', '• ', '- '): str.strip('o') would eat the O of 'Ohio'.
+    line = re.sub(r"^\s*(?:[•·▪◦●*\-–—]|o(?=\s))\s*", "", str(line or ""))
+    for segment in _INSTITUTION_SPLIT_RE.split(line.strip()):
+        # A GPA ends the name: 'Arizona State University (3.72/4) Tempe, AZ' -> the school
+        # only, not the campus city that follows the grade with no separator.
+        gpa = re.search(r"\(\s*\d[\d.]*\s*/\s*\d[\d.]*\s*\)|\bGPA\b|\bCGPA\b", segment)
+        segment = (segment[:gpa.start()] if gpa else segment).strip(" ,;")
+        if _INSTITUTION_RE.search(segment) and not _DEGREE_RE.match(segment):
+            return segment
+    return ""
+
+
+def complete_education(value, resume_text: str) -> str:
+    """Add the school to an Education value that names only the degree.
+
+    Live row APP-20260908-1304-MCLA published 'Bachelor of Science in Computer Science'
+    while its resume reads that line followed directly by 'National University of Computer &
+    Emerging Sciences (FAST-NUCES), Lahore, Pakistan' (2026-09-14). The extractors are asked
+    for the school and a sibling row got it; this one did not, so the column was
+    inconsistent. The school is taken only from the degree's own line or the two lines
+    right under it, and only its name - never the city or country after it, which say
+    where the candidate studied, not where they live.
+    """
+    val = normalize_education(value)
+    if val == "Not extracted" or _INSTITUTION_RE.search(val) or not resume_text:
+        return val
+    core = re.sub(r"[^a-z0-9]+", " ", val.lower()).strip()
+    if len(core) < 4:
+        return val
+    lines = [ln.strip() for ln in str(resume_text).splitlines() if ln.strip()]
+    for i, line in enumerate(lines):
+        if core not in re.sub(r"[^a-z0-9]+", " ", line.lower()):
+            continue
+        for candidate in [line] + lines[i + 1:i + 3]:
+            if candidate is not line and candidate.lower().rstrip(":").strip() in SECTION_WORDS:
+                break
+            school = _institution_on_line(candidate)
+            if school and school.lower() not in val.lower():
+                return normalize_education(f"{val}, {school}")
+        break
+    return val
 
 
 def _normalize_edu_date_token(token: str) -> str:
@@ -1707,6 +1777,12 @@ def normalize_skills(value) -> str:
         list_match = re.fullmatch(r"\[\s*(.*?)\s*\]", text)
         if list_match:
             text = list_match.group(1)
+        # Keep a bracketed group ONE skill: 'AWS (EC2, S3, IAM)' was split on its inner commas
+        # into 'AWS (EC2' / 'S3' / 'IAM)', which only read correctly because they were joined
+        # back with the same comma. Balanced, short groups only, so a stray '(' never swallows
+        # the rest of the list.
+        text = re.sub(r"\(([^()]{1,60})\)",
+                      lambda m: "(" + re.sub(r"\s*[,;]\s*", "/", m.group(1).strip()) + ")", text)
         # Split on ';' as well as ',': resumes separate skill GROUPS with semicolons
         # ('...MongoDB, SQL; Web Technologies: HTML, CSS'), and without this the group
         # heading stays glued mid-piece where _strip_skill_section_label cannot see it.
@@ -1743,6 +1819,11 @@ def normalize_skills(value) -> str:
     # data at all, so fall back to the unfiltered list when filtering removed everything.
     if not out and kept_before_prose_filter:
         return ", ".join(kept_before_prose_filter)
+    # 'AWS' next to 'AWS (EC2/S3/IAM)' is the same skill listed twice (live row
+    # APP-20260908-1304-MCLA, 2026-09-14). Keep the more specific form; scoring._skill_set
+    # still reads the base 'aws' out of it, so no role match is lost.
+    detailed = {re.sub(r"\s*\(.*\)\s*$", "", p).strip().lower() for p in out if re.search(r"\(.+\)\s*$", p)}
+    out = [p for p in out if "(" in p or p.lower() not in detailed]
     return ", ".join(out) if out else "Not extracted"
 
 
@@ -2842,8 +2923,129 @@ def _demarkdown(text: str) -> str:
     return text
 
 
+def _docx_text(raw: bytes) -> str:
+    """Text of a .docx, paragraphs plus table cells, with any hyperlinks appended."""
+    import docx
+    document = docx.Document(io.BytesIO(raw))
+    parts = [p.text for p in document.paragraphs]
+    # Table cells too — plenty of resumes lay out contact info in tables,
+    # which document.paragraphs alone never sees.
+    for tbl in document.tables:
+        for row in tbl.rows:
+            for cell in row.cells:
+                if cell.text.strip():
+                    parts.append(cell.text)
+    text = "\n".join(parts)
+    if text.strip():
+        links = _docx_hyperlinks(document)
+        if links:
+            text += "\nLinks in document: " + " ".join(links)
+    return text
+
+
+def _rtf_text(raw: bytes) -> str:
+    """Plain text out of an RTF body.
+
+    Several editors write RTF when asked to "save as .doc", so this is reached through
+    the .doc branch rather than by extension. Deliberately small: drop control words,
+    decode \\'xx hex escapes, and unwrap groups. Enough for a resume's prose, which is
+    all the scorer reads.
+    """
+    body = raw.decode("cp1252", "replace")
+    body = re.sub(r"\\\*\\[a-zA-Z]+(?:-?\d+)?[ ]?(?:\{[^{}]*\})?", "", body)
+    body = re.sub(r"\{\\(?:fonttbl|colortbl|stylesheet|info|pict|object)[^{}]*"
+                  r"(?:\{[^{}]*\}[^{}]*)*\}", "", body)
+    body = re.sub(r"\\'([0-9a-fA-F]{2})",
+                  lambda m: bytes([int(m.group(1), 16)]).decode("cp1252", "replace"), body)
+    body = re.sub(r"\\(?:par|line|sect|page)\b[ ]?", "\n", body)
+    body = re.sub(r"\\(?:tab)\b[ ]?", "\t", body)
+    body = re.sub(r"\\[a-zA-Z]+(?:-?\d+)?[ ]?", "", body)
+    body = body.replace("{", "").replace("}", "").replace("\\\n", "\n")
+    return "\n".join(ln.rstrip() for ln in body.split("\n")).strip()
+
+
+def _word97_text(raw: bytes) -> str:
+    """Plain text out of a Word 97-2003 binary .doc (OLE2 compound file).
+
+    The text is not stored contiguously: the FIB names a table stream holding a piece
+    table, and each piece points at a run in the WordDocument stream that is either
+    cp1252 single-byte or UTF-16LE, flagged by bit 30 of the piece's file offset.
+    Reading the stream raw instead of following the pieces yields the document's text
+    interleaved with deleted revisions and field codes, which is why this walks the
+    table properly.
+
+    Returns "" for anything it cannot read, which sends the row down P2's existing
+    unreadable-resume path rather than publishing half a document as if it were whole.
+    """
+    try:
+        import olefile
+    except ImportError:
+        logger.warning("   olefile is not installed; legacy .doc resumes cannot be read. "
+                       "Fix: pip install olefile")
+        return ""
+    try:
+        ole = olefile.OleFileIO(io.BytesIO(raw))
+    except Exception as e:
+        logger.warning(f"   legacy .doc is not a readable OLE2 file: {e}")
+        return ""
+    try:
+        if not ole.exists("WordDocument"):
+            return ""
+        wd = ole.openstream("WordDocument").read()
+        if len(wd) < 0x1A6 + 4:
+            return ""
+        # fibBase.flags bit 9 picks which of the two table streams is the live one.
+        flags = struct.unpack_from("<H", wd, 0x0A)[0]
+        table_name = "1Table" if flags & 0x0200 else "0Table"
+        if not ole.exists(table_name):
+            return ""
+        table = ole.openstream(table_name).read()
+        fc_clx, lcb_clx = struct.unpack_from("<II", wd, 0x1A2)
+        clx = table[fc_clx:fc_clx + lcb_clx]
+
+        # The Clx is zero or more Prc blocks (0x01) followed by the Pcdt (0x02).
+        offset, pcdt = 0, b""
+        while offset < len(clx):
+            if clx[offset] == 0x01:
+                offset += 3 + struct.unpack_from("<h", clx, offset + 1)[0]
+            elif clx[offset] == 0x02:
+                size = struct.unpack_from("<I", clx, offset + 1)[0]
+                pcdt = clx[offset + 5:offset + 5 + size]
+                break
+            else:
+                break
+        if len(pcdt) < 16:
+            return ""
+
+        count = (len(pcdt) - 4) // 12
+        cps = struct.unpack_from("<%dI" % (count + 1), pcdt, 0)
+        chunks = []
+        for index in range(count):
+            base = 4 * (count + 1) + 8 * index
+            fc = struct.unpack_from("<I", pcdt, base + 2)[0]
+            length = cps[index + 1] - cps[index]
+            if fc & 0x40000000:
+                start = (fc & ~0x40000000) // 2
+                chunks.append(wd[start:start + length].decode("cp1252", "replace"))
+            else:
+                chunks.append(wd[fc:fc + length * 2].decode("utf-16-le", "replace"))
+        text = "".join(chunks)
+    except Exception as e:
+        logger.warning(f"   legacy .doc piece table could not be read: {e}")
+        return ""
+    finally:
+        ole.close()
+
+    # Word's in-band markers: \r ends a paragraph, \x07 a table cell/row, and
+    # \x13-\x15 bracket field codes whose result is already in the text.
+    for marker, replacement in (("\r", "\n"), ("\x07", "\n"), ("\x0b", "\n"),
+                                ("\x0c", "\n"), ("\x13", ""), ("\x14", ""), ("\x15", "")):
+        text = text.replace(marker, replacement)
+    return "\n".join(line.rstrip() for line in text.split("\n")).strip()
+
+
 def extract_text_from_bytes(raw: bytes, filename: str) -> str:
-    """Extract text from raw PDF/DOCX bytes (with layout-aware extraction and OCR fallback)."""
+    """Extract text from raw PDF/DOC/DOCX bytes (layout-aware, with OCR fallback)."""
     name = (filename or "").lower()
     if not raw:
         return ""
@@ -2914,22 +3116,21 @@ def extract_text_from_bytes(raw: bytes, filename: str) -> str:
                     text += "\nLinks in document: " + " ".join(links)
             return text
         if name.endswith(".docx"):
-            import docx
-            document = docx.Document(io.BytesIO(raw))
-            parts = [p.text for p in document.paragraphs]
-            # Table cells too — plenty of resumes lay out contact info in tables,
-            # which document.paragraphs alone never sees.
-            for tbl in document.tables:
-                for row in tbl.rows:
-                    for cell in row.cells:
-                        if cell.text.strip():
-                            parts.append(cell.text)
-            text = "\n".join(parts)
-            if text.strip():
-                links = _docx_hyperlinks(document)
-                if links:
-                    text += "\nLinks in document: " + " ".join(links)
-            return text
+            return _docx_text(raw)
+        if name.endswith(".doc"):
+            # Legacy Word. The extension is the least reliable thing about these files,
+            # so route on the actual magic bytes: applicants rename a .docx to .doc, and
+            # "Save as .doc" in several editors writes RTF. Only a genuine OLE2 compound
+            # file gets the Word 97 binary reader.
+            if raw[:4] == b"PK\x03\x04":
+                return _docx_text(raw)
+            if raw[:5] == b"{\\rtf":
+                return _rtf_text(raw)
+            if raw[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+                return _word97_text(raw)
+            logger.warning(f"   '{filename or '?'}' is named .doc but is not Word or RTF; "
+                           f"no text extracted.")
+            return ""
         if name.endswith((".png", ".jpg", ".jpeg")):
             try:
                 engine = _get_rapidocr_engine()
@@ -3034,7 +3235,8 @@ def extract_with_ollama(text: str, hints: dict | None = None) -> dict | None:
         "format": _CANDIDATE_FORMAT,
         "think": False,
         "stream": False,
-        "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
+        "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT,
+                            "seed": OLLAMA_SEED},
         "messages": [
             {"role": "system",
              "content": _AI_PROMPT + hint_block + " Respond ONLY with a JSON object "
@@ -3098,9 +3300,16 @@ def _merge_keyword_skills(result: dict, text: str) -> dict:
     found = _scan_skill_keywords(text)
     if not found:
         return result
-    base = [s.strip() for s in str(result.get("skills", "")).split(",")
+    # Group and de-duplicate BEFORE counting against the cap. A raw comma split shredded
+    # 'AWS (EC2, S3, IAM)' into three entries and kept 'AWS' beside it, so those phantom
+    # entries used up slots and genuine skills at the end of the list were cut: live row
+    # APP-20260908-1304-MCLA lost Microservices, SQLite and n8n when three new vocabulary
+    # terms were added (2026-09-14). normalize_skills keeps a bracketed group as one entry.
+    raw_skills = normalize_skills(result.get("skills", ""))
+    base = [s.strip() for s in raw_skills.split(", ")
             if s.strip() and s.strip().lower() != "not extracted"]
-    have = {s.lower() for s in base}
+    # 'AWS (EC2/S3/IAM)' already covers the keyword 'aws'; do not append a plain 'AWS' again.
+    have = {s.lower() for s in base} | {re.sub(r"\s*\(.*\)\s*$", "", s).lower() for s in base}
     for sk in found:
         label = SKILL_DISPLAY.get(sk, sk.title())
         if label.lower() not in have:
@@ -3272,6 +3481,7 @@ def extract_candidate_details_smart(text: str) -> dict:
         result["skills"] = baseline.get("skills", "Not extracted")
         for f in tier2_fields:
             result[f] = baseline.get(f, "" if f == "country" else "Not extracted")
+        result["education"] = complete_education(result.get("education"), text)
         return result
 
     hints = {f: baseline.get(f, "") for f in tier2_fields}
@@ -3284,6 +3494,7 @@ def extract_candidate_details_smart(text: str) -> dict:
         result["skills"] = baseline.get("skills", "Not extracted")
         for f in tier2_fields:
             result[f] = baseline.get(f, "" if f == "country" else "Not extracted")
+        result["education"] = complete_education(result.get("education"), text)
         return result
 
     logger.info(f"   extractor: Ollama ({OLLAMA_MODEL}, free local LLM) + deterministic Tier 1")
@@ -3327,6 +3538,9 @@ def extract_candidate_details_smart(text: str) -> dict:
         ollama.get("location", ""), result.get("country", ""), text)
     result["location"], result["country"] = finalize_geography_shape(
         result["location"], result["country"], text)
+    # The model may drop the school even though the prompt asks for it; restore it from the
+    # resume's own degree block so the column is consistent (see complete_education).
+    result["education"] = complete_education(result.get("education"), text)
 
     return result
 
@@ -3383,7 +3597,8 @@ def ai_recheck_fields(fields: dict, resume_text: str, mail_body: str) -> dict:
                 "format": _CANDIDATE_FORMAT,
                 "think": False,
                 "stream": False,
-                "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
+                "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT,
+                            "seed": OLLAMA_SEED},
                 "messages": [
                     {"role": "system", "content": _RECHECK_PROMPT},
                     {"role": "user", "content": context},
@@ -3443,7 +3658,7 @@ def ai_recheck_fields(fields: dict, resume_text: str, mail_body: str) -> dict:
             changed.append(_k)
         improved[_k] = _v
 
-    improved["education"] = normalize_education(improved.get("education", ""))
+    improved["education"] = complete_education(improved.get("education", ""), resume_text)
     if changed:
         logger.info(f"       Recheck   : AI updated {', '.join(changed)}")
     else:
@@ -3487,7 +3702,8 @@ def infer_looking_for_role(resume_text: str, mail_body: str, skills: str) -> str
                     "format": _ROLE_SUMMARY_FORMAT,
                     "think": False,
                     "stream": False,
-                    "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
+                    "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT,
+                            "seed": OLLAMA_SEED},
                     "messages": [
                         {"role": "system", "content": _ROLE_SUMMARY_PROMPT},
                         {"role": "user", "content": context},
@@ -3669,7 +3885,8 @@ def infer_missing_portfolios(resume_text: str, current_p1: str, current_p2: str,
                 "format": _PORTFOLIO_FORMAT,
                 "think": False,
                 "stream": False,
-                "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT},
+                "options": {"temperature": 0, "num_predict": _EXTRACTION_NUM_PREDICT,
+                            "seed": OLLAMA_SEED},
                 "messages": [
                     {"role": "system", "content": _PORTFOLIO_INFER_PROMPT},
                     {"role": "user", "content": (resume_text or "")[:AI_TEXT_LIMIT]},

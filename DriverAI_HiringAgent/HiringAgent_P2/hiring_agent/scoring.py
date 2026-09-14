@@ -53,7 +53,43 @@ _AI_TOOL_SKILLS = {
 }
 
 
-def assign_category(role_str: str, skills_str: str = "") -> str:
+#: A QA / test-automation professional, from what they say they want or from their tools.
+#: Added 2026-09-14 with _catalog_has_qa_opening below. The JD catalog (105 documents, 54
+#: openings) has no QA/SDET/test role, so a QA engineer's best matches are always developer
+#: roles that share only generic tooling (Java, Git, CI/CD): live row APP-20260902-2155-MCPA,
+#: an SDET, was filed first under Web Team (Full Stack 60%) and then Mobile Apps (Mobile
+#: Developer 80%). A category named after a role the candidate does not do is misleading;
+#: 'General' is honest. Three distinct test tools are required so a developer who merely
+#: lists JUnit is not caught - across 280 past candidates only this one profile matched.
+_QA_PREF_RE = _re.compile(
+    r"(?i)\b(?:qa|sdet|quality\s+assurance|test(?:ing)?\s+(?:automation|engineer|analyst|lead)|"
+    r"automation\s+test(?:er|ing)?|software\s+test(?:er|ing)?)\b")
+_QA_TOOL_SKILLS = {"selenium", "cypress", "testng", "junit", "testrail", "jmeter",
+                   "restassured", "appium", "zephyr", "bugzilla", "playwright", "cucumber"}
+_QA_OPENING_RE = _re.compile(r"(?i)\b(?:qa|sdet|quality\s+(?:assurance|engineer)|test(?:ing|er)?)\b")
+
+
+def _catalog_has_qa_opening() -> bool:
+    """True once the cached JD catalog contains a QA/test opening (so the guard retires itself)."""
+    try:
+        from hiring_agent.jd_sources import _read_role_cache
+        cached = _read_role_cache() or {}
+        titles = [str(r.get("title", "")) for r in (cached.get("roles") or [])]
+    except Exception:
+        titles = []
+    if not titles:
+        titles = [str(r.get("title", "")) for r in get_open_roles()]
+    return any(_QA_OPENING_RE.search(t) for t in titles)
+
+
+def is_unmatched_qa_profile(skills_str: str = "", role_pref: str = "") -> bool:
+    """A clear QA/test candidate while no QA/test opening exists to match them against."""
+    skills = {s.strip().lower() for s in _re.split(r"[,;]", str(skills_str or "")) if s.strip()}
+    is_qa = bool(_QA_PREF_RE.search(str(role_pref or ""))) or len(skills & _QA_TOOL_SKILLS) >= 3
+    return is_qa and not _catalog_has_qa_opening()
+
+
+def assign_category(role_str: str, skills_str: str = "", role_pref: str = "") -> str:
     """Map 'Role Title (NN%)' → business category using config-driven rules.
 
     Rules are defined in config.yaml under role_categories.rules (first-match-wins,
@@ -74,7 +110,13 @@ def assign_category(role_str: str, skills_str: str = "") -> str:
     stack is more reliable than a loosely-matched title, so a clear, uncontested mobile
     signal in Skills is trusted over the title match. Optional and defaults to empty so
     any caller without skills in scope keeps working unchanged.
+
+    `role_pref` (Looking For Role), if given, feeds the QA guard checked before everything
+    else: a clear QA/test candidate is 'General' while the catalog has no QA/test opening,
+    rather than being named after whichever developer role scored highest.
     """
+    if is_unmatched_qa_profile(skills_str, role_pref):
+        return ROLE_CATEGORY_DEFAULT
     skills = {s.strip().lower() for s in _re.split(r"[,;]", str(skills_str or "")) if s.strip()}
     if skills & _MOBILE_TOOL_SKILLS and not (skills & _GRAPHICS_TOOL_SKILLS):
         return "Mobile Apps (Android IOS)"
@@ -144,6 +186,15 @@ def _skill_set(skills_str: str) -> set[str]:
         # 'nan'/'none' guard: blank Excel cells stringify to these, not real skills
         if s and s not in ("not extracted", "nan", "none", "n/a") and len(s) <= 40:
             out.add(s)
+        # 'aws (ec2/s3/iam)' also means 'aws', 'ec2', 's3' and 'iam'. normalize_skills keeps a
+        # bracketed group as one skill and drops the separate plain 'AWS', so the base and the
+        # items must be read back out here or that match would silently disappear.
+        m = _re.fullmatch(r"(.+?)\s*\((.+)\)", s)
+        if m:
+            for part in [m.group(1)] + _re.split(r"\s*/\s*", m.group(2)):
+                part = part.strip()
+                if part and len(part) <= 40:
+                    out.add(part)
     return out
 
 _SKILL_EXPANSIONS = {
@@ -549,7 +600,7 @@ def _rematch_one(target, roles=None) -> int:
         role1s.append(res["role_1"])
         role2s.append(res["role_2"])
         role3s.append(res.get("role_3", ""))
-        cats.append(assign_category(res["role_1"], skills))   # never blank — "General" fallback
+        cats.append(assign_category(res["role_1"], skills, pref))   # never blank — "General" fallback
         logger.info(f"   {row.get('Full Name', '?')}: cat={cats[-1]} | "
                     f"{res['role_1']} | {res['role_2']} | {res.get('role_3','')} "
                     f"[{res['source']}]")
