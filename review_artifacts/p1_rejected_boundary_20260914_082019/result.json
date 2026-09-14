@@ -1,0 +1,21 @@
+{
+  "backup": "C:\\Users\\yash9\\Downloads\\HiringAgent2\\review_artifacts\\p1_rejected_boundary_20260914_082019",
+  "candidate_list_before": 18,
+  "rejected_before": 11,
+  "candidate_list_after": 29,
+  "rejected_after": 0,
+  "unique_application_ids_after": 29,
+  "restored": [
+    "APP-20260819-0140-MCRA",
+    "APP-20260815-0302-MCYA",
+    "APP-20260812-1003-MC5A",
+    "APP-20260810-1751-MC9A",
+    "APP-20260805-0132-MDDA",
+    "APP-20260804-2313-MDFA",
+    "APP-20260804-2208-MDGA",
+    "APP-20260804-2021-MDIA",
+    "APP-20260804-1923-MDKA",
+    "APP-20260804-1910-MDLA",
+    "APP-20260804-1557-MDNA"
+  ]
+}

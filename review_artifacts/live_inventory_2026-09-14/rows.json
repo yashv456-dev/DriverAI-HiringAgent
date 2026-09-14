@@ -1,0 +1,512 @@
+[
+  {
+    "app_id": "APP-20260908-1304-MCLA",
+    "sheet": "CandidateList",
+    "row": 2,
+    "email": "awaistahir0001@gmail.com",
+    "received": "2026-09-08T13:04:03",
+    "status": "Scored",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 00:01",
+    "files": [
+      "Candidate_Resumes/2026/September/Muhammad_Tahir_MCLA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260509-2004-FD29)",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAkeAjxwAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAkeAjxwAAARIAEACCRbEgbu9WQo1a7E-F3YtY",
+            "name": "Muhammad Awais Tahir Resume.pdf",
+            "size": 153748
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": "Muhammad_Tahir_MCLA.pdf",
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260902-2155-MCPA",
+    "sheet": "CandidateList",
+    "row": 3,
+    "email": "thevishantchau@gmail.com",
+    "received": "2026-09-02T21:55:49",
+    "status": "Needs Review - Location Confirmation",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 00:05",
+    "files": [
+      "Candidate_Resumes/2026/September/Vishant_Chaudhary_MCPA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Application for SDET / QA Automation Role / Immediate Joiner / 4+ years of experience",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAi8qD5gAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAi8qD5gAAARIAEACWVX3f6cKERY_9l12LoqDY",
+            "name": "VISHANT_CHAUDHARY.pdf",
+            "size": 59620
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": "Vishant_Chaudhary_MCPA.pdf",
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260821-0812-MCQA",
+    "sheet": "CandidateList",
+    "row": 4,
+    "email": "renuj@teknotrain.com",
+    "received": "2026-08-21T08:12:35",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:19",
+    "files": [],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Data Leader / Cloud Data Architecture - 16+ Years | Interested in Driverai",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEugAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEugAAARIAEAAm8QB9Dt9SSpVzuwtZSChz",
+            "name": "Renu Jaitly.docx",
+            "size": 35362
+          }
+        ]
+      }
+    ],
+    "issues": [
+      "no stored resume matched"
+    ],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260819-0140-MCRA",
+    "sheet": "CandidateList",
+    "row": 5,
+    "email": "mona.c9109@gmail.com",
+    "received": "2026-08-19T01:40:01",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:20",
+    "files": [
+      "Candidate_Resumes/2026/August/Mona_Rawat_CV_MCRA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Expression of Interest",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEvgAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEvgAAARIAEAAcs4VafC7UQ7DWN0ZXuXFh",
+            "name": "Mona_Rawat_CV.pdf",
+            "size": 118444
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260817-1859-MCSA",
+    "sheet": "CandidateList",
+    "row": 6,
+    "email": "sksing32@asu.edu",
+    "received": "2026-08-17T18:59:36",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:21",
+    "files": [
+      "Candidate_Resumes/2026/August/Shashank_CV_MCSA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Update - APP-20260418-0528-1F71",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEwQAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEwQAAARIAEADcKjxxFPxdQ4yS_RpPsiML",
+            "name": "Shashank_CV.pdf",
+            "size": 64337
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260817-1239-MCUA",
+    "sheet": "CandidateList",
+    "row": 7,
+    "email": "ngoel20@asu.edu",
+    "received": "2026-08-17T12:39:56",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:23",
+    "files": [
+      "Candidate_Resumes/2026/August/Nimish_Goel_Resume_PM_(1)_MCUA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Job Application : Update - APP-20260504-0124-8339",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdExwAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdExwAAARIAEADR0fIZ_JwTSZgJupUdyqbH",
+            "name": "Nimish_Goel_Resume_PM (1).pdf",
+            "size": 136954
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260817-0617-MCVA",
+    "sheet": "CandidateList",
+    "row": 8,
+    "email": "charusneha266@gmail.com",
+    "received": "2026-08-17T06:17:22",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:24",
+    "files": [
+      "Candidate_Resumes/2026/August/Charu_Sneha_-_software_ML_MCVA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260511-1646-B9F0)",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEzAAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEzAAAARIAEACLs1aUqP2TSoWjY4VMfIyV",
+            "name": "Charu Sneha - software_ML.pdf",
+            "size": 31364
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260816-1338-MCWA",
+    "sheet": "CandidateList",
+    "row": 9,
+    "email": "kshitij.sahu3@gmail.com",
+    "received": "2026-08-16T13:38:49",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:25",
+    "files": [
+      "Candidate_Resumes/2026/August/Kshitij_Sahu_Resume_MCWA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260512-2010-5C49)",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEzwAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdEzwAAARIAEACjjWaM3W3DTqnqXxrq61Vb",
+            "name": "Kshitij_Sahu_Resume.pdf",
+            "size": 145661
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260815-0504-MCXA",
+    "sheet": "CandidateList",
+    "row": 10,
+    "email": "bharhanu@umd.edu",
+    "received": "2026-08-15T05:04:08",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:26",
+    "files": [
+      "Candidate_Resumes/2026/August/Bharath_Updated_MCXA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Update - APP-20260508-0221-43ED",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdE0gAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdE0gAAARIAEAAi9AuEWeROS5HOGqWdMY9X",
+            "name": "Bharath_Updated.pdf",
+            "size": 226997
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260815-0302-MCYA",
+    "sheet": "CandidateList",
+    "row": 11,
+    "email": "shahyash29031997@gmail.com",
+    "received": "2026-08-15T03:02:20",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:27",
+    "files": [
+      "Candidate_Resumes/2026/August/Yash_Shah_Resume_MCYA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260508-2148-9896)",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdE1gAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdE1gAAARIAEACp3C-OGL9rSa7y5_DB21TC",
+            "name": "Yash_Shah_Resume.pdf",
+            "size": 146183
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260814-0841-MC0A",
+    "sheet": "CandidateList",
+    "row": 12,
+    "email": "manaylodha0@gmail.com",
+    "received": "2026-08-14T08:41:52",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:29",
+    "files": [
+      "Candidate_Resumes/2026/August/Lodha_Manay_Resume_MC0A.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260508-0058-1C02)",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdE2QAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIdE2QAAARIAEAC6fblsXCCiRLGag4Asj8bk",
+            "name": "Lodha_Manay_Resume.pdf",
+            "size": 179048
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260813-1733-MC1A",
+    "sheet": "CandidateList",
+    "row": 13,
+    "email": "jeffreysajjlins@gmail.com",
+    "received": "2026-08-13T17:33:21",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:30",
+    "files": [
+      "Candidate_Resumes/2026/August/Jeffrey_ML_Resume_MC1A.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260530-0938-E5A5)",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5TwAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5TwAAARIAEACuhbzbcwazSr1DK1il72Yf",
+            "name": "Jeffrey_ML_Resume.pdf",
+            "size": 158303
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260812-1126-MC3A",
+    "sheet": "CandidateList",
+    "row": 14,
+    "email": "mhussain@webtechexpertapp.com",
+    "received": "2026-08-12T11:26:34",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:33",
+    "files": [
+      "Candidate_Resumes/2026/August/Muhammad_Ahsan_Hussain_Resume_Updated_(1)_MC3A.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260721-2030-3AA7)",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5UwAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5UwAAARIAEAAKU2t2EZUrTLsPUgLf-FgT",
+            "name": "Muhammad_Ahsan_Hussain_Resume_Updated (1).pdf",
+            "size": 325816
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260812-1003-MC5A",
+    "sheet": "CandidateList",
+    "row": 15,
+    "email": "petervishal55@gmail.com",
+    "received": "2026-08-12T10:03:38",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:34",
+    "files": [
+      "Candidate_Resumes/2026/August/Peter_Vishal1_MC5A.docx"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260716-1037-6CE3)",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5VwAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5VwAAARIAEABiS9OJePZ6Qat7GbOIMpGS",
+            "name": "Peter_Vishal1.docx",
+            "size": 10299
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260812-0009-MC6A",
+    "sheet": "CandidateList",
+    "row": 16,
+    "email": "prernasaluja259@gmail.com",
+    "received": "2026-08-12T00:09:25",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:35",
+    "files": [
+      "Candidate_Resumes/2026/August/Prerna_Saluja_Resume_MC6A.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260716-2052-6112)",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5WwAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5WwAAARIAEAD-WCXWjGhpTaAdEFkEhh6U",
+            "name": "Prerna_Saluja_Resume.pdf",
+            "size": 213643
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260810-1751-MC9A",
+    "sheet": "CandidateList",
+    "row": 17,
+    "email": "victoroliver.contact@gmail.com",
+    "received": "2026-08-10T17:51:33",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:38",
+    "files": [
+      "Candidate_Resumes/2026/August/cv_victor_aug26_MC9A.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Marketing- Social Media - Application",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5YwAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5YwAAARIAEADsi6GlzK5DRJjdNycNJEFZ",
+            "name": "cv_victor_aug26.pdf",
+            "size": 82032
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  },
+  {
+    "app_id": "APP-20260810-1014-PMCA",
+    "sheet": "CandidateList",
+    "row": 18,
+    "email": "shalin.edward2000@gmail.com",
+    "received": "2026-08-10T10:14:06",
+    "status": "New Email Received",
+    "mail_marker": "Suppressed (applicant email disabled) 2026-09-14 02:39",
+    "files": [
+      "Candidate_Resumes/2026/August/Shalin_Edward_Resume_1.1_PMCA.pdf"
+    ],
+    "source_messages": [
+      {
+        "folder": "archive",
+        "subject": "Interest in Opportunities at Driver AI",
+        "is_read": true,
+        "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5ZgAA",
+        "attachments": [
+          {
+            "id": "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AGjlnyT8PPkWDzzz6qjcqhgAAhIc5ZgAAARIAEADVyYLV293mQINcZCduixCn",
+            "name": "Shalin_Edward_Resume_1.1.pdf",
+            "size": 119985
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "resume_link_value": null,
+    "resume_link_clickable": false
+  }
+]
