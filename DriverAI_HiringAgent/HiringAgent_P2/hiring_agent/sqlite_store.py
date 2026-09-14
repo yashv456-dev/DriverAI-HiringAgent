@@ -222,10 +222,52 @@ class SQLiteCandidateStore:
                                          for r in self.conn.execute('SELECT * FROM intake_files')}
             source.extend(('main', dict(row['values'])) for row in client.list_intake_events())
         groups = {}
+        keyless_rows = []
         for sheet, vals in source:
             app = str(vals.get('Application ID', '')).strip()
             if app:
                 groups.setdefault(app, []).append((sheet, vals))
+            elif any(str(vals.get(col, '') or '').strip() for col in
+                     ('Received Date', 'Full Name', 'Email', 'Status', 'Original Filename',
+                      'Mail Subject', 'Mail Body')):
+                keyless_rows.append(vals)
+
+        if keyless_rows:
+            detail = (
+                f"P1 CandidateList contains {len(keyless_rows)} candidate-shaped row(s) "
+                "without an Application ID. Refusing to skip them or publish until P1 is "
+                "repaired."
+            )
+            with self.conn:
+                self.conn.execute('UPDATE publication SET error=? WHERE id=1', (detail,))
+            raise RuntimeError(detail)
+
+        # A shorter P1 snapshot is never treated as an implicit delete.  P1 is the intake
+        # ledger, and a row can disappear transiently because Excel/Graph returned an
+        # incomplete table or permanently because another process deleted it.  The old
+        # behaviour silently deactivated the corresponding scored record, after which both
+        # P2-MasterFile.xlsx and Candidate_List_Results.xlsx faithfully omitted it.  That is
+        # how two live, already-scored applicants disappeared while their resumes remained.
+        #
+        # Fail before importing anything so the last complete database/publication stays
+        # authoritative.  ``force=True`` is the explicit administrative deletion path; an
+        # ordinary scoring/export run never passes it.
+        active_stored = self.conn.execute(
+            "SELECT * FROM candidates WHERE active=1 AND app_id<>''"
+        ).fetchall()
+        remote_apps = set(groups)
+        missing_remote = sorted({r['app_id'] for r in active_stored} - remote_apps)
+        if missing_remote and not force:
+            detail = (
+                f"P1 CandidateList is missing {len(missing_remote)} active P2 application(s): "
+                f"{', '.join(missing_remote)}. Refusing to deactivate or publish a shorter "
+                "candidate set; restore the P1 row(s), or use force=True for an intentional "
+                "administrative deletion."
+            )
+            with self.conn:
+                self.conn.execute('UPDATE publication SET error=? WHERE id=1', (detail,))
+            raise RuntimeError(detail)
+
         changed = 0
         with self.conn:
             for file_key, payload in getattr(client, '_intake_event_cache', {}).items():
@@ -287,14 +329,30 @@ class SQLiteCandidateStore:
                 self._dirty()
                 changed += 1
 
-            # Deactivate candidates in local store that were deleted from the remote source:
-            active_stored = self.conn.execute('SELECT id, app_id FROM candidates WHERE active=1').fetchall()
-            remote_apps = set(groups.keys())
-            for row in active_stored:
-                if row['app_id'] and row['app_id'] not in remote_apps:
-                    self.conn.execute('UPDATE candidates SET active=0 WHERE id=?', (row['id'],))
-                    self._dirty()
-                    changed += 1
+            # Destructive source reconciliation is opt-in.  The preflight above guarantees
+            # this loop is empty during every normal scoring/export pass.
+            if force:
+                for row in active_stored:
+                    if row['app_id'] not in remote_apps:
+                        self._history(row)
+                        self.conn.execute(
+                            'UPDATE candidates SET active=0,version=version+1,'
+                            'updated_at=CURRENT_TIMESTAMP WHERE id=?', (row['id'],))
+                        self._dirty()
+                        changed += 1
+
+        conflicts = [row for row in self.conn.execute(
+            'SELECT app_id,reason FROM import_conflicts ORDER BY app_id'
+        ).fetchall() if row['app_id'] in remote_apps]
+        if conflicts:
+            detail = (
+                "P1-to-P2 import has unresolved Application ID conflict(s): " +
+                '; '.join(f"{row['app_id']} ({row['reason']})" for row in conflicts) +
+                ". Refusing to publish a candidate set that skips ambiguous rows."
+            )
+            with self.conn:
+                self.conn.execute('UPDATE publication SET error=? WHERE id=1', (detail,))
+            raise RuntimeError(detail)
         return changed
 
     def begin_attempt(self, candidate_id):

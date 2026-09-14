@@ -542,73 +542,103 @@ def _with_period_separators(rows: list) -> list:
     return [dict(blank)] + list(rows)
 
 
+def _client_export_projection(vals: dict) -> dict:
+    """Return the exact client-facing representation of one committed candidate."""
+    projected = {}
+    for col in _CLIENT_EXPORT_COLUMNS:
+        value = vals.get(col, "")
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            value = ""
+        if col in _MISSING_IF_BLANK_COLS:
+            value = _missing_if_gap(value)
+        elif col in ("Portfolio 1", "Portfolio 2", "Portfolio 3"):
+            value = _na_if_gap(value)
+        elif col == "Category" and _is_gap(value):
+            value = assign_category(str(vals.get("Suggested Role 1", "") or ""),
+                                    str(vals.get("Current Skills", "") or ""),
+                                    str(vals.get("Looking For Role", "") or ""))
+        projected[col] = value if value is not None else ""
+    return projected
+
+
+def _export_source_values(candidate) -> dict:
+    if isinstance(candidate, dict):
+        return candidate.get("values", candidate)
+    if hasattr(candidate, "values") and not callable(candidate.values):
+        return candidate.values
+    return {}
+
+
 def audit_client_export_integrity(rows: list, source_candidates: list | None = None) -> list[str]:
-    """Audit client export rows to guarantee 100% field completeness and zero drift against source.
+    """Fail if a Results export loses, duplicates, invents, or changes a candidate.
 
-    Verifies:
-      1. Every candidate row has all 24 _CLIENT_EXPORT_COLUMNS populated (no None, no NaN, no raw gaps).
-      2. Required fields (Application ID, Full Name, Email, Category, Suggested Role 1, Location) are non-empty.
-      3. Cross-verifies candidate fields against source_candidates to ensure 0% data drift/mismatch.
-      4. Auto-heals trivial omissions from source and logs any discrepancies.
-
-    Returns a list of warning/healing messages.
+    Candidate cells are normalized exactly as the exporter displays them. When committed
+    source rows are supplied, the audit requires a one-to-one Application ID set and compares
+    every one of the 24 exported fields. The only row without an ID must be the single blank
+    spacer directly below the header.
     """
-    warns = []
-    source_map = {}
-    if source_candidates:
-        for s in source_candidates:
-            if isinstance(s, dict):
-                s_vals = s.get("values", s)
-            elif hasattr(s, "values") and not callable(s.values):
-                s_vals = s.values
-            else:
-                s_vals = {}
-            aid = str(s_vals.get("Application ID", "") or "").strip()
-            if aid:
-                source_map[aid] = s_vals
+    errors = []
+    actual = {}
+    spacer_rows = []
 
-    for r in rows:
-        aid = str(r.get("Application ID", "") or "").strip()
+    for row_number, row in enumerate(rows, start=2):
+        if not isinstance(row, dict):
+            errors.append(f"row {row_number} is not a field mapping")
+            continue
+        missing_columns = [col for col in _CLIENT_EXPORT_COLUMNS if col not in row]
+        if missing_columns:
+            errors.append(f"row {row_number} is missing columns {missing_columns}")
+
+        aid = str(row.get("Application ID", "") or "").strip()
         if not aid:
-            # Separator / spacer row: keep strictly blank
+            nonblank = [col for col in _CLIENT_EXPORT_COLUMNS
+                        if not _is_gap(row.get(col, ""))]
+            if nonblank:
+                errors.append(f"row {row_number} has data but no Application ID: {nonblank}")
+            spacer_rows.append(row_number)
             continue
 
-        # 1. Clean None / NaN values across all 24 client export columns
-        for col in _CLIENT_EXPORT_COLUMNS:
-            val = r.get(col)
-            if val is None or (isinstance(val, float) and pd.isna(val)):
-                r[col] = ""
+        normalized = _client_export_projection(row)
+        row.update(normalized)
+        if aid in actual:
+            errors.append(f"duplicate Application ID {aid!r} in Results rows")
+        else:
+            actual[aid] = normalized
 
-        # 2. Check candidate-owed columns have standardized placeholders rather than bare gaps
-        for col in _MISSING_IF_BLANK_COLS:
-            if _is_gap(r.get(col, "")):
-                r[col] = MISSING_VALUE
+    if spacer_rows != [2]:
+        errors.append(f"expected one blank spacer at row 2; found blank-ID rows {spacer_rows}")
 
-        for slot in ("Portfolio 1", "Portfolio 2", "Portfolio 3"):
-            if _is_gap(r.get(slot, "")):
-                r[slot] = "N/A"
+    if source_candidates is not None:
+        expected = {}
+        for position, candidate in enumerate(source_candidates, start=1):
+            values = _export_source_values(candidate)
+            aid = str(values.get("Application ID", "") or "").strip()
+            if not aid:
+                errors.append(f"source candidate {position} has no Application ID")
+                continue
+            if aid in expected:
+                errors.append(f"duplicate Application ID {aid!r} in Results source")
+                continue
+            expected[aid] = _client_export_projection(values)
 
-        # 3. Category must never be blank
-        if _is_gap(r.get("Category", "")):
-            r["Category"] = assign_category(str(r.get("Suggested Role 1", "") or ""),
-                                            str(r.get("Current Skills", "") or ""),
-                                            str(r.get("Looking For Role", "") or ""))
-            warns.append(f"{aid}: blank Category healed to '{r['Category']}'")
+        missing_ids = sorted(set(expected) - set(actual))
+        extra_ids = sorted(set(actual) - set(expected))
+        if missing_ids:
+            errors.append(f"Results omitted source Application IDs {missing_ids}")
+        if extra_ids:
+            errors.append(f"Results contains unexpected Application IDs {extra_ids}")
 
-        # 4. Cross-check against source record to guarantee zero mismatch
-        if aid in source_map:
-            src = source_map[aid]
-            for check_col in ("Application ID", "Full Name", "Email", "Category", "Suggested Role 1", "Location"):
-                r_val = str(r.get(check_col, "") or "").strip()
-                s_val = str(src.get(check_col, "") or "").strip()
-                if s_val and r_val != s_val and not _is_gap(s_val):
-                    # Align export row directly with source to eliminate any drift
-                    warns.append(f"{aid}: mismatch in '{check_col}' ('{r_val}' vs source '{s_val}') -> synced to source")
-                    r[check_col] = s_val
+        for aid in sorted(set(expected) & set(actual)):
+            changed = [col for col in _CLIENT_EXPORT_COLUMNS
+                       if actual[aid].get(col, "") != expected[aid].get(col, "")]
+            if changed:
+                errors.append(f"{aid} differs from committed source in columns {changed}")
 
-    if warns:
-        logger.info(f"  Result Sheet Audit: verified {len(rows)} export row(s) with {len(warns)} consistency check(s).")
-    return warns
+    if errors:
+        raise ValueError("Result Sheet integrity validation failed: " + "; ".join(errors))
+    logger.info("  Result Sheet Audit: verified %d candidate row(s), 0 omissions, "
+                "0 extras, 0 duplicates, and 0 field changes.", len(actual))
+    return []
 
 
 def is_doubt_candidate(fields: dict) -> tuple[bool, str]:
@@ -657,19 +687,7 @@ def prepare_client_export_rows(value_dicts) -> list:
     """
     rows = []
     for vals in value_dicts:
-        r = {}
-        for col in _CLIENT_EXPORT_COLUMNS:
-            v = vals.get(col, "")
-            if col in _MISSING_IF_BLANK_COLS:
-                v = _missing_if_gap(v)
-            elif col in ("Portfolio 1", "Portfolio 2", "Portfolio 3"):
-                v = _na_if_gap(v)
-            elif col == "Category" and _is_gap(v):
-                v = assign_category(str(vals.get("Suggested Role 1", "") or ""),
-                                    str(vals.get("Current Skills", "") or ""),
-                                    str(vals.get("Looking For Role", "") or ""))
-            r[col] = v if v is not None else ""
-        rows.append(r)
+        rows.append(_client_export_projection(vals))
     rows.sort(key=_client_export_sort_key, reverse=True)
     out = _with_period_separators(rows)
     audit_client_export_integrity(out, value_dicts)

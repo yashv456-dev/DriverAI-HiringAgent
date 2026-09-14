@@ -1,5 +1,6 @@
 """Offline reliability regressions. All databases, CVs and publications are synthetic."""
 import hashlib
+import io
 import json
 import os
 import tempfile
@@ -12,7 +13,7 @@ from hiring_agent.store import SQLiteCandidateStore, RowVanished
 from hiring_agent.sqlite_store import database_path
 from hiring_agent.local_pipeline import (run_local_pipeline, LocalClient, _child, worker_lock,
                                          _find_by_app_ref, cache_documents)
-from hiring_agent.publisher import publish_results
+from hiring_agent.publisher import publish_results, _verify_report
 from sharepoint_client import SharePointError, SharePointClient
 
 
@@ -33,6 +34,7 @@ class Remote:
         self.files = {('/CVs', r['Application ID']+'.docx'): b'original '+r['Application ID'].encode() for r in self.rows}
         self.uploads = []
         self.fail_upload = False
+        self.fail_upload_name = None
     def list_rows(self):
         return [{'index': i, 'values': dict(r)} for i, r in enumerate(self.rows)]
     def list_rejected_rows(self):
@@ -45,10 +47,12 @@ class Remote:
     def file_web_url(self, folder, name):
         return 'https://example.test'+folder+'/'+name
     def upload_file(self, folder, name, data):
-        if self.fail_upload:
+        if self.fail_upload or name == self.fail_upload_name:
             raise SharePointError('locked', status_code=423)
         self.uploads.append((folder, name))
         self.files[('/'+folder.strip('/'), name)] = data
+    def delete_file(self, folder, name):
+        self.files.pop(('/'+folder.strip('/'), name), None)
 
 
 class ReliabilityTests(unittest.TestCase):
@@ -123,10 +127,17 @@ class ReliabilityTests(unittest.TestCase):
 
     def test_conflicting_identity_is_retained_not_merged(self):
         remote = Remote([candidate(), dict(candidate(), Email='someoneelse@example.test')])
-        self.store.sync_from_client(remote)
+        with self.assertRaisesRegex(RuntimeError, 'unresolved Application ID conflict'):
+            self.store.sync_from_client(remote)
         self.assertEqual(len(self.store.all_rows()), 0)
         self.assertEqual(self.store.conn.execute('SELECT count(*) FROM source_events').fetchone()[0], 2)
         self.assertEqual(self.store.conn.execute('SELECT count(*) FROM import_conflicts').fetchone()[0], 1)
+
+    def test_candidate_shaped_p1_row_without_id_stops_sync(self):
+        broken = dict(candidate(), **{'Application ID': ''})
+        with self.assertRaisesRegex(RuntimeError, 'without an Application ID'):
+            self.store.sync_from_client(Remote([broken]))
+        self.assertEqual(len(self.store.all_rows()), 0)
 
     def test_stale_worker_cannot_commit_newer_input(self):
         self.store.add(candidate())
@@ -173,6 +184,61 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(set(remote.uploads),
                          {('Master_Files', 'P2-MasterFile.xlsx'),
                           ('', 'Candidate_List_Results.xlsx')})
+
+    def test_second_workbook_failure_rolls_back_first_upload(self):
+        row = dict(candidate(), Status='Scored', Country='United States',
+                   Category='Engineering', Phone='(602) 555-0100')
+        self.store.add(row)
+        remote = Remote()
+        publish_results(self.store, remote)
+        old_client = remote.files[('/', 'Candidate_List_Results.xlsx')]
+        old_master = remote.files[('/Master_Files', 'P2-MasterFile.xlsx')]
+        old_published = self.store.conn.execute(
+            'SELECT published_revision FROM publication WHERE id=1').fetchone()[0]
+
+        self.store.save_by_id('APP-A', {'Phone': '(602) 555-0199'})
+        remote.fail_upload_name = 'P2-MasterFile.xlsx'
+        publish_results(self.store, remote)
+
+        self.assertEqual(remote.files[('/', 'Candidate_List_Results.xlsx')], old_client)
+        self.assertEqual(remote.files[('/Master_Files', 'P2-MasterFile.xlsx')], old_master)
+        publication = self.store.conn.execute(
+            'SELECT published_revision,error FROM publication WHERE id=1').fetchone()
+        self.assertEqual(publication['published_revision'], old_published)
+        self.assertIn('rolled back successfully', publication['error'])
+
+    def test_remote_verifier_rejects_same_shape_wrong_candidate(self):
+        row = dict(candidate(), Status='Scored', Country='United States',
+                   Category='Engineering', Phone='(602) 555-0100')
+        self.store.add(row)
+        remote = Remote()
+        report = publish_results(self.store, remote)
+        expected = report.read_bytes()
+        wb = load_workbook(io.BytesIO(expected))
+        ws = wb['Candidates']
+        id_col = [cell.value for cell in ws[1]].index('Application ID') + 1
+        ws.cell(3, id_col, 'APP-WRONG')
+        changed = io.BytesIO()
+        wb.save(changed)
+        wb.close()
+        remote.files[('/', 'Candidate_List_Results.xlsx')] = changed.getvalue()
+        with self.assertRaisesRegex(ValueError, 'missing IDs=.*APP-A'):
+            _verify_report(remote, '', 'Candidate_List_Results.xlsx', expected)
+
+    def test_result_audit_rejects_omitted_and_changed_rows(self):
+        from hiring_agent.sharepoint_scoring import (
+            audit_client_export_integrity, prepare_client_export_rows)
+        source = [dict(candidate('APP-A'), Category='Engineering'),
+                  dict(candidate('APP-B'), Category='Engineering')]
+        prepared = prepare_client_export_rows(source)
+        omitted = [dict(row) for row in prepared[:-1]]
+        with self.assertRaisesRegex(ValueError, 'omitted source Application IDs'):
+            audit_client_export_integrity(omitted, source)
+
+        changed = [dict(row) for row in prepared]
+        changed[1]['Email'] = 'wrong@example.test'
+        with self.assertRaisesRegex(ValueError, 'differs from committed source'):
+            audit_client_export_integrity(changed, source)
 
     def test_bad_candidate_does_not_block_next_or_consume_retry(self):
         remote = Remote([candidate(), candidate('APP-B')])
@@ -405,8 +471,8 @@ class MasterWriteContract(unittest.TestCase):
             finally:
                 store.conn.close()
 
-    def test_sync_from_client_deactivates_deleted_remote_records(self):
-        """When an admin wipes/deletes rows remotely, sync_from_client deactivates them in local store."""
+    def test_sync_from_client_refuses_shorter_snapshot_unless_forced(self):
+        """A transiently short P1 read cannot silently remove a committed P2 candidate."""
         import tempfile
         from hiring_agent.sqlite_store import SQLiteCandidateStore
 
@@ -423,8 +489,13 @@ class MasterWriteContract(unittest.TestCase):
                 store.sync_from_client(Remote([row1, row2]))
                 self.assertEqual(len(store.all_rows('main')), 2)
 
-                # Now remote has deleted row2
-                store.sync_from_client(Remote([row1]))
+                with self.assertRaisesRegex(RuntimeError, 'APP-2'):
+                    store.sync_from_client(Remote([row1]))
+                self.assertEqual([r.app_id for r in store.all_rows('main')],
+                                 ['APP-1', 'APP-2'])
+
+                # Intentional administrative deletion remains available only when explicit.
+                store.sync_from_client(Remote([row1]), force=True)
                 active_rows = store.all_rows('main')
                 self.assertEqual(len(active_rows), 1)
                 self.assertEqual(active_rows[0].app_id, 'APP-1')
