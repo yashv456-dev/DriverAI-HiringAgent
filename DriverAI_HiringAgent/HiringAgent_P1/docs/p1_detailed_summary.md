@@ -174,7 +174,7 @@ The 2026-07-12 audit is the authoritative source for the original findings — *
 
 ## 10. Coexistence Contract with Phase 2
 
-Phase 1 writes `Status = "New Email Received"` and stops. Phase 2 (`../HiringAgent_P2/`) polls for that status, reads the resume, fills the P2-owned scoring columns, applies the USA-only geo-filter, and flips `Status` to `Scored` or moves the row to Rejected. Clear foreign current locations become `Rejected - Non-USA Location`; still-conflicting current-location rows become `Rejected - Location Not Confirmed` only after P2 already asked once for an updated resume and P1 re-queued that update back onto the same row. Neither phase calls the other directly - the SharePoint workbook is the only contract, and P1 never sends an email on P2's behalf. P2 outbound mail covers different triggers entirely: non-USA/location-not-confirmed decline and the missing-info/current-location nudge, both sent via Microsoft Graph directly, not through this flow.
+Phase 1 writes `Status = "New Email Received"` and stops. Phase 2 (`../HiringAgent_P2/`) polls for that status, reads the resume, and keeps the full extraction/scoring result in its local database and `P2-MasterFile.xlsx`. It writes only `Status` and `Resume Link` back to the same P1 `CandidateList` row. Clear foreign current locations appear as `Rejected - Non-USA Location` on that intake row and under P2 master's `Rejected` sheet; P2 does not move or delete rows inside the P1 workbook.
 
 ---
 

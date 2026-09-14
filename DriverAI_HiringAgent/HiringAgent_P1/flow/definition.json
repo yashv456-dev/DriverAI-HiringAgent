@@ -1149,7 +1149,10 @@
                                           "connectionName": "shared_excelonlinebusiness",
                                           "operationId": "AddRowV2"
                                         },
-                                        "authentication": "@parameters('$authentication')"
+                                        "authentication": "@parameters('$authentication')",
+                                        "retryPolicy": {
+                                          "type": "none"
+                                        }
                                       }
                                     },
                                     "Ensure_resume_folder": {

@@ -188,7 +188,7 @@ The candidate workbook has **32 columns**. Phase 1 writes **11** of them and lea
 | Original Filename | What their file was called when they sent it |
 | Application Updates | The repeat-contact counter, starting at 0 |
 
-**Phase 2 fills the rest:** Category, Phone, Location, Country, Current Skills, Education (and its dates), Looking For Role, Suggested Roles 1–3, the three Portfolio links, Resume Link and URL, Retry Count, and the Info Request stamp.
+**Phase 2 keeps the rest in its own master:** Category, Phone, Location, Country, Current Skills, Education (and its dates), Looking For Role, Suggested Roles 1–3, Portfolio links, Resume URL/path, Retry Count and P2 mail markers live in `P2-MasterFile.xlsx`. P2 writes only `Status` and `Resume Link` back to this P1 workbook.
 
 > **A row only ever exists if there is a real résumé behind it.** Someone who writes in asking about a job without attaching anything gets Email 3, but **no row** — so Phase 2 never sees an empty candidate.
 
@@ -199,8 +199,9 @@ The candidate workbook has **32 columns**. Phase 1 writes **11** of them and lea
 | The candidate workbook | `Documents / Master_Files / Sharepoint_Master_File.xlsx` — one file, all years |
 | Résumés | `Documents / Candidate_Resumes / <Year> / <Month> /` — folders created automatically |
 | Résumé file name | `JaneDoe_APP-20260630-1430-A3F9.pdf` at intake; Phase 2 renames it to `Jane_Doe_A3F9.pdf` once scored |
-| Rejected candidates | The `Rejected` sheet in the same workbook; their résumés move to `Candidate_Resumes / <Year> / Rejected /` |
-| The client-facing report | `Documents / Master_Files / Candidate_List_Results.xlsx` — written by Phase 2 |
+| Rejected candidates | Their P1 intake rows stay on `CandidateList`; full rejected records live in P2 master's `Rejected` sheet; résumés move to `Candidate_Resumes / <Year> / Rejected /` |
+| P2 full master | `Documents / Master_Files / P2-MasterFile.xlsx` |
+| The client-facing report | `Documents / Candidate_List_Results.xlsx` — written by Phase 2 |
 | **Job descriptions** | **Not used by Phase 1 at all.** They live on the Phase 2 side: SharePoint `led1234567-my.sharepoint.com` → `/personal/tracys_driverai_io` → folder **`Staffing/PDs`** |
 
 > **Do not move résumé files between folders.** Phase 2 works out where a file is from the candidate's row. A file moved by hand becomes invisible to it.

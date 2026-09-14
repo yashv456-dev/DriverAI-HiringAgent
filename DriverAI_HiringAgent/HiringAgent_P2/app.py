@@ -1650,19 +1650,31 @@ class HiringApp:
             messagebox.showerror("Couldn't save", str(e))
 
     def _load_candidates_online(self):
-        """Load candidates straight from the live SharePoint table."""
+        """Load candidates from P2's authoritative store."""
         if getattr(self, "_cand_loading", False):
             return
         self._cand_loading = True
-        self.candidate_filter_status.configure(text="Loading from SharePoint...")
+        self.candidate_filter_status.configure(text="Loading candidates...")
 
         def worker():
             try:
-                from sharepoint_client import SharePointClient
-                client = SharePointClient()
-                rows = [r["values"] for r in client.list_rows()]
-                if self.include_rejected_var.get():
-                    rows += [r["values"] for r in client.list_rejected_rows()]
+                from hiring_agent.config import storage_backend
+                if storage_backend() == "sqlite":
+                    from hiring_agent.sqlite_store import SQLiteCandidateStore
+                    store = SQLiteCandidateStore()
+                    try:
+                        rows = [dict(r.values) for r in store.all_rows("main") if r.app_id]
+                        if self.include_rejected_var.get():
+                            rows += [dict(r.values) for r in store.all_rows("rejected") if r.app_id]
+                    finally:
+                        store.conn.close()
+                else:
+                    # Compatibility for an explicitly selected legacy Excel backend.
+                    from sharepoint_client import SharePointClient
+                    client = SharePointClient()
+                    rows = [r["values"] for r in client.list_rows()]
+                    if self.include_rejected_var.get():
+                        rows += [r["values"] for r in client.list_rejected_rows()]
 
                 def done():
                     self._cand_loading = False

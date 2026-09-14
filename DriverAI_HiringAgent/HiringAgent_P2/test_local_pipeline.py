@@ -10,7 +10,8 @@ from unittest.mock import patch
 from openpyxl import load_workbook
 from hiring_agent.store import SQLiteCandidateStore, RowVanished
 from hiring_agent.sqlite_store import database_path
-from hiring_agent.local_pipeline import run_local_pipeline, LocalClient, _child, worker_lock
+from hiring_agent.local_pipeline import (run_local_pipeline, LocalClient, _child, worker_lock,
+                                         _find_by_app_ref, cache_documents)
 from hiring_agent.publisher import publish_results
 from sharepoint_client import SharePointError, SharePointClient
 
@@ -190,6 +191,64 @@ class ReliabilityTests(unittest.TestCase):
         result = run_local_pipeline(remote, scorer=lambda *a: self.fail('partial attachments scored'))
         self.assertEqual(result['deferred'], 1)
 
+    def test_short_tail_collision_uses_original_filename_identity(self):
+        """Two unrelated Application IDs may share the same four-character tail."""
+        class TailRemote:
+            def list_folder_children(self, _place):
+                return [{'name': 'Shalin_Edward_PMCA.pdf'},
+                        {'name': 'Vibha_Swaminathan_Resume_-_DriverAI_PMCA.pdf'}]
+            def download_file(self, _place, name):
+                return name.encode()
+
+        found = _find_by_app_ref(
+            TailRemote(), 'APP-20260805-0931-PMCA', ['/CVs'],
+            hints=('Vibha_Swaminathan Resume - DriverAI.pdf', 'vibha.work.1212'))
+        self.assertEqual(found[1], 'Vibha_Swaminathan_Resume_-_DriverAI_PMCA.pdf')
+
+    def test_short_tail_collision_fails_closed_without_identity_match(self):
+        class TailRemote:
+            def list_folder_children(self, _place):
+                return [{'name': 'Shalin_Edward_PMCA.pdf'},
+                        {'name': 'Vibha_Swaminathan_PMCA.pdf'}]
+            def download_file(self, _place, name):
+                return name.encode()
+
+        self.assertIsNone(_find_by_app_ref(
+            TailRemote(), 'APP-20260805-0931-PMCA', ['/CVs'], hints=('someone_else.pdf',)))
+
+    def test_cache_prefers_original_filename_over_stale_derived_link(self):
+        """A prior bad result must not keep selecting the other PMCA candidate forever."""
+        class TailRemote:
+            resumes_folder = '/Candidate_Resumes'
+            files = {
+                ('/Candidate_Resumes/2026/August', 'Shalin_Edward_PMCA.pdf'): b'shalin',
+                ('/Candidate_Resumes/2026/August',
+                 'Vibha_Swaminathan_Resume_-_DriverAI_PMCA.pdf'): b'vibha',
+            }
+            def download_file(self, place, name):
+                key = ('/' + place.strip('/'), name)
+                if key not in self.files:
+                    raise SharePointError('missing', status_code=404)
+                return self.files[key]
+            def file_web_url(self, place, name):
+                return 'https://example.test/' + name
+            def list_folder_children(self, place):
+                prefix = '/' + place.strip('/')
+                return [{'name': name} for folder, name in self.files if folder == prefix]
+
+        values = {
+            'Application ID': 'APP-20260805-0931-PMCA',
+            'Received Date': '2026-08-05T09:31:49',
+            'Original Filename': 'Vibha_Swaminathan Resume - DriverAI.pdf',
+            'Full Name': 'Shalin Edward',
+            'Email': 'vibha.work.1212@gmail.com',
+            'Category': 'Data Analytics',
+            'Resume URL': 'https://example.test/Shalin_Edward_PMCA.pdf',
+        }
+        docs = cache_documents(TailRemote(), values, self.root/'tail-cache')
+        self.assertEqual(list(docs), ['Vibha_Swaminathan_Resume_-_DriverAI_PMCA.pdf'])
+        self.assertEqual(Path(next(iter(docs.values()))['path']).read_bytes(), b'vibha')
+
     def test_exporter_refuses_intake_target(self):
         self.store.add(candidate())
         remote = Remote()
@@ -282,16 +341,31 @@ class MasterWriteContract(unittest.TestCase):
         self.assertFalse(set(body) & set(INPUT_COLUMNS),
                          'an input column in a master write resets the row on the next poll')
 
-    def test_rejected_row_keeps_p1s_own_input_values(self):
-        from hiring_agent.local_pipeline import _with_original_inputs
-        from hiring_agent.sqlite_store import INPUT_COLUMNS, input_key
-        archived = _with_original_inputs(self._scored(), self.P1_ROW)
-        for col in INPUT_COLUMNS:
-            self.assertEqual(archived[col], self.P1_ROW[col], col)
-        self.assertEqual(input_key(archived), input_key(self.P1_ROW),
-                         'archiving a candidate must not change the input hash')
-        self.assertEqual(archived['Phone'], '(602) 555-0147',
-                         'P2-derived fields still reach the Rejected sheet')
+    def test_rejected_result_only_patches_the_existing_p1_row(self):
+        from hiring_agent.local_pipeline import _sync_row_to_sharepoint
+
+        writes = []
+        class Remote:
+            table = 'HiringAgent_P1_Candidates'
+            def list_rows(self):
+                return [{'index': 0, 'values': dict(self_row)}]
+            def row_values_at(self, index):
+                return dict(self_row) if index == 0 else None
+            def update_row(self, index, fields, current_values=None):
+                writes.append((index, dict(fields)))
+            def add_rejected_row(self, fields):
+                raise AssertionError('P2 must not write P1 Rejected')
+            def delete_row(self, index):
+                raise AssertionError('P2 must not delete the P1 intake row')
+
+        self_row = self.P1_ROW
+        rejected = self._scored()
+        rejected['Status'] = 'Rejected - Non-USA Location'
+        _sync_row_to_sharepoint(Remote(), 'APP-1', 'rejected', rejected, self.P1_ROW)
+        self.assertEqual(writes, [(0, {
+            'Status': 'Rejected - Non-USA Location',
+            'Resume Link': 'Marcus_Vance_AF6A',
+        })])
 
     def test_a_scored_row_survives_the_next_poll(self):
         """The reset loop, end to end.
@@ -357,8 +431,32 @@ class MasterWriteContract(unittest.TestCase):
             finally:
                 store.conn.close()
 
+    def test_sync_from_client_ignores_p1s_historical_rejected_sheet(self):
+        """P2's rejected state comes from SQLite/P2 master, not the P1 workbook."""
+        import tempfile
+        from hiring_agent.sqlite_store import SQLiteCandidateStore
+
+        class Remote:
+            def list_rows(self):
+                return [{'values': dict(self_row)}]
+            def list_rejected_rows(self):
+                return [{'values': {
+                    'Application ID': 'APP-OLD', 'Email': 'old@example.com',
+                    'Status': 'Rejected - Non-USA Location',
+                }}]
+
+        self_row = self.P1_ROW
+        with patch.dict(os.environ, {'HIRING_SQLITE_PATH': os.path.join(tempfile.mkdtemp(), 't.db')}):
+            store = SQLiteCandidateStore()
+            try:
+                store.sync_from_client(Remote())
+                self.assertIsNotNone(store.get('APP-1', 'main'))
+                self.assertIsNone(store.get('APP-OLD', 'rejected'))
+            finally:
+                store.conn.close()
+
     def test_excel_candidate_store_guards_intake_table_against_profile_columns(self):
-        """ExcelCandidateStore must never write candidate profile fields to HiringAgent_P1_Candidates."""
+        """ExcelCandidateStore must never write profile fields to HiringAgent_P1_Candidates."""
         from hiring_agent.store import ExcelCandidateStore
 
         recorded = {}
@@ -385,6 +483,40 @@ class MasterWriteContract(unittest.TestCase):
         self.assertNotIn('Location', recorded)
         self.assertNotIn('Category', recorded)
         self.assertNotIn('Suggested Role 1', recorded)
+
+    def test_excel_store_keeps_rejected_outcome_on_p1_candidate_list(self):
+        """The direct Excel fallback obeys the same P1/P2 ownership boundary."""
+        from hiring_agent.store import ExcelCandidateStore
+
+        calls = {'updates': [], 'adds': [], 'deletes': []}
+        class MockClient:
+            table = 'HiringAgent_P1_Candidates'
+            def list_rows(self):
+                return [{'index': 0, 'values': {
+                    'Application ID': 'APP-1', 'Status': 'New Email Received'}}]
+            def row_values_at(self, index):
+                return self.list_rows()[0]['values'] if index == 0 else None
+            def update_row(self, index, fields, current_values=None):
+                calls['updates'].append(dict(fields))
+            def add_rejected_row(self, fields):
+                calls['adds'].append(dict(fields))
+            def delete_row(self, index):
+                calls['deletes'].append(index)
+
+        moved = ExcelCandidateStore(MockClient()).move_to_rejected('APP-1', {
+            'Application ID': 'APP-1',
+            'Status': 'Rejected - Non-USA Location',
+            'Resume Link': 'Candidate_ABCD.pdf',
+            'Full Name': 'Extracted Name',
+            'Country': 'India',
+        })
+        self.assertTrue(moved)
+        self.assertEqual(calls['updates'], [{
+            'Status': 'Rejected - Non-USA Location',
+            'Resume Link': 'Candidate_ABCD.pdf',
+        }])
+        self.assertEqual(calls['adds'], [])
+        self.assertEqual(calls['deletes'], [])
 
 
 if __name__ == '__main__':

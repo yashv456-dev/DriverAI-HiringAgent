@@ -212,8 +212,11 @@ class SQLiteCandidateStore:
     def sync_from_client(self, client, force=False):
         """Incremental, non-destructive import. Record every input before reconciliation."""
         # All remote I/O precedes the transaction. Failure cannot partly import a snapshot.
-        source = [(sheet, dict(row['values'])) for sheet, reader in
-                  [('main', client.list_rows), ('rejected', client.list_rejected_rows)] for row in reader()]
+        # Sharepoint_Master_File.xlsx is P1's immutable intake ledger. Its historical
+        # Rejected worksheet was once used as P2 storage, but P2 now owns that state in this
+        # database and P2-MasterFile.xlsx. Import CandidateList only; otherwise an old copy in
+        # P1's Rejected sheet can overwrite or conflict with the authoritative local result.
+        source = [('main', dict(row['values'])) for row in client.list_rows()]
         if hasattr(client, 'list_intake_events'):
             client._intake_event_cache = {r['file_key']: json.loads(r['payload'])
                                          for r in self.conn.execute('SELECT * FROM intake_files')}

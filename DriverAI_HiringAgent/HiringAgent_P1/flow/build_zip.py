@@ -989,6 +989,11 @@ _REF_OR_EMAIL_FILTER = (
 )
 hr["actions"]["Get_rows"]["inputs"]["parameters"]["$filter"] = _REF_OR_EMAIL_FILTER
 set_excel(dup["else"]["actions"]["Add_row"])
+# AddRowV2 is non-idempotent. If the connector commits the row but its response is lost,
+# Power Automate's default retry appends the same deterministic Application ID a second time.
+# A later whole-flow replay is safe because Get_rows sees the committed row and takes the
+# duplicate/update path; an automatic retry inside this one append is not.
+dup["else"]["actions"]["Add_row"]["inputs"]["retryPolicy"] = {"type": "none"}
 
 # ── 10a. Workbook is NON-DESTRUCTIVE now — NO auto-create/overwrite (changed 2026-07-04) ──
 # The old design probed the workbook with GetFileMetadataByPath and, on a "NotFound", uploaded a

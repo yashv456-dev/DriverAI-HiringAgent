@@ -289,23 +289,24 @@ class ExcelCandidateStore:
 
     # ---- writes ------------------------------------------------------------
 
-    FORBIDDEN_INTAKE_COLUMNS = frozenset({
-        "Category", "Phone", "Location", "Country", "Years Exp", "Current Skills",
-        "Education", "Education Start Date", "Education End Date", "Looking For Role",
-        "Suggested Role 1", "Suggested Role 2", "Suggested Role 3",
-        "Portfolio 1", "Portfolio 2", "Portfolio 3", "Resume URL", "Resume Folder Path",
-    })
+    P1_MASTER_WRITE_COLUMNS = frozenset({"Status", "Resume Link"})
+
+    def _is_p1_intake(self) -> bool:
+        return getattr(self.client, "table", None) == "HiringAgent_P1_Candidates"
 
     def save_by_id(self, app_id: str, fields: dict, *,
                    current_values: dict | None = None, sheet: Sheet = "main",
                    hint: str | int | None = None) -> None:
         """PATCH one row, located by Application ID. Unlisted columns keep their value."""
+        if self._is_p1_intake() and sheet == "rejected":
+            raise RowVanished("P1's Rejected sheet is read-only to P2")
         index = self._resolve(app_id, sheet, hint)
         if sheet == "rejected":
             self.client.update_rejected_row(index, fields, current_values=current_values)
         else:
-            if getattr(self.client, "table", None) == "HiringAgent_P1_Candidates":
-                fields = {k: v for k, v in fields.items() if k not in self.FORBIDDEN_INTAKE_COLUMNS}
+            if self._is_p1_intake():
+                fields = {k: v for k, v in fields.items()
+                          if k in self.P1_MASTER_WRITE_COLUMNS}
             self.client.update_row(index, fields, current_values=current_values)
 
     def add(self, fields: dict, sheet: Sheet = "main") -> None:
@@ -358,6 +359,12 @@ class ExcelCandidateStore:
         the ghost-row symptom, and collapsing it here means the eventual fix lands in one
         place instead of the four call sites that used to open-code the pair.
         """
+        if self._is_p1_intake():
+            # The rejection belongs to P2's store/master. P1 keeps its intake row and sees
+            # only the terminal Status and renamed Resume Link.
+            self.save_by_id(app_id, fields, sheet="main", hint=hint)
+            return True
+
         self.client.add_rejected_row(fields)
         try:
             removed = self.delete_by_id(app_id, "main", hint)

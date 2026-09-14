@@ -200,9 +200,9 @@ Set-Location -LiteralPath $p2Path
 .\.venv\Scripts\python.exe bot.py --score-sharepoint --batch-size 5
 ```
 
-This command DOES write live data: row updates, file rename/moves, routing/reconciliation and results export can occur. The batch limit caps queued scoring, not every maintenance/email/reconciliation pass across existing rows. Mail suppression is not a dry run. Unknown location normally remains Main/Needs Review; confirmed non-US routes to Rejected. Do not assert all Main rows are confirmed USA or auto-approve every Scored row while the documented defects remain.
+This command DOES write live data: P1 `Status`/`Resume Link` updates, file rename/moves, P2 routing/reconciliation and results export can occur. The batch limit caps queued scoring, not every maintenance/email/reconciliation pass across existing rows. Mail suppression is not a dry run. Unknown location remains under review; confirmed non-US stays in P1 `CandidateList` with a rejected status and routes to the `Rejected` sheet in `P2-MasterFile.xlsx`.
 
-For each touched Application ID, read back: candidate contact/location/degree dates, status, top roles, resume file opening from its URL, and presence in the correct Main/Rejected sheet. Compare the remote results workbook with current eligible Scored IDs, not just its modified timestamp. Confirm no unintended applicant mail and review any admin alert. For a rejected candidate, verify the destination file before treating the transfer as complete. For failure/review cases, verify the record still exists with an actionable state.
+For each touched Application ID, read back the P1 status/link and the P2-master contact, location, degree dates, top roles and correct P2 Main/Rejected placement. Compare the remote results workbook with current eligible Scored IDs, not just its modified timestamp. Confirm no unintended applicant mail and review any admin alert. For a rejected candidate, verify the destination file before treating the transfer as complete. For failure/review cases, verify the P1 intake record still exists with an actionable status.
 
 If the results export is stale after rows are checked, `bot.py --export-results` rebuilds and UPLOADS it; it is a write to the published workbook and does not fix bad fields. Verify the uploaded workbook again because upload failure handling is a known gap.
 

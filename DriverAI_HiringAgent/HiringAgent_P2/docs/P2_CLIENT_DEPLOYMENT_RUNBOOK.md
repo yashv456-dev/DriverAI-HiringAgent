@@ -224,7 +224,7 @@ SENDER_MAILBOX=...
 
 P2 sends only scoring-stage emails:
 
-- Non-USA decline emails from Rejected rows.
+- Non-USA decline emails from P2's rejected records.
 - Missing-info requests for scored rows missing phone, location, skills, or education.
 - Admin error alerts for rows that fail processing 3 times, if configured.
 
@@ -238,8 +238,8 @@ To reprocess old mail without contacting anyone, set in `.env`:
 HIRING_SUPPRESS_EMAILS=true
 ```
 
-No P2 email of any kind then leaves the mailbox, while scoring, row patches, resume
-renames/moves, Rejected-sheet maintenance, and the client workbook export all run normally.
+No P2 email of any kind then leaves the mailbox, while scoring, P1 status/link patches,
+resume renames/moves, P2-master maintenance, and the client workbook export all run normally.
 Affected rows are stamped `TEST-MODE (suppressed) Sent <timestamp>` instead of
 `Sent <timestamp>`, so replayed rows stay distinguishable from real contacts.
 
@@ -410,50 +410,16 @@ To change the schedule later:
 
 Do not edit `RunDaily.bat` just to change time. Use the task trigger for schedule changes.
 
-## 11A. Columns P2 Uses
+## 11A. Workbook Ownership
 
-Main `CandidateList` columns, in order:
+`Sharepoint_Master_File.xlsx` is P1's intake ledger. P2 reads `CandidateList` and writes only
+`Status` and `Resume Link` back to the same row. It does not populate profile/scoring columns,
+append to P1's historical `Rejected` worksheet, or delete intake rows.
 
-1. Application ID
-2. Received Date
-3. Last Updated Date
-4. Category
-5. Resume Link  *(moved here from position 27 at client request, 2026-07-24)*
-6. Full Name
-7. Email
-8. Phone
-9. Location
-10. Country
-11. Current Skills
-12. Education
-13. Looking For Role
-14. Suggested Role 1
-15. Suggested Role 2
-16. Suggested Role 3
-17. Mail Subject
-18. Mail Body
-19. Status
-20. Has Resume
-21. Original Filename
-22. Application Updates
-23. Retry Count
-24. Portfolio 1
-25. Portfolio 2
-26. Portfolio 3
-27. Resume URL
-28. Resume Folder Path
-29. Mail Sent
-30. Info Request Sent
-
-Rejected sheet columns are the same except:
-
-- `Mail Sent` is removed.
-- `Info Request Sent` is removed.
-- `Decline Sent` is added as the final column.
-
-P1 owns intake fields such as Application ID, Received Date, Last Updated Date, Email, Mail Subject, Mail Body, Has Resume, Original Filename, Application Updates, and Mail Sent. P2 preserves those and fills scoring fields, status, retry count, resume links/paths, and P2 mail markers.
-
-`Resume Link` should display the P1-owned `Original Filename` while pointing at the P2-owned `Resume URL`. P2 may rename the stored SharePoint file, but it should not overwrite `Original Filename` with the canonical storage filename.
+`P2-MasterFile.xlsx` is P2's complete record. Its `CandidateList` sheet contains kept/review
+records, and its `Rejected` sheet contains rejected records with the full extracted profile,
+scores, resume URL/path, retry count and P2 mail markers. `Original Filename` remains what the
+applicant sent; `Resume Link` identifies the canonical stored file after P2 renames it.
 
 ## 11B. Folder Creation And Resume Naming
 
@@ -510,7 +476,7 @@ Every live SharePoint scoring run also creates a client-facing workbook:
 - `P2_Final_Results\Candidate_List_Results.xlsx`
 - SharePoint root `Shared Documents/` folder: `Candidate_List_Results.xlsx`
 
-That workbook contains one `Candidates` sheet only. It excludes the Rejected sheet and includes only scored candidates from the main sheet.
+That workbook contains one `Candidates` sheet only. It excludes P2's Rejected sheet and includes only scored candidates from P2's main sheet.
 
 ## 11C. Practical Pros And Cons
 
@@ -548,12 +514,12 @@ Manual SharePoint checks:
 - Main sheet has no `New Email Received` rows left, unless new mail arrived during the run.
 - Main scored rows have `Status = Scored`.
 - Main unresolved geo rows have `Status = Needs Review - Location Confirmation`; they are not part of the client results export.
-- Rejected sheet has non-USA rows with `Status = Rejected - Non-USA Location`.
+- P2 master Rejected sheet has non-USA rows with `Status = Rejected - Non-USA Location`.
 - `Rejected - Location Not Confirmed` is historical only; current P2 keeps unresolved candidates on Main for manual confirmation.
 - Processing-error rows have `Status = Rejected - Processing Error`.
 - `Decline Sent` is stamped for non-USA rejected rows.
 - `Info Request Sent` is stamped or set to `Nothing missing` / `No valid email` for scored rows.
-- No duplicate Application IDs across Main + Rejected.
+- No duplicate Application IDs across P2 Main + Rejected.
 
 ## 13. Common Problems
 
@@ -640,7 +606,7 @@ If the new install has issues:
 - [ ] One live `bot.py --score-sharepoint` run completed.
 - [ ] Log shows `Errors : 0`.
 - [ ] Log shows decline/info mail pass with `0 failed`.
-- [ ] SharePoint Main has no stale pending rows.
-- [ ] Rejected sheet has stamped `Decline Sent` values.
-- [ ] No duplicate Application IDs across Main + Rejected.
+- [ ] P1 `CandidateList` has no stale pending rows and contains no P2 profile/scoring values.
+- [ ] P2 master Rejected sheet has stamped `Decline Sent` values.
+- [ ] No duplicate Application IDs across P2 Main + Rejected.
 - [ ] Task Scheduler configured if ongoing laptop automation is needed.

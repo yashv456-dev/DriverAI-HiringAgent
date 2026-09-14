@@ -400,9 +400,9 @@ The workbook is `/Master_Files/Sharepoint_Master_File.xlsx`. Row 1 holds the can
 | Table | Sheet role | Column count | Table range |
 |---|---|---|---|
 | HiringAgent_P1_Candidates | Main candidate roster | 33 | A1:AG2 |
-| HiringAgent_P2_Rejected | Rejected roster, shipped with the template | 32 | A1:AF2 |
+| HiringAgent_P2_Rejected | Historical compatibility sheet, shipped empty with the template | 32 | A1:AF2 |
 
-**Corrected.** The README states 30 main columns and 29 rejected columns. The shipped template has 33 and 32. The original TDD's 33-column list is correct and is retained below. The Rejected sheet is not created by P2 at runtime; it ships inside the template, and its 32nd column is `Decline Sent` rather than the main sheet's `Mail Sent` and `Info Request Sent` pair.
+**Corrected.** The shipped template has 33 main columns and 32 historical Rejected columns. P2 does not store candidate records in that P1 Rejected table; full rejected records live in `P2-MasterFile.xlsx`, while P1 `CandidateList` retains the intake row with P2's status/link patch.
 
 `Add_row` writes exactly 11 fields and omits the rest, so they land as genuinely blank cells. That matches the real tenant export format and avoids the import-time schema binding that was dropping fields in the designer.
 

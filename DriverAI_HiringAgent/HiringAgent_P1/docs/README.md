@@ -931,15 +931,15 @@ in addition to the `Sites.ReadWrite.All` / `Files.ReadWrite.All` the P2 worker a
 
 ## Hand-off to Phase 2
 
-Phase 1 writes rows with `Status = "New Email Received"`. Phase 2 (`../HiringAgent_P2/`) polls for those rows, reads each resume, fills the P2-owned scoring fields, applies USA-only geo-filter, and flips `Status` to `Scored` or moves the row to Rejected as `Rejected - Non-USA Location` / `Rejected - Location Not Confirmed`. The two phases never call each other - the SharePoint workbook is the only contract.
+Phase 1 writes rows with `Status = "New Email Received"`. Phase 2 (`../HiringAgent_P2/`) polls those rows, reads each resume, stores its full extraction/scoring result in P2's own database and `P2-MasterFile.xlsx`, and writes only `Status` and `Resume Link` back to the same P1 `CandidateList` row. Rejected candidates remain in P1's intake ledger with a rejected status; their full records appear on P2 master's `Rejected` sheet.
 
 **The table has 30 columns; `Add_row` writes only the 11 P1-owned ones.** The other 19 are simply not listed in the write, so they land as blank cells — identical outcome to writing them as empty strings, but it matches the genuine tenant export format and avoids the import-time schema-binding fragility that was dropping fields in the designer.
 
 **P1 intake values (11 fields — the ones Add_row writes):** Application ID, Received Date, Last Updated Date, Full Name, Email, Mail Subject, Mail Body, Status (`New Email Received`), Has Resume (`Yes`), Original Filename, Application Updates (`0`).
 
-**Blank/calculated/audit cells left after Add_row (19 fields — NOT written by Add_row):** Category, Phone, Location, Country, Current Skills, Education, Looking For Role, Suggested Role 1/2/3, Portfolio 1/2/3, Retry Count, Resume URL, Resume Link, Resume Folder Path, Info Request Sent, Mail Sent. P2 fills the scoring/profile, retry, resume-link, and info-request fields; P1 stamps `Mail Sent` only after a reply send path succeeds or is test-suppressed.
+**Blank/calculated/audit cells left after Add_row (19 fields — NOT written by Add_row):** Category, Phone, Location, Country, Current Skills, Education, Looking For Role, Suggested Role 1/2/3, Portfolio 1/2/3, Retry Count, Resume URL, Resume Link, Resume Folder Path, Info Request Sent, Mail Sent. P2 later writes only `Status` and `Resume Link` to this intake workbook; its profile, scoring, retry and mail-request data stays in the P2 master. P1 stamps `Mail Sent` only after a reply send path succeeds or is test-suppressed.
 
-**P2 fills its blanks:** scores the resume, writes the scoring/profile and resume metadata columns, handles missing-info/current-location requests, moves clear non-USA candidates to Rejected, and flips Status to `Scored` when scoring completes. If a candidate already received a current-location request and then sends an updated resume that is still conflicting or unclear, P2 moves that row to Rejected as `Rejected - Location Not Confirmed`. P2's duplicate cleanup deliberately skips rows that are still `New Email Received`, blank, or `Needs Review - Unreadable Resume`, so a newly arrived resume update is scored before any older duplicate row can be merged away.
+**P2 keeps its own full record:** it scores the resume, stores profile/resume metadata and mail markers in `P2-MasterFile.xlsx`, and patches only `Status`/`Resume Link` on P1's row. Clear non-USA candidates are classified under P2 master's `Rejected` sheet while the original P1 intake row remains in `CandidateList`.
 
 Phase 2's SharePoint settings must match Phase 1's names exactly: `SHAREPOINT_HOSTNAME` +
 `SHAREPOINT_SITE_PATH` (same site), `SHAREPOINT_TABLE` (`HiringAgent_P1_Candidates`), and
@@ -967,7 +967,7 @@ the P2 README).
 | Full workbook path | `/Shared Documents/Master_Files/Sharepoint_Master_File.xlsx` | this is the only workbook P1 uses |
 | Worksheet (tab) name | **`CandidateList`** | do not rename |
 | Table name | **`HiringAgent_P1_Candidates`** | `excel.table` — 30 columns; do not rename |
-| Rejected worksheet | **`Rejected`** (table `RejectedCandidates`) | **already shipped in `P1_Templates/HiringAgent_P1_CandidateList.xlsx`** — uploading that template gives you both sheets on day one, P2 only ever writes rows into it |
+| Rejected worksheet | **`Rejected`** (table `RejectedCandidates`) | Historical compatibility sheet shipped in the P1 template; P2 does not write candidate rows into it |
 | Resume files | `Candidate_Resumes/<Year>/<Month>/<FirstLast>_APP-YYYYMMDD-HHMM-XXXX.pdf` at intake | dated subfolders auto-created by the flow; P2 renames to `<First>_<Last>_<tail>.ext` once scored, and moves a rejected candidate's file into `<Year>/Rejected/` (one folder per year, not per month) |
 | Trigger mailbox | `apply@driverai.io` | `email.trigger_mailbox` |
 | Applicant reply "from" | `apply@driverai.io` | needs Send-As on the connection owner |
@@ -982,10 +982,11 @@ the P2 README).
 CandidateList_HiringAgent  (site)
 └── Shared Documents  (Documents library)
     ├── Master_Files/
-    │   ├── Sharepoint_Master_File.xlsx                 ← THE workbook (one for all years)
+    │   ├── Sharepoint_Master_File.xlsx                 ← P1 intake workbook (one for all years)
     │   │     ├── sheet "CandidateList"  → table "HiringAgent_P1_Candidates" (30 cols)
     │   │     └── sheet "Rejected"       → table "RejectedCandidates", shipped in the template
-    │   └── Candidate_List_Results.xlsx                 ← P2 final client-facing result
+    │   └── P2-MasterFile.xlsx                          ← P2 full main/rejected record
+    ├── Candidate_List_Results.xlsx                     ← P2 final client-facing result
     └── Candidate_Resumes/                          ← the resumes root (resumes_folder)
         ├── 2026/June/Jane_Doe_A1B2.pdf    ← saved resumes, dated Year/Month
         ├── 2026/July/JohnSmith_CloudAndDevOps_D4E5.docx
@@ -1000,12 +1001,12 @@ CandidateList_HiringAgent  (site)
 |---|---|
 | **You, once** | The `Candidate_Resumes`, `Master_Files`, and `SharePoint_Master_Template` folders. Put the live `Sharepoint_Master_File.xlsx` inside `Master_Files/`, and keep a blank reference copy in `SharePoint_Master_Template/`. Grant Send-As on `apply@driverai.io`. |
 | **P1, automatically** | The dated resume subfolders (`<Year>/<Month>`) + the saved resume files + candidate rows in the table. |
-| **P2, automatically** | The `Category`/scored columns; renames each resume to `<First>_<Last>_<tail>.ext` once scored; writes rows into the pre-created `Rejected` worksheet/table; and creates/uses the year-level `Rejected/` resume folder (moves a rejected candidate's file(s) into it, one folder per year). |
+| **P2, automatically** | Writes only `Status` and `Resume Link` on P1 `CandidateList`; keeps full main/rejected details in `P2-MasterFile.xlsx`; renames resumes and moves rejected files into the year-level `Rejected/` folder. |
 | **NOT auto** | The workbook file itself — P1 never re-creates or overwrites it (removed 2026-07-04). If it's ever missing, `Notify_failure` alerts the admin to restore it from the template. |
 
 ### Category dropdown
 
-The committed template (`P1_Templates/HiringAgent_P1_CandidateList.xlsx`) has a data-validation dropdown on the **Category** column listing the DriverAI departments (e.g., `Senior & Executive`, `AI/ML/CV (SIN2)`, `Data Analytics`, `3D/CV/ IoT/ AI Agents (SIN3)`, `Cloud and DevOps`, `Web Team (Full stack/Back end & UI/UX)`, `Graphics`, `Mobile Apps (Android IOS)`, `Business Analytics`, `Supply Chain`, `Finance`, `Cybersecurity and IT Admin`, `Data Center`, `Satellite`, `General`). P1 leaves Category blank; **P2 fills it** when it scores. The column's *filter* dropdown fills with real values only as candidates get scored (Excel filters only list values that exist). **Note:** the template's dropdown *list itself* (the manual-entry validation, distinct from the auto-filled filter) was not re-generated to add `Graphics` as of 2026-07-15 — P2 writes it fine via Graph (API writes bypass UI dropdown validation), but a human manually editing the Category cell in Excel won't see `Graphics` as a pickable option in the existing template/live workbook until that dropdown list is regenerated.
+The committed template (`P1_Templates/HiringAgent_P1_CandidateList.xlsx`) retains its historical **Category** dropdown for compatibility. P1 leaves Category blank, and P2 keeps the assigned category in `P2-MasterFile.xlsx` rather than populating the P1 intake workbook.
 
 ### Local repo structure
 

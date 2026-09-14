@@ -9,7 +9,7 @@ September 7 source review: use the [current architecture](../../CURRENT_ARCHITEC
 > ## 🔇 A live run currently contacts nobody (since 2026-09-04)
 >
 > Applicant mail is **OFF** in both phases. A live run still scores rows, moves
-> resumes, maintains the Rejected sheet and rebuilds the client export — it only
+> resumes, maintains P2's own master and rebuilds the client export — it only
 > withholds:
 >
 > - the **decline** to a candidate confirmed outside the USA,
@@ -81,7 +81,7 @@ No unscored candidates - queue is empty.
 - Processes candidates with a genuinely updated resume or clarification reply.
 - Leaves previously scored or rejected candidates untouched.
 - Keeps unclear-location candidates on the main sheet for human review.
-- Moves only confirmed non-US candidates to the Rejected sheet.
+- Keeps every P1 intake row on `CandidateList`; confirmed non-US candidates receive a rejected status there and move to the Rejected sheet only in `P2-MasterFile.xlsx`.
 - Sends eligible clarification or decline emails.
 - Refreshes SharePoint `Candidate_List_Results.xlsx` after the batch finishes.
 
@@ -219,7 +219,7 @@ still waiting.
 
 - `Processed`: candidates completed in this run.
 - `Geo review`: unclear locations kept on the main sheet for review.
-- `Rejected`: confirmed non-US candidates moved to Rejected.
+- `Rejected`: confirmed non-US candidates classified as Rejected in P2's own master.
 - `Declines`: decline email results.
 - `Info reqs`: clarification email results.
 - `Errors`: should be zero.

@@ -278,6 +278,8 @@ ok("triggerOutputs" not in blob and "triggerBody" not in blob,
 # Add_row is untouched and the flow package does NOT need rebuilding or re-importing.
 print("\n=== B. COLUMN CONTRACT (11-col write, 33-col table) ===")
 item   = actions["Add_row"]["inputs"]["parameters"]["item"]
+ok(actions["Add_row"].get("inputs", {}).get("retryPolicy", {}).get("type") == "none",
+   "Add_row disables automatic replay of the non-idempotent Excel append")
 cols   = list(item.keys())
 p2cols = ycfg["columns"]
 # Reverted to 11 on 2026-09-08. 'Resume URL' (the attachment manifest) and 'Resume Folder

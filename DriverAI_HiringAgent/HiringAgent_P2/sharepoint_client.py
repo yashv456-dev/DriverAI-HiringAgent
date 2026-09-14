@@ -683,13 +683,11 @@ class SharePointClient:
             current = next((r for r in self.list_rows() if r["index"] == index), None)
             current_values = current["values"] if current else {}
         if getattr(self, "table", None) == "HiringAgent_P1_Candidates":
-            _forbidden = {
-                "Category", "Phone", "Location", "Country", "Years Exp", "Current Skills",
-                "Education", "Education Start Date", "Education End Date", "Looking For Role",
-                "Suggested Role 1", "Suggested Role 2", "Suggested Role 3",
-                "Portfolio 1", "Portfolio 2", "Portfolio 3", "Resume URL", "Resume Folder Path",
-            }
-            fields = {k: v for k, v in fields.items() if k not in _forbidden}
+            # This workbook is P1's intake ledger. P2's extracted/scored record lives in
+            # candidates.db and P2-MasterFile.xlsx; only workflow state and the renamed-file
+            # display value are allowed back onto the intake row.
+            fields = {k: v for k, v in fields.items()
+                      if k in {"Status", "Resume Link"}}
         merged = dict(current_values)
         merged.update(fields)
         values = [[merged.get(c, "") for c in cols]]

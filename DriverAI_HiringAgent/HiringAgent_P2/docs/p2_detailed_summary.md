@@ -1,6 +1,6 @@
 ﻿# Phase 2 (Scoring Client) Detailed Architectural Summary
 
-**Phase 2** (`HiringAgent_P2`) acts as the scoring client and pipeline executor of the hiring pipeline. It can run serverlessly in the cloud (Azure Functions, GitHub Actions), as a background daemon CLI, or as a local Desktop GUI. It reads pending rows from the SharePoint workbook, extracts and scores their resumes against active job descriptions, applies the USA-only location filter, and updates the SharePoint rows.
+**Phase 2** (`HiringAgent_P2`) acts as the scoring client and pipeline executor of the hiring pipeline. It reads pending rows from P1's SharePoint workbook, extracts and scores their resumes, and stores the full result in SQLite and `P2-MasterFile.xlsx`. It writes only `Status` and `Resume Link` back to P1's `CandidateList`.
 
 ---
 
@@ -26,8 +26,8 @@ graph TD
     Extract --> Parse[Parse Fields: LLM or Offline Regex]
     Parse --> Score[Match open JDs: LLM or Keyword Scorer]
     Score --> Geo[USA Geo-Filter check]
-    Geo -- USA --> MainSheet[Save to Main Workbook, Status: Scored]
-    Geo -- Non-USA --> RejSheet[Move to Rejected Sheet, Decline Sent: Sent timestamp]
+    Geo -- USA --> MainSheet[Save to P2 Main, patch P1 status/link]
+    Geo -- Non-USA --> RejSheet[Save to P2 Rejected, patch P1 status/link]
 ```
 
 ### Step 1: Resume Retrieval
@@ -55,10 +55,10 @@ Calculates compatibility matches against active Job Descriptions (JDs):
 Current policy (updated 2026-07-28) is tri-state: `confirmed_us`, `confirmed_non_us`, or `unknown`. Only confirmed non-US evidence moves a candidate to `Rejected - Non-USA Location`. Missing or conflicting current-location evidence stays on the main sheet as `Needs Review - Location Confirmation`, even after an updated-resume follow-up. A US phone, university, or employer prevents an unsafe rejection but does not prove current residence, fabricate Location/Country, or make the row eligible for the scored-results export.
 
 Checks the candidate's extracted `Country` and `Location` values.
-* **USA Location:** Candidate is accepted. The row is updated with all 15 P2-owned scored columns (Full Name, Phone, Location, Country, Current Skills, Education, Looking For Role, Suggested Role 1-3, Category, Portfolio 1-3, Status), and `Status` is flipped to `"Scored"`. The saved resume is also renamed at this point to `<FirstNameLastName>_<Category>_<tail>.<ext>` (e.g. `JaneDoe_DataAnalytics_A5F2.pdf`, `tail` = the AppID's own hex tail â€” changed 2026-07-15, was `<FirstLast>_<AppID>`).
+* **USA Location:** Candidate is accepted. The full extracted/scored row is saved in P2's local store and `P2-MasterFile.xlsx`, and P1 receives `Status = "Scored"` plus the renamed `Resume Link`. The saved resume is also renamed at this point to `<FirstNameLastName>_<Category>_<tail>.<ext>`.
   The workbook's visible `Resume Link` label remains the candidate's `Original Filename` while linking to the final P2-owned `Resume URL`.
 * **Unknown/conflicting Location:** Candidate remains on the main sheet as `"Needs Review - Location Confirmation"`. No decline is queued, and the row is excluded from `Candidate_List_Results.xlsx` until current US residence is confirmed.
-* **Non-USA Location:** Candidate is declined only when current non-US evidence is confirmed. The row is moved to the **`Rejected`** worksheet, its status is changed to `"Rejected - Non-USA Location"`, its resume file is moved into a single **year-level** `<Year>/Rejected/` folder (changed 2026-07-15 â€” was one `Rejected/` subfolder per month), and the `"Decline Sent"` column is left blank so the separate decline-mail pass (below) picks it up.
+* **Non-USA Location:** Candidate is declined only when current non-US evidence is confirmed. The full row moves to the **`Rejected`** worksheet in `P2-MasterFile.xlsx`; P1 keeps the original intake row on `CandidateList` and receives only `Status = "Rejected - Non-USA Location"` and `Resume Link`. The resume file moves into the year-level `<Year>/Rejected/` folder, and P2's `Decline Sent` value drives the separate decline-mail pass.
 
 Concrete current US location evidence is a state, ZIP, territory, or recognizable US city in the extracted current-location field. A US phone or US education/work context is supporting evidence only: it can contradict a stale foreign hometown/degree extraction and route the row to review, but cannot independently confirm residence. A bare country field also remains unknown without a confirmed current location.
 
@@ -69,18 +69,16 @@ The nudge is also used for current-location clarification. P1 captures an update
 
 Duplicate cleanup keeps the newest row by `Received Date` and may heal missing scored/profile fields from an older duplicate, but it never copies P1-owned identity, date, mail, original filename, or resume URL/path fields from the older row into the newer row.
 
-After a candidate is accepted and scored, a separate pass checks whether **Phone, Location, Current Skills, or Education** came back blank (Portfolio is not checked). It also asks for **current location/country** when a kept row has a nonblank but ambiguous location that is neither a concrete US signal nor a concrete foreign signal. If any are missing or unclear, a one-time email asks the candidate to reply **with an updated resume attached** containing that information â€” a plain-text reply is never actually captured downstream, so the copy is deliberately worded to point at the one path that gets re-scored. Tracked via the main-sheet-only `Info Request Sent` column so it never asks twice; historical rows stamped `Nothing missing` can be reopened only for this newer location-clarity rule, while `Sent ...` remains final. This never replaces a geography rejection: clear non-USA candidates still move to Rejected, while only unclear kept/scored candidates get a nudge.
+After a candidate is accepted and scored, a separate pass checks whether **Phone, Location, Current Skills, or Education** came back blank (Portfolio is not checked). It also asks for **current location/country** when a kept row has a nonblank but ambiguous location. P2 tracks the request in its own stored row; P1 still receives only status/link updates. Clear non-USA candidates route to P2 Rejected, while only unclear kept/scored candidates get a nudge.
 
 ### Step 6a: Client Export Period Separators (added 2026-07-31)
 `_with_period_separators()` (`sharepoint_scoring.py`) inserts one fully blank row under the header of `Candidate_List_Results.xlsx`, plus one between each calendar month, matching the visual rhythm of P1's year/month separators on CandidateList. A year change is also a month change, so a year boundary yields exactly **one** blank row rather than two stacked. Separators are blank in every column and carry no `Application ID`, so every reader skips them. A blank/unparseable `Received Date` is treated as *no period* — without that guard `_parse_received` returns a fallback date and a single dateless row injects a spurious separator on both sides of itself (caught by the tests, fixed before release). Covered by `test_p2.py` §W2.
 
-### Step 6a-2: Rejected Sheet Period Separators (added 2026-07-31)
-The Rejected sheet is appended one row at a time (unlike the client export, which is rebuilt whole), so `_ensure_rejected_period_separator()` decides per insert: it reads the months already present on the sheet and adds a single fully blank row only when the incoming rejection opens a new month. A year change is also a month change, so exactly **one** blank lands either way - the same rule P1 applies on CandidateList. The very first Rejected row gets no separator, since the permanent spacer under the header already provides that gap.
-
-It takes the **raw** Received Date rather than a parsed datetime on purpose: `_parse_received` returns a fallback date instead of `None` for blank or garbage input, so parsing at the call site would make a dateless row look like a brand-new period and insert a spurious blank. Wired into all four append sites (give-up path, `_finish_rejection`, and both recheck flows) and fully best-effort - any failure is logged and swallowed, because a cosmetic blank row must never stop a real rejection being recorded. Covered by `test_p2.py` §W3.
+### Step 6a-2: P2 Rejected Sheet
+The `Rejected` sheet is generated from P2's transactional local store whenever `P2-MasterFile.xlsx` is published. P2 does not append to the historical `Rejected` worksheet in `Sharepoint_Master_File.xlsx`.
 
 ### Step 6b: Master Email Kill-Switch (added 2026-07-31)
-`HIRING_SUPPRESS_EMAILS=true` (or `test_mode.suppress_emails: true` in `config.yaml`) stops every outbound P2 email while the rest of the pipeline runs untouched: rows are scored and patched, resumes renamed and moved, the Rejected sheet maintained, the client workbook exported. It is the P2 counterpart of P1's `flow_config.json` `test_mode.suppress_emails`; the two are independent and both must be set for a fully silent replay.
+`HIRING_SUPPRESS_EMAILS=true` (or `test_mode.suppress_emails: true` in `config.yaml`) stops every outbound P2 email while the rest of the pipeline runs untouched: rows are scored, resumes renamed/moved, the P2 master maintained and the client workbook exported. It is the P2 counterpart of P1's `flow_config.json` `test_mode.suppress_emails`; the two are independent and both must be set for a fully silent replay.
 
 Enforcement lives inside `SharePointClient.send_mail()` rather than at each call site, deliberately. `GEO_REJECT_EMAIL` gates the decline and `ERROR_EMAIL_ENABLED` gates the admin alert, but the **missing-info nudge has never had a flag of its own** — it fires on any scored row with a gap — so turning both existing flags off did *not* silence P2. Gating the one function every sender calls makes that class of omission impossible.
 
@@ -94,7 +92,7 @@ Suppressed rows are stamped `TEST-MODE (suppressed) Sent <ts>` in `Mail Sent` / 
 * **Duplicate Merge Guard:** Duplicate cleanup skips rows that are still active queue items (`New Email Received`, blank status, or `Needs Review - Unreadable Resume`). Fresh updates are scored before any older duplicate row can be collapsed into them.
 * **Retry Cap:** If a row fails **3 times** consecutively:
   1. The client gives up.
-  2. The row is moved to the **`Rejected`** worksheet with `Status = "Rejected - Processing Error"`.
+  2. The row is classified on P2's **`Rejected`** worksheet with `Status = "Rejected - Processing Error"`; its P1 intake row remains in `CandidateList` with that status.
   3. The `Decline Sent` column is pre-stamped so no decline template is emailed.
   4. An email alert is fired to the admin (`yashv@driverai.io`) for manual review.
 

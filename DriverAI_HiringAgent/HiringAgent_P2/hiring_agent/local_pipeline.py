@@ -130,7 +130,16 @@ def isolated_score(values, documents, roles, timeout=None):
             process.join()
 
 
-def _find_by_app_ref(remote, app, places, hint=None):
+def _filename_identity(value, app='', tail=''):
+    """Comparable filename/name hint with application tokens and punctuation removed."""
+    value = Path(str(value or '')).stem.lower()
+    for token in (str(app or '').lower(), str(tail or '').lower()):
+        if token:
+            value = value.replace(token, '')
+    return ''.join(ch for ch in value if ch.isalnum())
+
+
+def _find_by_app_ref(remote, app, places, hints=None):
     """Locate a CV by the application reference stamped into its filename.
 
     Every name P1 and P2 save ends '_<AppRef tail>.<ext>', but reconstructing the rest of the
@@ -139,8 +148,11 @@ def _find_by_app_ref(remote, app, places, hint=None):
     stored file was 'Awais_Ahmad_WPWA.pdf', so the row could never be scored and never got the
     name that would have found it. The reference does not depend on any of that.
 
-    Returns (folder, name, bytes), or None. If multiple files match this tail (e.g. an intake
-    file and a canonical rename both exist), it disambiguates by hint or canonical shape.
+    Returns (folder, name, bytes), or None. A full Application ID match is authoritative.
+    A short-tail match is accepted only when an applicant/original-filename hint uniquely
+    identifies it. Four-character tails are not unique: APP-20260805-0931-PMCA (Vibha)
+    and APP-20260810-1014-PMCA (Shalin) collided live, and the old canonical-shape fallback
+    attached Shalin's CV to Vibha's row. Ambiguity now fails closed instead of guessing.
     """
     from sharepoint_client import SharePointError
     tail = str(app or '').rsplit('-', 1)[-1].strip()
@@ -157,28 +169,30 @@ def _find_by_app_ref(remote, app, places, hint=None):
                          if Path(n).stem.lower().endswith('_' + tail.lower())]
         if not hits:
             continue
-        if len(hits) == 1:
-            try:
-                return place, hits[0], remote.download_file(place, hits[0])
-            except SharePointError:
-                continue
-        # Multiple hits ending with this tail (e.g. intake file + canonical rename):
-        target = None
-        if hint:
-            hint_stem = Path(hint).stem.lower().replace(app.lower(), '').strip('_-')
-            for h in hits:
-                if hint_stem and hint_stem in h.lower():
-                    target = h
+        target = exact[0] if len(exact) == 1 else None
+        if target is None:
+            # Hints are ordered by authority. Original Filename and sender identity come
+            # before a previously-derived Full Name/Resume Link, which might itself be the
+            # result of an earlier bad tail match. Use the first hint with one unique hit.
+            for value in (hints or []):
+                identity = _filename_identity(value, app, tail)
+                if not identity:
+                    continue
+                hinted = []
+                for candidate in hits:
+                    candidate_id = _filename_identity(candidate, app, tail)
+                    if (identity == candidate_id or
+                            (len(identity) >= 6 and identity in candidate_id) or
+                            (len(candidate_id) >= 6 and candidate_id in identity)):
+                        hinted.append(candidate)
+                if len(hinted) == 1:
+                    target = hinted[0]
                     break
-        if not target:
-            # Prefer canonical <First>_<Last>_<tail>.ext shape if present
-            for h in hits:
-                parts = Path(h).stem.split('_')
-                if len(parts) == 3 and parts[-1].lower() == tail.lower():
-                    target = h
-                    break
-        if not target:
-            target = hits[0]
+        if target is None:
+            cfg.logger.warning(
+                '        Attachment: %s has ambiguous short-tail matches in %s: %s',
+                app, place, ', '.join(hits))
+            continue
         try:
             return place, target, remote.download_file(place, target)
         except SharePointError:
@@ -225,7 +239,28 @@ def cache_documents(remote, values, cache_dir, *, rejected=False):
     documents = {}
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    for slot in slots:
+    original_names = [part.strip() for part in
+                      str(values.get('Original Filename', '') or '').split(',')]
+    tail = str(app or '').rsplit('-', 1)[-1].strip()
+    email_local = str(values.get('Email', '') or '').split('@', 1)[0]
+    for slot_index, slot in enumerate(slots):
+        original_hint = (original_names[slot_index]
+                         if slot_index < len(original_names) else '')
+
+        def _candidate_rank(entry):
+            name = str(entry.get('name', '') or '')
+            if str(app).lower() in name.lower():
+                return 0
+            candidate_id = _filename_identity(name, app, tail)
+            original_id = _filename_identity(original_hint, app, tail)
+            email_id = _filename_identity(email_local, app, tail)
+            if original_id and (original_id == candidate_id or original_id in candidate_id):
+                return 1
+            if email_id and len(email_id) >= 6 and email_id in candidate_id:
+                return 2
+            return 3
+
+        slot = sorted(slot, key=_candidate_rank)
         for entry in slot:
             name = entry['name']
             places = [entry['folder'], f'{remote.resumes_folder}/{counterpart}']
@@ -248,7 +283,9 @@ def cache_documents(remote, values, cache_dir, *, rejected=False):
                     if error.status_code != 404:
                         raise
             if raw is None:
-                found = _find_by_app_ref(remote, app, places, hint=name)
+                found = _find_by_app_ref(
+                    remote, app, places,
+                    hints=(original_hint, email_local, values.get('Full Name', ''), name))
                 if found:
                     target_folder, name, raw = found
             if raw is None:
@@ -282,14 +319,8 @@ RECOVERABLE_FIELDS = ('Phone', 'Location', 'Country', 'Years Exp',
 #: The workbook is a STATE fallback, not a data backup. Every field P2 derives lives in the
 #: local database and in the two published reports; sync_from_client compares only
 #: INPUT_COLUMNS and leaves a matching row untouched, so nothing P2 writes here is ever read
-#: back into P2. Two columns is therefore the whole useful contract:
-#:
-#:   Status       the state machine. P2's queue reads it, and on a rebuilt database it is
-#:                what stops every candidate being scored again from scratch. It already
-#:                carries Scored / Needs Review - * / Rejected - *.
-#:   Resume Link  the only route from the sheet to the file, because P2 renames the resume
-#:                after scoring and 'Original Filename' deliberately keeps what the
-#:                APPLICANT sent rather than what is stored.
+#: back into P2. Two columns are the whole useful contract: workflow Status and the stored
+#: Resume Link after P2 renames the file.
 MASTER_WRITE_COLUMNS = ('Status', 'Resume Link')
 
 
@@ -300,30 +331,6 @@ def _master_patch(values):
     than blanking anything.
     """
     return {col: values[col] for col in MASTER_WRITE_COLUMNS if col in values}
-
-
-def _with_original_inputs(values, source):
-    """`values` with every P1-owned input column restored from `source`.
-
-    Writing a row back with a CHANGED input column is not a cosmetic problem: the local
-    store hashes exactly those columns to decide whether a submission is new, so a single
-    altered cell makes the next poll read the row as a fresh application, reset it to
-    'New Email Received', clear Retry Count and discard the scored result - which P2 then
-    re-scores, rewriting the row every cycle. P2 fills 'Original Filename' and
-    'Last Updated Date' when P1 leaves them blank, and both are input columns, so this was
-    reachable in normal operation (reproduced 2026-09-11).
-
-    Used on the Rejected-sheet ADD, which has to carry a whole row. The main-sheet path
-    avoids the problem differently, by never sending an input column at all.
-    """
-    from .sqlite_store import INPUT_COLUMNS
-    out = dict(values)
-    for col in INPUT_COLUMNS:
-        if col in source:
-            out[col] = source[col]
-        else:
-            out.pop(col, None)
-    return out
 
 
 def _is_gap(value):
@@ -576,23 +583,15 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
 def _sync_row_to_sharepoint(remote, app_id, sheet, result_values, source_values=None):
     """Sync the scored result back to the SharePoint intake table if available.
 
-    Writes MASTER_WRITE_COLUMNS and nothing else. `source_values` is the row exactly as it
-    was imported; the Rejected ADD restores P1's input columns from it so moving a
-    candidate off the main sheet cannot alter the input hash either.
+    SharePoint_Master_File.xlsx is P1's intake ledger. P2 keeps its own main/rejected split
+    in SQLite and P2-MasterFile.xlsx, so either outcome patches the original P1 row in place
+    with MASTER_WRITE_COLUMNS and nothing else. A rejected result changes Status; it never
+    copies profile data to, or deletes a row from, P1's workbook.
     """
     if not hasattr(remote, 'list_rows'):
         return
     from .store import ExcelCandidateStore
     sp_store = ExcelCandidateStore(remote)
-    if sheet == 'main':
+    if sheet in ('main', 'rejected'):
         sp_store.save_by_id(app_id, _master_patch(result_values))
-    elif sheet == 'rejected':
-        try:
-            # A rejection LEAVES the main sheet, so the Rejected row is the only remaining
-            # record and carries the whole candidate. Input columns are restored from the
-            # imported row so the archived copy still hashes identically.
-            sp_store.move_to_rejected(
-                app_id, _with_original_inputs(result_values, source_values or {}))
-        except Exception as rej_err:
-            cfg.logger.warning('Could not move %s to rejected in SharePoint: %s', app_id, rej_err)
 
