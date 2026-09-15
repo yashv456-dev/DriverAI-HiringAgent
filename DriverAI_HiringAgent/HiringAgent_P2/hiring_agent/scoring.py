@@ -251,6 +251,26 @@ def _skill_overlap_count(skills_str: str, role_skills) -> int:
     return len(candidate & {str(s).lower() for s in role_skills})
 
 
+def _ai_pick_has_evidence(skills_str: str, role_pref: str, title: str,
+                          role_skills) -> bool:
+    """True when an AI-ranked role has enough literal support to publish.
+
+    A matching stated role family is meaningful semantic evidence. Without it, one generic
+    shared skill cannot support a role whose JD lists several requirements. This prevents a
+    hardware/RTL resume with only Python in common from being labeled an 85% AI/CV software
+    match, while retaining preference-aligned picks and genuine one-skill specialist JDs.
+    """
+    required = {str(s).lower() for s in (role_skills or []) if str(s).strip()}
+    overlap = _skill_overlap_count(skills_str, required)
+    if overlap == 999:
+        return True
+    if overlap == 0:
+        return False
+    if len(required) > 2 and overlap < 2 and not _preference_matches_title(role_pref, title):
+        return False
+    return True
+
+
 def _is_scoring_role(role: dict) -> bool:
     """True for real candidate-match JDs; false for admin docs accidentally cached as JDs."""
     title = str(role.get("title", "") or "")
@@ -483,9 +503,12 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
                 # A confident model with zero evidence is worse than no model: drop any AI
                 # pick that shares no skill at all with the candidate. Roles with a genuine
                 # overlap keep the AI's ranking, which is what it is good at.
-                if _skill_overlap_count(skills_str, role_skills_by_title.get(title.lower())) == 0:
+                if not _ai_pick_has_evidence(
+                        skills_str, role_pref, title,
+                        role_skills_by_title.get(title.lower())):
                     logger.info(f"   scorer: dropped AI pick {title[:48]!r} - zero skill "
-                                f"overlap with the candidate (AI said {r['score']}%)")
+                                f"or only one unsupported generic overlap with the candidate "
+                                f"(AI said {r['score']}%)")
                     continue
                 seen_openings.add(key)
                 ranked.append(r)

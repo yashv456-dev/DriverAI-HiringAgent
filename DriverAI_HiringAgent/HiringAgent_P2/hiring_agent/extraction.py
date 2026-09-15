@@ -1180,6 +1180,10 @@ def normalize_education(value: str) -> str:
     if not text or text.lower() in _GAP_LITERALS:
         return "Not extracted"
     text = text.replace("\u00a0", " ").replace("\u2019", "'")
+    # Single underscores are pymupdf4llm italic markers, not candidate data.
+    text = re.sub(r"(?<!\w)_([^_\n]+)_(?!\w)", r"\1", text)
+    text = text.replace("~~", "")
+    text = _EDU_GLUED_MONTH_RE.sub(" ", text)
     # Undo stylistic letter-spacing before anything else reads the value, so a cell stored
     # damaged (pre-2026-07-31) is actually repaired rather than just flagged. Collapsing runs
     # the words together ("BachelorofScienceinCS"), which the fused-word replacements below
@@ -1213,15 +1217,26 @@ def normalize_education(value: str) -> str:
     text = re.sub(r"\s+([,;])", r"\1", text)
     text = re.sub(r"([,;])(?=\S)", r"\1 ", text)
     text = re.sub(r"\s{2,}", " ", text).strip(" ,;-|")
+    text = re.sub(r",\s*[-\u2013\u2014]\s*", ", ", text)
     # Multi-degree entries can carry a parenthesized range before the next degree, so the
     # trailing-date cleanup below never reaches it. Date columns own this data; remove only
     # an unmistakable four-digit year range wherever it appears.
     text = re.sub(
-        r"\s*\(\s*(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}\s*\)",
+        r"\s*\(\s*(?:19|20)\d{2}\s*[-\u2013\u2014]\s*(?:19|20)\d{2}\s*\)",
         "", text)
     # A trailing date is not part of the degree: Education Start/End Date carry it, and live
     # row APP-20260902-2155-MCPA published 'B.Sc. (Design and Computing), BITS Pilani (WILP)
     # | 2025' with the same 2025 already in Education End Date (2026-09-14).
+    # Education Start/End Date own month/year evidence. Remove it anywhere in a combined
+    # multi-degree value, including "MS ... | May 2026 Bachelor ... | May 2024".
+    text = re.sub(
+        rf"(?i)\s*(?:\|\s*)?(?:{_EDU_MONTH_RE})\.?\s+\d{{4}}"
+        rf"(?:\s*(?:[-\u2013\u2014]|to)\s*(?:(?:{_EDU_MONTH_RE})\.?\s+\d{{4}}|\d{{4}}|present|current))?"
+        r"\s*(?:\(\s*expected\s*\))?",
+        " ", text)
+    text = re.sub(r"\(\s*\)", "", text)
+    text = re.sub(r"\s+([,;])", r"\1", text)
+    text = re.sub(r"\s{2,}", " ", text).strip(" ,;-|")
     text = _EDU_TRAILING_DATE_RE.sub("", text).strip(" ,;-|")
     if text.upper() in {"AND TRAINING", "EDUCATION", "TRAINING", "AND"}:
         return "Not extracted"
@@ -1441,13 +1456,24 @@ def _institution_on_line(line: str) -> str:
     """The school named on one resume line ('National University of … (FAST-NUCES)'), or ""."""
     # Drop a leading bullet only ('o ', '• ', '- '): str.strip('o') would eat the O of 'Ohio'.
     line = re.sub(r"^\s*(?:[•·▪◦●*\-–—]|o(?=\s))\s*", "", str(line or ""))
-    for segment in _INSTITUTION_SPLIT_RE.split(line.strip()):
+    segments = _INSTITUTION_SPLIT_RE.split(line.strip())
+    for index, segment in enumerate(segments):
         # A GPA ends the name: 'Arizona State University (3.72/4) Tempe, AZ' -> the school
         # only, not the campus city that follows the grade with no separator.
         gpa = re.search(r"\(\s*\d[\d.]*\s*/\s*\d[\d.]*\s*\)|\bGPA\b|\bCGPA\b", segment)
         segment = (segment[:gpa.start()] if gpa else segment).strip(" ,;")
         if _INSTITUTION_RE.search(segment) and not _DEGREE_RE.match(segment):
-            return segment
+            # A business/engineering school and its parent university are often separated
+            # by a comma. Keep the adjacent parent institution, but stop before a campus
+            # city/country (live: W. P. Carey School of Business, Arizona State University).
+            school_parts = [segment]
+            for following in segments[index + 1:]:
+                following = following.strip(" ,;")
+                if not (_INSTITUTION_RE.search(following)
+                        and not _DEGREE_RE.match(following)):
+                    break
+                school_parts.append(following)
+            return ", ".join(school_parts)
     return ""
 
 
@@ -1472,21 +1498,29 @@ def complete_education(value, resume_text: str) -> str:
     for i, line in enumerate(lines):
         if core not in re.sub(r"[^a-z0-9]+", " ", line.lower()):
             continue
-        # Prefer the lines after the degree.  That is the usual degree-then-school layout
-        # and avoids treating an immediately preceding achievement such as "College Level:
-        # Recognised ..." as the institution (live: Sankalp Sharma).  Some two-column PDFs
-        # put the school immediately before the degree, so use those lines only if the
-        # forward pass found nothing.  Each direction stops at its own section boundary.
-        directions = ([line] + lines[i + 1:i + 3],
-                      list(reversed(lines[max(0, i - 2):i])))
-        for direction in directions:
-            for candidate in direction:
-                if candidate != line and (_is_section_heading(candidate)
-                                          or _DEGREE_RE.search(candidate)):
-                    break
-                school = _institution_on_line(candidate)
-                if school and school.lower() not in val.lower():
-                    return normalize_education(f"{val}, {school}")
+        forward, backward = [], []
+        for candidate in lines[i + 1:i + 3]:
+            if _is_section_heading(candidate) or _DEGREE_RE.search(candidate):
+                break
+            forward.append(candidate)
+        for candidate in reversed(lines[max(0, i - 2):i]):
+            if _is_section_heading(candidate) or _DEGREE_RE.search(candidate):
+                break
+            backward.append(candidate)
+        # Immediate adjacency is stronger than direction: degree->school and
+        # school->degree are both common. Do not skip over a coursework line to steal the
+        # following degree's school (live: Nimish Goel, whose MS was paired with R.V. College
+        # instead of the W. P. Carey / ASU line immediately above it).
+        neighbors = [line]
+        for offset in range(max(len(forward), len(backward))):
+            if offset < len(forward):
+                neighbors.append(forward[offset])
+            if offset < len(backward):
+                neighbors.append(backward[offset])
+        for candidate in neighbors:
+            school = _institution_on_line(candidate)
+            if school and school.lower() not in val.lower():
+                return normalize_education(f"{val}, {school}")
         break
     return val
 
@@ -1602,6 +1636,21 @@ def _extract_education_dates(text: str) -> tuple[str, str]:
     lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
     lines = _split_collapsed_sections(lines)
     lines = _rejoin_word_fragmented_lines(lines)
+
+    # A degree and date sharing one visual row is the strongest available association.
+    # Consider all such rows before a damaged Markdown table can donate a nearby fellowship
+    # or employment range (live: Pragya Mittal's 2023-2024 fellowship displaced the
+    # Aug 2023-May 2025 dates printed on her master's row).
+    degree_pairs = []
+    for line in lines:
+        if not _DEGREE_RE.search(line):
+            continue
+        found = _best_effort(_EDU_GLUED_MONTH_RE.sub(" ", line))
+        if found:
+            degree_pairs.append(found)
+    same_row = _latest(degree_pairs)
+    if same_row:
+        return same_row
 
     # Anchor dates to the exact education value selected for the row whenever that entry can
     # be located.  Selecting the newest date in the whole section is wrong when the text
@@ -1732,7 +1781,7 @@ _EXP_YEARS_FIRST_RE = re.compile(
     # Gerunds sit alongside the nouns for the same reason: "9+ years designing enterprise
     # automation" states a total as plainly as "9+ years of experience". _exp_scan still
     # takes the LARGEST figure, so a per-skill breakdown cannot outrank an overall one.
-    r"(?:experience|expertise|background|engineering|development|industry|software|"
+    r"(?:experience|expertise|background|engineering|development|industry|software|owning|"
     r"production|systems|designing|developing|building|delivering|leading|managing|"
     r"supporting|architecting|automating)\b")
 
@@ -3013,10 +3062,14 @@ def _demarkdown(text: str) -> str:
     if not text:
         return text
     import re as _re
+    text = _re.sub(r"(?i)<br\s*/?>", "\n", text)
+    text = _re.sub(r"(?i)</?(?:u|sup|sub|span|b|i|strong|em)(?:\s[^>]*)?>", "", text)
     text = _re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", text)   # [label](url) -> label
     text = _re.sub(r"\*\*\*(.+?)\*\*\*", r"\1", text, flags=_re.S)
     text = _re.sub(r"\*\*(.+?)\*\*", r"\1", text, flags=_re.S)
     text = _re.sub(r"(?<!\w)_{2}(.+?)_{2}(?!\w)", r"\1", text, flags=_re.S)
+    text = _re.sub(r"(?<!\w)_(.+?)_(?!\w)", r"\1", text, flags=_re.S)
+    text = text.replace("~~", "")
     text = _re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)             # headings
     text = _re.sub(r"(?m)^\s{0,3}>\s?", "", text)                  # block quotes
     text = _re.sub(r"(?m)^\s*([-*+])\s+", "", text)                # bullets

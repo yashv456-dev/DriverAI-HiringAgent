@@ -527,6 +527,7 @@ exp_cases = {
     "building distributed systems.\n": "6 years",
     "SUMMARY: over five years of hands-on experience in data engineering.\n": "5 years",
     "Profile\nMarketing lead. 12 years of experience across B2B SaaS.\n": "12 years",
+    "Summary\nProduct specialist with 3+ years owning end-to-end delivery.\n": "3 years",
     # Singular is spelled correctly - "1 years" would read as a bug to the client.
     "Summary\n1 year of professional experience in QA automation.\n": "1 year",
     # Tier 1 picks the LARGEST stated figure: resumes print a per-skill breakdown under
@@ -5932,7 +5933,7 @@ ok(clean_role_text("Senior React Native or Full-Stack Engineer")
    == "Senior React Native or Full-Stack Engineer", "a clean role title is untouched")
 
 # -- AI scorer: a confident pick with ZERO evidence must be dropped --
-from hiring_agent.scoring import _skill_overlap_count
+from hiring_agent.scoring import _skill_overlap_count, _ai_pick_has_evidence
 _ciso = "Cybersecurity, SIEM, Incident Response, Compliance, Risk Management"
 ok(_skill_overlap_count(_ciso, ["python", "pytorch", "computer vision", "tensorflow"]) == 0,
    "a CISO has zero overlap with an AI/ML JD - the case that was ranked #1 at 95%")
@@ -5940,10 +5941,18 @@ ok(_skill_overlap_count(_ciso, ["cybersecurity", "siem", "compliance", "incident
    "the cybersecurity JD he should have matched scores 4")
 ok(_skill_overlap_count(_ciso, []) == 999,
    "a JD with NO parsed skills is exempt - only a genuine mismatch is dropped")
+_hw = "SystemVerilog, Verilog, ASIC Design, RTL Design, Python"
+_ai_jd = ["computer vision", "machine learning", "tensorflow", "pytorch", "python"]
+ok(not _ai_pick_has_evidence(_hw, "Hardware Engineer", "Software Developer - AI/ML, Computer Vision", _ai_jd),
+   "one generic overlap cannot turn a hardware profile into a multi-skill AI/CV match")
+ok(_ai_pick_has_evidence(_hw, "AI/ML Engineer", "Software Developer - AI/ML, Computer Vision", _ai_jd),
+   "a candidate's stated role preference can support a related low-overlap role")
+ok(_ai_pick_has_evidence(_hw, "Hardware Engineer", "Python Specialist", ["python"]),
+   "a one-skill specialist JD remains eligible when its one required skill matches")
 _sc_src = Path(__file__).with_name("hiring_agent").joinpath("scoring.py").read_text(
     encoding="utf-8", errors="replace")
-ok("_skill_overlap_count(skills_str, role_skills_by_title" in _sc_src,
-   "the zero-overlap guard is wired into the Ollama ranking path")
+ok("_ai_pick_has_evidence(" in _sc_src,
+   "the evidence guard is wired into the Ollama ranking path")
 
 # -- Last Updated must never predate Received --
 _ss_src2 = Path(__file__).with_name("hiring_agent").joinpath(
@@ -6922,6 +6931,13 @@ _z24_sankalp_text = _z24_sankalp_primary + "\n" + "\n".join(_z24_layout_rows)
 ok(_edu_dates(_z24_sankalp_text) == ("", "2014"),
    f"the date aligned with BCA survives Markdown reordering (got {_edu_dates(_z24_sankalp_text)})")
 
+_z24_pragya = """Education
+Masters, Computer Science Fellowship Scholar 2023-2024 - Texas A&M University Aug 202_3 - May 2025
+B.Tech, Computer Science 2019 - 2023
+Masters, Computer Science - Texas A&M University, College Station, TX Aug 2023 - May 2025"""
+ok(_edu_dates(_z24_pragya) == ("Aug 2023", "May 2025"),
+   f"a dated degree row outranks fellowship years on the same degree line (got {_edu_dates(_z24_pragya)})")
+
 # ── Z25. 2026-09-14 LIVE-ROW REVIEW FIXES ────────────────────────────────────
 # Found by opening the resumes behind APP-20260908-1304-MCLA and APP-20260902-2155-MCPA and
 # checking every published column against them.
@@ -6948,6 +6964,12 @@ ok(complete_education(
        "Bachelor of Computer Applications (BCA)", _z24_sankalp_primary) ==
    "Bachelor of Computer Applications (BCA), SSLD Varshney Institute of Management & Engineering",
    "an award sentence containing 'College' cannot replace the school below the degree")
+_z25_nimish = ("EDUCATION\nW.P. Carey School of Business, Arizona State University\n"
+               "M.S. in Information Systems & Management\nRelevant Coursework\n"
+               "R.V. College of Engineering\nB.E. in Electrical Engineering")
+ok(complete_education("M.S. in Information Systems & Management", _z25_nimish) ==
+   "M.S. in Information Systems & Management, W.P. Carey School of Business, Arizona State University",
+   "the institution immediately above the current degree wins over an older school below it")
 ok(complete_education("MBA", "EDUCATION\nMBA\nSKILLS\nPython") == "MBA",
    "no school is invented when none is near the degree (stops at the next section)")
 ok(complete_education(
@@ -6976,6 +6998,14 @@ ok(normalize_education("Seattle University, MS in Computer Science Sept 2023 - J
    "a whole trailing range is removed, never just its second half")
 ok(normalize_education("Bachelor of Arts, Class of 2020 Scholars Program") ==
    "Bachelor of Arts, Class of 2020 Scholars Program", "a year that is not a trailing date stays")
+ok(normalize_education(
+    "Master of Science, ASU | _May 2026_ Bachelor of Technology, SNI | _May 2024_") ==
+   "Master of Science, ASU Bachelor of Technology, SNI",
+   "markdown emphasis and internal degree dates are removed from Education")
+ok(normalize_education(
+    "Master of Science in EE Aug 2024 – May 2026, ASU; Bachelor of Technology Aug 2018 – May 2022, KIIT") ==
+   "Master of Science in EE, ASU; Bachelor of Technology, KIIT",
+   "month ranges are removed cleanly from each degree in a combined Education value")
 
 # Skills: a bracketed group is one skill, the plain duplicate goes, scoring keeps every token.
 ok(normalize_skills("AWS, AWS (EC2, S3, IAM), Docker") == "AWS (EC2/S3/IAM), Docker",
@@ -6984,6 +7014,12 @@ ok({"aws", "ec2", "s3", "iam", "docker"} <= _skill_set("AWS (EC2/S3/IAM), Docker
    "scoring still reads the base and the bracketed items, so no role match is lost")
 ok(normalize_skills("Excel (Pivot, VLOOKUP") == "Excel (Pivot, VLOOKUP",
    "an unbalanced bracket never swallows the rest of the list")
+_z25_hw = _scan_skill_keywords(
+    "SystemVerilog RTL ASIC FPGA TCL GDSII CDC RDC ModelSim Synopsys Verdi "
+    "Design Compiler Cadence Innovus Cadence Genus Xilinx Vivado SPI I2C")
+ok({"systemverilog", "rtl", "asic", "fpga", "gdsii", "modelsim", "cadence innovus",
+    "xilinx vivado", "spi", "i2c"} <= set(_z25_hw),
+   "hardware and silicon resume skills remain visible to role matching")
 from hiring_agent.extraction import _merge_keyword_skills
 # 33 + 1 group + 3 genuine + 3 new keywords = 40, exactly the cap once the group counts once.
 # Counted the old way (group shredded into 3, plus a re-added plain 'AWS') it is 43, and the
