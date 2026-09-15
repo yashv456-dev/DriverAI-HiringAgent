@@ -465,6 +465,8 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
     """
     roles = [r for r in (roles if roles is not None else get_open_roles()) if _is_scoring_role(r)]
 
+    ai = None   # bound here so the REQUIRE_AI branch below can tell "model gave us
+                # nothing" apart from "model answered and our filters rejected it all".
     if OLLAMA_ENABLED and OLLAMA_SCORING:
         ai_roles = _ai_role_shortlist(skills_str, role_pref, roles)
         if len(ai_roles) < len(roles):
@@ -482,15 +484,24 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
                                     for r in ai_roles}
             ranked = []
             seen_openings = set()
+            # Why each pick was discarded. Two of these branches used to `continue` in
+            # silence, so a row that lost every pick here was indistinguishable in the log
+            # from one where Ollama never answered - see the empty-`ranked` warning below.
+            dropped = []
             for r in ai:
-                if r["score"] < SCORING_MIN_MATCH:
-                    continue
                 title = str(r.get("title", "")).strip()
+                if r["score"] < SCORING_MIN_MATCH:
+                    dropped.append(f"{title[:48]!r} {r['score']}% < {SCORING_MIN_MATCH}% minimum")
+                    continue
                 # Same opening-level grouping as the keyword path (_dedupe_ranked_titles), so
                 # an Ollama ranking can't fill all three slots with the JA/PD/v2 documents of
                 # one opening either.
                 key = openings.get(title.lower()) or role_opening_id(title)
                 if not key or key in seen_openings or _NON_JOB_ROLE_TITLE_RE.search(title):
+                    dropped.append(f"{title[:48]!r} {r['score']}% " + (
+                        "has no opening id" if not key
+                        else "repeats an opening already picked" if key in seen_openings
+                        else "is not a job document"))
                     continue
                 # ZERO-OVERLAP GUARD (added 2026-08-04). Ollama scores from its reading of
                 # the text, so it can rate a JD highly that shares NOT ONE skill with the
@@ -509,6 +520,7 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
                     logger.info(f"   scorer: dropped AI pick {title[:48]!r} - zero skill "
                                 f"or only one unsupported generic overlap with the candidate "
                                 f"(AI said {r['score']}%)")
+                    dropped.append(f"{title[:48]!r} {r['score']}% has no skill overlap")
                     continue
                 seen_openings.add(key)
                 ranked.append(r)
@@ -570,17 +582,28 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
                     "reason": r1.get("reason", ""),
                     "source": "ollama",
                 }
+            else:
+                logger.warning("   scorer: Ollama ranked %d role(s), but every pick was "
+                               "filtered out: %s", len(ai), "; ".join(dropped))
 
-    # If Ollama AI scoring was enabled, but Ollama failed or timed out:
-    # Under REQUIRE_AI, strictly forbid falling back to keyword scoring!
+    # Ollama scoring was enabled but produced nothing publishable - either the model never
+    # answered, or it answered and the filters above rejected every pick. Under REQUIRE_AI,
+    # strictly forbid falling back to keyword scoring.
     if getattr(_cfg, "REQUIRE_AI", False) and (OLLAMA_ENABLED and OLLAMA_SCORING):
-        logger.warning("   scorer: Ollama AI role scoring failed or timed out; "
-                       "keyword fallback is disabled under REQUIRE_AI.")
+        if ai:
+            # Do NOT call this a timeout. Reporting a filtered-out ranking as an Ollama
+            # failure sends whoever reads the log chasing the model, the host or the
+            # network for a fault that is not there - the model answered fine.
+            detail = (f"Ollama ranked {len(ai)} role(s) but none cleared the scoring "
+                      f"filters (minimum match {SCORING_MIN_MATCH}%)")
+        else:
+            detail = "Ollama returned no ranking at all (failed, timed out, or unreachable)"
+        logger.warning("   scorer: %s; keyword fallback is disabled under REQUIRE_AI.", detail)
         return {
             "role_1": "",
             "role_2": "",
             "role_3": "",
-            "reason": "AI role scoring failed or timed out",
+            "reason": detail,
             "source": "unavailable",
         }
 

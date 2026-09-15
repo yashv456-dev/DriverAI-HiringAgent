@@ -251,6 +251,59 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(store.get('APP-A').values.get('Retry Count', 0), 0)
         store.conn.close()
 
+    def test_row_stops_being_retried_once_its_budget_is_spent(self):
+        """A deterministic failure must not be re-attempted forever.
+
+        Before the cap reached this path, APP-20260821-0812-MCQA accumulated 22 deferred
+        attempts against a SCORE_RETRY_MAX of 3: the give-up logic lived in the excel
+        scorer, which the sqlite pipeline never reaches.
+        """
+        remote = Remote()
+        def always_fails(values, docs, roles):
+            raise TimeoutError('model slow')
+
+        with patch('hiring_agent.config.SCORE_RETRY_MAX', 3):
+            for run in range(1, 4):
+                result = run_local_pipeline(remote, scorer=always_fails)
+                self.assertEqual(result['deferred'], 1, f'run {run} should have attempted')
+            # Budget spent: the row is skipped instead of burning another attempt.
+            result = run_local_pipeline(remote, scorer=always_fails)
+            self.assertEqual(result['deferred'], 0)
+
+        store = SQLiteCandidateStore(database_path())
+        self.addCleanup(store.conn.close)
+        row = store.get('APP-A')
+        self.assertEqual(store.deferred_attempts(int(row.version)), 3,
+                         'the capped run must not record a fourth attempt')
+        # Never silently rejected or altered - it stays put for a human to look at.
+        self.assertEqual(row.values['Status'], 'New Email Received')
+
+    def test_new_input_restores_the_retry_budget(self):
+        """A candidate who sends a fresh resume is not punished for the old one."""
+        remote = Remote()
+        def always_fails(values, docs, roles):
+            raise TimeoutError('model slow')
+
+        with patch('hiring_agent.config.SCORE_RETRY_MAX', 1):
+            self.assertEqual(run_local_pipeline(remote, scorer=always_fails)['deferred'], 1)
+            self.assertEqual(run_local_pipeline(remote, scorer=always_fails)['deferred'], 0)
+            remote.rows[0]['Last Updated Date'] = '2026-09-09T10:00:00'
+            remote.rows[0]['Application Updates'] = 1
+            self.assertEqual(run_local_pipeline(remote, scorer=always_fails)['deferred'], 1,
+                             'new input must earn a fresh attempt')
+
+    def test_explicit_rerun_overrides_a_spent_budget(self):
+        """An operator asking for one specific row by id is not blocked by the cap."""
+        remote = Remote()
+        def always_fails(values, docs, roles):
+            raise TimeoutError('model slow')
+
+        with patch('hiring_agent.config.SCORE_RETRY_MAX', 1):
+            self.assertEqual(run_local_pipeline(remote, scorer=always_fails)['deferred'], 1)
+            self.assertEqual(run_local_pipeline(remote, scorer=always_fails)['deferred'], 0)
+            forced = run_local_pipeline(remote, scorer=always_fails, app_ids=['APP-A'])
+            self.assertEqual(forced['deferred'], 1)
+
     def test_missing_slot_defers_without_partial_score(self):
         remote = Remote()
         remote.rows[0]['Resume URL'] = 'manifest:'+json.dumps([{'name': 'APP-A.docx', 'folder': '/CVs'}, {'name': 'missing.docx', 'folder': '/CVs'}])

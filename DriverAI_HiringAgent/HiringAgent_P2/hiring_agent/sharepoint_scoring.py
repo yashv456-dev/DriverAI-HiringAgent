@@ -636,8 +636,14 @@ def audit_client_export_integrity(rows: list, source_candidates: list | None = N
 
     if errors:
         raise ValueError("Result Sheet integrity validation failed: " + "; ".join(errors))
-    logger.info("  Result Sheet Audit: verified %d candidate row(s), 0 omissions, "
-                "0 extras, 0 duplicates, and 0 field changes.", len(actual))
+    # An export runs this twice - once in prepare_client_export_rows with the source rows to
+    # compare against, once more at the write boundary without them - which printed the same
+    # audit line twice and made it look like two separate audits had run. Only the pass that
+    # actually cross-checks the source announces itself; the write-boundary re-check still
+    # runs and still raises, it just does not repeat the headline.
+    (logger.info if source_candidates is not None else logger.debug)(
+        "  Result Sheet Audit: verified %d candidate row(s), 0 omissions, "
+        "0 extras, 0 duplicates, and 0 field changes.", len(actual))
     return []
 
 
@@ -2988,8 +2994,12 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
 
     logger.info("  Step 2/4  Checking workbook & columns...")
     if dry_run or _local_client is not None:
-        # Dry-run must be side-effect-free: never create the workbook or add columns.
-        logger.info("  SKIP      Dry-run: not creating/altering workbook or columns.")
+        # Dry-run must be side-effect-free: never create the workbook or add columns. The
+        # local worker skips the same step for an unrelated reason - it has no Excel
+        # workbook at all - and labelling that "Dry-run" made every LIVE sqlite run read
+        # like a preview in the log. Name the actual reason.
+        logger.info("  SKIP      %s: not creating/altering workbook or columns.",
+                    "Dry-run" if dry_run else "Local store")
     else:
         if not _ensure_workbook_or_alert(client, dry_run):
             return {"error": "candidate workbook could not be confirmed - see log; "
@@ -3332,9 +3342,15 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                 # do not publish a match percentage that reads as an AI verdict.
                 deferred += 1
                 consecutive_failures += 1
+                # Carry the scorer's own reason. "fell back to the unavailable scorer" alone
+                # reads as an outage even when the model answered perfectly well and simply
+                # matched nothing above the threshold - which is a catalogue/candidate fit
+                # question for a human, not a fault to go and repair on the host.
                 logger.warning(
                     f"       DEFERRED : {app_id} - role scoring fell back to the "
-                    f"{res.get('source', 'keyword')} scorer. Not written; retried next run."
+                    f"{res.get('source', 'keyword')} scorer "
+                    f"({res.get('reason') or 'no reason reported'}). "
+                    f"Not written; retried next run."
                 )
                 if consecutive_failures >= consecutive_failure_limit:
                     circuit_breaker_tripped = True
@@ -3573,7 +3589,12 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                                            f"{app_id}_scorecard.txt", card.encode("utf-8"))
                     except SharePointError as e:
                         logger.warning(f"       WARNING  : Scorecard upload failed: {e}")
-                logger.info("       Result   : SCORED — row updated in SharePoint.")
+                # Only the excel path writes to SharePoint here; the local worker writes to
+                # its own in-process store, and when the caller is previewing, that store is
+                # a throwaway in-memory copy. Claiming "SharePoint" in those cases made a
+                # dry run look like it had just written to the live tenant.
+                logger.info("       Result   : SCORED — row updated in %s.",
+                            "SharePoint" if _local_client is None else "the local store")
             consecutive_failures = 0
             processed += 1
             candidate_result = "Would score" if dry_run else "Scored"

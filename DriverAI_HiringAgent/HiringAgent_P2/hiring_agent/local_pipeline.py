@@ -448,6 +448,14 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
         try:
             if dry_run:
                 # No persistent candidate/import/publication writes during previews.
+                # Say so plainly: the per-candidate lines below come from the worker, which
+                # runs against this throwaway store and reports its writes exactly as a live
+                # run would, so without this banner a preview is hard to tell from the real
+                # thing in the log.
+                cfg.logger.info('  PREVIEW   Dry run: scoring against a throwaway in-memory '
+                                'copy. No candidate row, resume file, workbook or email is '
+                                'changed; per-candidate "row updated" lines below are '
+                                'previews only.')
                 memory = SQLiteCandidateStore(':memory:')
                 store.conn.backup(memory.conn)
                 store.conn.close()
@@ -485,7 +493,26 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
             elif force:
                 queue = [r for sheet in ('main', 'rejected') for r in store.all_rows(sheet)]
             conflicts = {r[0] for r in store.conn.execute('SELECT app_id FROM import_conflicts')}
-            queue = [r for r in queue if r.app_id not in conflicts][:cfg.SCORING_BATCH_LIMIT]
+            queue = [r for r in queue if r.app_id not in conflicts]
+            # Retry cap. SCORE_RETRY_MAX exists so a row is "never retried forever", but the
+            # give-up path that enforces it lives in the excel scorer, which this function
+            # short-circuits past - so on sqlite a row that fails deterministically (same
+            # resume, same cached JDs, temperature-0 model) was re-attempted on every run
+            # for good: APP-20260821-0812-MCQA reached 22 deferred attempts against a cap of
+            # 3. Stop re-running a row once its budget is spent and say so, loudly, once per
+            # run. An explicit --app-id/force re-run is an operator override and still runs.
+            if app_ids is None and not force:
+                exhausted = [r for r in queue
+                             if store.deferred_attempts(int(r.version)) >= cfg.SCORE_RETRY_MAX]
+                if exhausted:
+                    cfg.logger.warning(
+                        '  STUCK     %d row(s) have spent all %d retries on the current input '
+                        'and will NOT be retried until it changes or they are re-run '
+                        'explicitly: %s', len(exhausted), cfg.SCORE_RETRY_MAX,
+                        ', '.join(r.app_id for r in exhausted))
+                    spent = {r.app_id for r in exhausted}
+                    queue = [r for r in queue if r.app_id not in spent]
+            queue = queue[:cfg.SCORING_BATCH_LIMIT]
             # Idle pass only: with nothing waiting, spend the spare time re-reading the CVs of
             # already-scored rows that still have a recoverable blank. Bounded by
             # HIRING_RECOVERY_LIMIT so an idle poll stays short, and each attempt is recorded

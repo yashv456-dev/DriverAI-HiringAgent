@@ -380,6 +380,21 @@ class SQLiteCandidateStore:
                               (state, detail, attempt_id))
         return state
 
+    def deferred_attempts(self, candidate_id):
+        """Failed attempts already spent on this row's CURRENT input.
+
+        Scoped to the row's present version, so a candidate who sends a new resume (which
+        bumps the version) starts again with a full retry budget instead of inheriting the
+        failures of the input that was replaced.
+        """
+        row = self.conn.execute('SELECT version FROM candidates WHERE id=? AND active=1',
+                                (candidate_id,)).fetchone()
+        if row is None:
+            return 0
+        return self.conn.execute(
+            "SELECT COUNT(*) FROM attempts WHERE candidate_id=? AND input_version=? "
+            "AND state='deferred'", (candidate_id, row['version'])).fetchone()[0]
+
     def backup(self, path):
         dest = sqlite3.connect(str(path))
         try:
