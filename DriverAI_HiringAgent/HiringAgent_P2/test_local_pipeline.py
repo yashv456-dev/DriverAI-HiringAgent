@@ -424,6 +424,57 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(capture[0]['summary']['errors'], 0, capture[0])
         self.assertEqual(capture[0]['rows'][0][1]['Status'], 'Scored', capture[0])
 
+    def test_candidate_with_no_matching_opening_is_recorded_not_retried(self):
+        """A read CV that matches no JD is an answer, not a failure.
+
+        APP-20260915-1110-OP7A (VLSI engineer, catalogue has no chip-design opening) was
+        deferred every run and so never reached the master file at all - not scored, not
+        rejected, invisible to anyone reading the sheet. She belongs on Main under General
+        for a human to place, and NOT on the Rejected sheet, which queues an automated
+        decline for a candidate nobody decided to turn down.
+        """
+        from hiring_agent import sharepoint_scoring as scoring
+        from hiring_agent import config as cfg
+        values = candidate()
+        path = self.root/'cv.docx'; path.write_bytes(b'synthetic')
+        docs = {'APP-A.docx': {'path': str(path), 'sha256': hashlib.sha256(b'synthetic').hexdigest(),
+                              'url': 'https://example.test/cv.docx'}}
+        values['_Local Resume Names'] = list(docs)
+        values['Resume URL'] = docs['APP-A.docx']['url']
+        details = {'full_name': 'Alex Morgan', 'phone': '5125550123', 'location': 'Austin, TX',
+                   'country': 'United States', 'skills': 'Verilog, ASIC, RTL',
+                   'looking_for_role': 'EE Circuit Design Engineer',
+                   'education': 'MS Computer Engineering', 'experience': '3 years'}
+        no_match = {'role_1': '', 'role_2': '', 'role_3': '', 'source': 'no_match',
+                    'reason': 'Ollama ranked 9 role(s) but none cleared the scoring filters'}
+        capture = []
+        class Pipe:
+            def send(self, value): capture.append(value)
+            def close(self): pass
+        with patch.object(scoring, 'ollama_health', return_value=(True,'OK')), \
+             patch.object(scoring, 'extract_text_from_bytes', return_value='Alex Morgan Austin TX Verilog ASIC RTL'), \
+             patch.object(scoring, 'extract_candidate_details_smart', return_value=details), \
+             patch.object(scoring, 'ai_recheck_fields', side_effect=lambda fields,*a: fields), \
+             patch.object(scoring, 'infer_missing_portfolios', return_value=('N/A','N/A','N/A')), \
+             patch.object(scoring, 'suggested_roles', return_value=no_match), \
+             patch.dict(scoring.EXTRACTION_SOURCE, {'value':'ollama'}), \
+             patch.dict(os.environ, {'HIRING_P2_DISABLED':'false'}):
+            _child(Pipe(), values, docs, [{'title':'Engineer','skills':['Python']}])
+
+        self.assertNotIn('error', capture[0], capture[0])
+        summary = capture[0]['summary']
+        self.assertEqual(summary.get('deferred', 0), 0,
+                         'a no-match candidate must not be queued for another attempt')
+        sheet, row = capture[0]['rows'][0]
+        self.assertEqual(sheet, 'main', 'no-match belongs on Main, never the Rejected sheet')
+        self.assertEqual(row['Status'], cfg.STATUS_NEEDS_REVIEW)
+        self.assertEqual(row['Category'], 'General')
+        self.assertEqual(row['Suggested Role 1'], '',
+                         'no role cleared the bar, so no role may be published')
+        # Her extracted profile has to survive - that is the point of recording her.
+        self.assertEqual(row['Full Name'], 'Alex Morgan')
+        self.assertIn('Verilog', row['Current Skills'])
+
 
 class MasterWriteContract(unittest.TestCase):
     """P2 may write only MASTER_WRITE_COLUMNS onto P1's intake workbook."""

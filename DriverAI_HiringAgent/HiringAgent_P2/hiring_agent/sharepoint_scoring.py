@@ -3108,6 +3108,9 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
         batch_left = batch_total - current
         queue_left = max(queue_total - current, 0)
         candidate_result = "Processing Error"
+        # Set when the model scored this CV fine and simply matched no opening, so the
+        # review the row lands in is not reported as an extraction problem.
+        no_matching_opening = False
 
         def log_candidate_progress(activity: str, state: str = "candidate",
                                    result: str = "") -> None:
@@ -3337,7 +3340,30 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
 
             log_candidate_progress("Matching roles and checking location")
             res = suggested_roles(skills, role_pref, roles=roles, resume_text=text)
-            if res.get("source") != "ollama":
+            if res.get("source") == "no_match":
+                # The model read this CV and rated every shortlisted JD below the bar. That
+                # is an answer, not a failure: it says we have no opening for this person,
+                # and it will say the same on every future run because nothing about the
+                # inputs changes. Deferring it meant a perfectly good candidate never
+                # reached the master file at all - not scored, not rejected, just retried
+                # for ever and invisible to anyone reading the sheet (live:
+                # APP-20260915-1110-OP7A, a VLSI engineer against a catalogue with no
+                # chip-design opening).
+                #
+                # So fall through with the role slots left empty. assign_category below
+                # files her under 'General', and the completeness gate further down writes
+                # the row as Needs Review on the MAIN sheet - which reaches a human without
+                # emailing anyone: _send_pending_info_requests only mails Scored/Location
+                # Review rows, and _age_out_stale_reviews only ages Location Review/Spam.
+                # Deliberately NOT the Rejected sheet: that queues an automated decline
+                # (see _send_pending_declines), and "we have no vacancy" is not a decision
+                # to reject someone on merit.
+                no_matching_opening = True
+                logger.warning(
+                    f"       NO MATCH : {app_id} - {res.get('reason') or 'no role cleared the bar'}. "
+                    f"Recording under 'General' for manual review instead of retrying."
+                )
+            elif res.get("source") != "ollama":
                 # Same rule as extraction: a keyword-scored row is not a model-scored row, so
                 # do not publish a match percentage that reads as an AI verdict.
                 deferred += 1
@@ -3538,7 +3564,11 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
             _cat = str(fields.get("Category", "") or "").strip()
 
             if not _r1 or _is_gap(_r1):
-                logger.warning("       PRE-SCORING CHECK: Suggested Role 1 is empty. Setting status to Needs Review.")
+                if no_matching_opening:
+                    logger.info("       PRE-SCORING CHECK: no opening matched this CV; "
+                                "filing under Needs Review for a human to place.")
+                else:
+                    logger.warning("       PRE-SCORING CHECK: Suggested Role 1 is empty. Setting status to Needs Review.")
                 fields["Status"] = _cfg.STATUS_NEEDS_REVIEW
             elif not _cat or _is_gap(_cat):
                 fields["Category"] = "General"
@@ -3551,7 +3581,8 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     logger.info("       Result   : NEEDS REVIEW — kept on Main for manual review.")
                 consecutive_failures = 0
                 processed += 1
-                candidate_result = "Needs Review - Extraction Incomplete"
+                candidate_result = ("Needs Review - No Matching Opening" if no_matching_opening
+                                    else "Needs Review - Extraction Incomplete")
                 logger.info("")
                 continue
 

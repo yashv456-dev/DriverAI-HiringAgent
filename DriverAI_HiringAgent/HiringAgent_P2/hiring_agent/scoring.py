@@ -594,6 +594,12 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
             # Do NOT call this a timeout. Reporting a filtered-out ranking as an Ollama
             # failure sends whoever reads the log chasing the model, the host or the
             # network for a fault that is not there - the model answered fine.
+            #
+            # 'no_match' and 'unavailable' must stay distinct outcomes: the model read this
+            # CV and found nothing above the bar, which is a fact about the catalogue and
+            # will be just as true on the next run, whereas an outage genuinely is worth
+            # retrying. Callers use this to decide between recording the candidate and
+            # queueing them again.
             detail = (f"Ollama ranked {len(ai)} role(s) but none cleared the scoring "
                       f"filters (minimum match {SCORING_MIN_MATCH}%)")
         else:
@@ -604,7 +610,7 @@ def suggested_roles(skills_str: str, role_pref: str = "", roles=None,
             "role_2": "",
             "role_3": "",
             "reason": detail,
-            "source": "unavailable",
+            "source": "no_match" if ai else "unavailable",
         }
 
     # ── keyword fallback ──
