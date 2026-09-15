@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from hiring_agent.config import (
     STATUS_NEEDS_REVIEW,
+    STATUS_NO_MATCHING_ROLE,
     STATUS_PROCESSING_FAILED,
     STATUS_REJECTED,
     STATUS_SCORED,
@@ -31,7 +32,8 @@ from hiring_agent.sharepoint_scoring import (
 from sharepoint_client import SharePointClient, SharePointError
 
 
-PENDING_STATUSES = {"", "New Email Received", STATUS_NEEDS_REVIEW}
+# A no-matching-role row still has a real resume on file that this audit must cover.
+PENDING_STATUSES = {"", "New Email Received", STATUS_NEEDS_REVIEW, STATUS_NO_MATCHING_ROLE}
 REJECTED_STATUSES = {STATUS_REJECTED, STATUS_PROCESSING_FAILED}
 
 

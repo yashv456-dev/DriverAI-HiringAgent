@@ -13,6 +13,12 @@ status_values:
   scored: "Scored"
   rejected: "Rejected - Non-USA Location"
   needs_review: "Needs Review - Unreadable Resume"
+  # The model read the CV fine and no opening in the catalogue matched it. Kept separate
+  # from needs_review above, which names an unreadable file - the opposite problem, and a
+  # misleading thing to show a recruiter looking at a perfectly good resume. A row in this
+  # state is waiting on a human placement decision, not on the bot, so it is never put back
+  # in a scoring queue; re-run it with --recheck-row once a matching JD exists.
+  no_matching_role: "Needs Review - No Matching Role"
   # Missing or conflicting current-location evidence stays on the main sheet.
   # It is neither exported as a confirmed candidate nor sent a decline.
   location_review: "Needs Review - Location Confirmation"

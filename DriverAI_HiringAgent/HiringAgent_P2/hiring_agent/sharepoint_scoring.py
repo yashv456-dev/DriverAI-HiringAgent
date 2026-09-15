@@ -1287,6 +1287,8 @@ def _merge_candidate_ready(vals: dict) -> bool:
     status = str(vals.get("Status", "") or "").strip()
     return status not in {
         "", "New Email Received", _cfg.STATUS_NEEDS_REVIEW, STATUS_LOCATION_REVIEW,
+        # Awaiting a human placement decision, so no more finished than a review row.
+        _cfg.STATUS_NO_MATCHING_ROLE,
     }
 
 
@@ -1653,7 +1655,8 @@ def _drop_retry_duplicate_if_completed(client, index: int, app_id: str, vals: di
         if row.get("index") == index:
             continue
         status = str(row_vals.get("Status", "") or "").strip()
-        if status and status not in {"New Email Received", _cfg.STATUS_NEEDS_REVIEW}:
+        if status and status not in {"New Email Received", _cfg.STATUS_NEEDS_REVIEW,
+                                     _cfg.STATUS_NO_MATCHING_ROLE}:
             completed_main = True
             break
 
@@ -2856,7 +2859,8 @@ def _unchanged_completed_retry(retry: dict, completed: dict) -> bool:
     the queue even when an older copy of the same Application ID is completed.
     Missing version information is not proof of a duplicate.
     """
-    if str(retry.get("Status", "")).strip() != _cfg.STATUS_NEEDS_REVIEW:
+    if str(retry.get("Status", "")).strip() not in (_cfg.STATUS_NEEDS_REVIEW,
+                                                    _cfg.STATUS_NO_MATCHING_ROLE):
         return False
     if str(completed.get("Status", "")).strip() not in (
             STATUS_SCORED, "Rejected - Non-USA Location"):
@@ -3566,19 +3570,22 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
             if not _r1 or _is_gap(_r1):
                 if no_matching_opening:
                     logger.info("       PRE-SCORING CHECK: no opening matched this CV; "
-                                "filing under Needs Review for a human to place.")
+                                "filing as '%s' for a human to place.",
+                                _cfg.STATUS_NO_MATCHING_ROLE)
+                    fields["Status"] = _cfg.STATUS_NO_MATCHING_ROLE
                 else:
                     logger.warning("       PRE-SCORING CHECK: Suggested Role 1 is empty. Setting status to Needs Review.")
-                fields["Status"] = _cfg.STATUS_NEEDS_REVIEW
+                    fields["Status"] = _cfg.STATUS_NEEDS_REVIEW
             elif not _cat or _is_gap(_cat):
                 fields["Category"] = "General"
 
-            if fields["Status"] == _cfg.STATUS_NEEDS_REVIEW:
+            if fields["Status"] in (_cfg.STATUS_NEEDS_REVIEW, _cfg.STATUS_NO_MATCHING_ROLE):
                 if dry_run:
-                    logger.info("       Result   : [DRY-RUN] Would mark Needs Review (missing core fields).")
+                    logger.info("       Result   : [DRY-RUN] Would mark '%s'.", fields["Status"])
                 else:
                     _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
-                    logger.info("       Result   : NEEDS REVIEW — kept on Main for manual review.")
+                    logger.info("       Result   : %s — kept on Main for manual review.",
+                                fields["Status"].upper())
                 consecutive_failures = 0
                 processed += 1
                 candidate_result = ("Needs Review - No Matching Opening" if no_matching_opening
@@ -4017,6 +4024,11 @@ def _plan_geo_recovery(client, vals: dict,
         heal["Status"] = (
             STATUS_SCORED
             if not _is_gap(vals.get("Suggested Role 1"))
+            # A row already parked as "no matching role" keeps that label: its roles are
+            # blank because nothing in the catalogue matched, not because the resume could
+            # not be read, and a heal pass must not quietly rewrite it into the other one.
+            else _cfg.STATUS_NO_MATCHING_ROLE
+            if str(vals.get("Status", "") or "").strip() == _cfg.STATUS_NO_MATCHING_ROLE
             else _cfg.STATUS_NEEDS_REVIEW
         )
     elif decision == GeoDecision.UNKNOWN:

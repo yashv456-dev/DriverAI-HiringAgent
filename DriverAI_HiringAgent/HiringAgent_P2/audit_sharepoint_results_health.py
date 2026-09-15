@@ -21,6 +21,7 @@ from hiring_agent.config import (
     STATUS_LOCATION_REVIEW,
     STATUS_LOCATION_UNCONFIRMED,
     STATUS_NEEDS_REVIEW,
+    STATUS_NO_MATCHING_ROLE,
     STATUS_PROCESSING_FAILED,
     STATUS_REJECTED,
     STATUS_SCORED,
@@ -145,6 +146,9 @@ def audit_records(records: list[dict]) -> tuple[list[dict], dict]:
         "main_scored": sum(1 for r in records if r["sheet"] == "Main" and r["status"] == STATUS_SCORED),
         "main_new": sum(1 for r in records if r["sheet"] == "Main" and r["status"] == "New Email Received"),
         "main_needs_review": sum(1 for r in records if r["sheet"] == "Main" and r["status"] == STATUS_NEEDS_REVIEW),
+        "main_no_matching_role": sum(
+            1 for r in records
+            if r["sheet"] == "Main" and r["status"] == STATUS_NO_MATCHING_ROLE),
         "main_location_review": sum(
             1 for r in records
             if r["sheet"] == "Main" and r["status"] == STATUS_LOCATION_REVIEW),

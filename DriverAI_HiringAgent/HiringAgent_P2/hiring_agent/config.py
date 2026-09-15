@@ -74,6 +74,14 @@ STATUS_PROCESSING_FAILED = _yaml.get("status_values", {}).get(
     "processing_failed", "Rejected - Processing Error")
 STATUS_NEEDS_REVIEW_SPAM = _yaml.get("status_values", {}).get(
     "needs_review_spam", "Needs Review - Possible Spam")
+# A CV the model read perfectly that matched no opening in the catalogue. Distinct from
+# STATUS_NEEDS_REVIEW because that one says "Unreadable Resume", which is the opposite of
+# what happened and sends a recruiter looking for a broken file (live: Ruta Kothari, a VLSI
+# engineer against a catalogue with no chip-design role). Nothing about the row is wrong -
+# we simply have no vacancy for them - so it is a human placement decision, not work the
+# bot can retry: it is deliberately NOT in any scoring queue.
+STATUS_NO_MATCHING_ROLE = _yaml.get("status_values", {}).get(
+    "no_matching_role", "Needs Review - No Matching Role")
 
 # P2's secondary content-safety net (see config.yaml content_safety) - checked against a
 # row's resume text and mail body before normal extraction runs. P1 already screens

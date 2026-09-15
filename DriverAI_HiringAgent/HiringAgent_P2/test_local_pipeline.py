@@ -467,13 +467,39 @@ class ReliabilityTests(unittest.TestCase):
                          'a no-match candidate must not be queued for another attempt')
         sheet, row = capture[0]['rows'][0]
         self.assertEqual(sheet, 'main', 'no-match belongs on Main, never the Rejected sheet')
-        self.assertEqual(row['Status'], cfg.STATUS_NEEDS_REVIEW)
+        self.assertEqual(row['Status'], cfg.STATUS_NO_MATCHING_ROLE)
+        self.assertNotEqual(row['Status'], cfg.STATUS_NEEDS_REVIEW,
+                            'must not be reported as an unreadable resume - it read fine')
         self.assertEqual(row['Category'], 'General')
         self.assertEqual(row['Suggested Role 1'], '',
                          'no role cleared the bar, so no role may be published')
         # Her extracted profile has to survive - that is the point of recording her.
         self.assertEqual(row['Full Name'], 'Alex Morgan')
         self.assertIn('Verilog', row['Current Skills'])
+
+    def test_no_matching_role_row_is_not_picked_up_again(self):
+        """Parked on a human, not on the bot: re-running must not re-score it.
+
+        The answer cannot change until the catalogue does, so re-queueing it would burn a
+        model call every run and rewrite the row for ever - the loop this whole status
+        exists to end. `--recheck-row` is the way back in once a matching JD lands.
+        """
+        from hiring_agent import config as cfg
+        remote = Remote()
+        store = SQLiteCandidateStore(database_path())
+        self.addCleanup(store.conn.close)
+        store.sync_from_client(remote)
+        store.save_by_id('APP-A', {'Status': cfg.STATUS_NO_MATCHING_ROLE,
+                                   'Category': 'General', 'Suggested Role 1': ''})
+
+        result = run_local_pipeline(
+            remote, scorer=lambda *a: self.fail('a parked no-match row must not be re-scored'))
+        self.assertEqual(result['processed'], 0)
+        self.assertEqual(store.get('APP-A').values['Status'], cfg.STATUS_NO_MATCHING_ROLE)
+
+        # ...but an explicit re-run still reaches it.
+        forced = run_local_pipeline(remote, scorer=self.score, app_ids=['APP-A'])
+        self.assertEqual(forced['processed'], 1)
 
 
 class MasterWriteContract(unittest.TestCase):
