@@ -89,6 +89,55 @@ def is_unmatched_qa_profile(skills_str: str = "", role_pref: str = "") -> bool:
     return is_qa and not _catalog_has_qa_opening()
 
 
+#: A silicon/hardware engineer, from what they say they want or from their tools. Exactly the
+#: QA case above in a different discipline, and added for the same reason: the catalog has no
+#: chip-design opening, so a VLSI engineer's best matches are software roles sharing only
+#: generic tooling (Python, "Machine Learning"). Live row APP-20260915-1110-OP7A (RTL-to-GDSII
+#: on a 7nm PDK, Cadence Virtuoso, HSPICE, PnR/DRC/LVS/STA/CTS) was filed under
+#: 'AI/ML/CV (SIN2)' off a 35% "Software Developer - AI/ML, Computer Vision" match, on the
+#: strength of one ML coursework line and a GCN hardware ACCELERATOR - which is chip design
+#: for an ML workload, not ML engineering. She does not do that job; 'General' is honest.
+#: Three distinct silicon tools are required, so a developer who lists Verilog once from a
+#: university course is not caught.
+_HW_PREF_RE = _re.compile(
+    r"(?i)\b(?:vlsi|asic|rtl\s+design|soc|silicon|semiconductor|tape\s*out|"
+    r"(?:chip|circuit|analog|digital|physical|logic|hardware)\s+design(?:er)?|"
+    r"design\s+verification|hardware\s+engineer|(?:ee|electrical)\s+\w*\s*engineer)\b")
+_HW_TOOL_SKILLS = {
+    "verilog", "systemverilog", "vhdl", "uvm", "cadence virtuoso", "virtuoso", "hspice",
+    "spice", "modelsim", "questasim", "calibre", "xilinx vivado", "vivado", "quartus",
+    "synopsys design compiler", "design compiler", "innovus", "genus", "primetime",
+    "rtl2gds", "gdsii", "pnr", "place-and-route", "drc", "lvs", "sta", "cts", "apr",
+    "vlsi design", "physical design", "asic flow", "floorplanning", "clock tree synthesis",
+    "logic synthesis", "physical verification",
+}
+#: A JD title that IS a hardware opening, so the guard retires itself the moment one exists.
+_HW_OPENING_RE = _re.compile(
+    r"(?i)\b(?:vlsi|asic|rtl|soc|silicon|semiconductor|fpga|embedded|firmware|pcb|"
+    r"(?:chip|circuit|analog|hardware)\s+\w*\s*(?:design|engineer))\b")
+
+
+def _catalog_has_hardware_opening() -> bool:
+    """True once the cached JD catalog contains a hardware/silicon opening."""
+    try:
+        from hiring_agent.jd_sources import _read_role_cache
+        cached = _read_role_cache() or {}
+        titles = [str(r.get("title", "")) for r in (cached.get("roles") or [])]
+    except Exception:
+        titles = []
+    if not titles:
+        titles = [str(r.get("title", "")) for r in get_open_roles()]
+    return any(_HW_OPENING_RE.search(t) for t in titles)
+
+
+def is_unmatched_hardware_profile(skills_str: str = "", role_pref: str = "") -> bool:
+    """A clear silicon/hardware candidate while no hardware opening exists to match them."""
+    skills = {s.strip().lower() for s in _re.split(r"[,;]", str(skills_str or "")) if s.strip()}
+    is_hw = (bool(_HW_PREF_RE.search(str(role_pref or "")))
+             or len(skills & _HW_TOOL_SKILLS) >= 3)
+    return is_hw and not _catalog_has_hardware_opening()
+
+
 def assign_category(role_str: str, skills_str: str = "", role_pref: str = "") -> str:
     """Map 'Role Title (NN%)' → business category using config-driven rules.
 
@@ -116,6 +165,8 @@ def assign_category(role_str: str, skills_str: str = "", role_pref: str = "") ->
     rather than being named after whichever developer role scored highest.
     """
     if is_unmatched_qa_profile(skills_str, role_pref):
+        return ROLE_CATEGORY_DEFAULT
+    if is_unmatched_hardware_profile(skills_str, role_pref):
         return ROLE_CATEGORY_DEFAULT
     skills = {s.strip().lower() for s in _re.split(r"[,;]", str(skills_str or "")) if s.strip()}
     if skills & _MOBILE_TOOL_SKILLS and not (skills & _GRAPHICS_TOOL_SKILLS):

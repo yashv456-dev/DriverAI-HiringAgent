@@ -7074,6 +7074,33 @@ try:
 finally:
     _z25_scoring._catalog_has_qa_opening = _z25_real_cache
 
+# Hardware guard: same rule, different discipline. A silicon engineer is 'General' while the
+# catalog has no chip-design opening, rather than being named after a weak software match.
+# Live: APP-20260915-1110-OP7A was filed 'AI/ML/CV (SIN2)' off a 35% AI/ML match because her
+# CV mentions machine learning once and a GCN hardware accelerator - she designs chips.
+_z27_hw_skills = ("Verilog, SystemVerilog, Cadence Virtuoso, HSPICE, ModelSim, Calibre, "
+                  "Xilinx Vivado, PnR, DRC, LVS, STA, CTS, RTL2GDS, VLSI Design, Python, "
+                  "Machine Learning")
+_z27_real_cache = _z25_scoring._catalog_has_hardware_opening
+try:
+    _z27_scoring_cache = _z25_scoring._catalog_has_hardware_opening = lambda: False
+    ok(assign_category("Software Developer - AI/ML, Computer Vision (35%)", _z27_hw_skills,
+                       "EE Circuit Design Engineer") == "General",
+       "a VLSI engineer weakly matched to an AI/ML role is filed under General, not AI/ML")
+    ok(assign_category("Software Developer - AI/ML, Computer Vision (35%)", _z27_hw_skills) == "General",
+       "three or more silicon tools alone identify a hardware profile (no Looking For Role needed)")
+    ok(assign_category("Software and Website Developer (70%)", "Python, React, Verilog, SQL, Git",
+                       "Frontend Engineer") == "Web Team (Full stack/Back end & UI/UX)",
+       "a developer who merely lists Verilog once keeps their normal category")
+    _z25_scoring._catalog_has_hardware_opening = lambda: True
+    ok(not _z25_scoring.is_unmatched_hardware_profile(_z27_hw_skills, "EE Circuit Design Engineer"),
+       "the hardware guard retires itself as soon as the catalog contains a chip-design opening")
+finally:
+    _z25_scoring._catalog_has_hardware_opening = _z27_real_cache
+# The live catalog must not already satisfy the guard, or it would never fire.
+ok(not _z25_scoring._catalog_has_hardware_opening(),
+   "no current JD title reads as a hardware opening, so the guard is active")
+
 # Seed: identical input must give identical scores.
 ok(isinstance(_z25cfg.OLLAMA_SEED, int), "every Ollama call carries a fixed seed from config")
 
