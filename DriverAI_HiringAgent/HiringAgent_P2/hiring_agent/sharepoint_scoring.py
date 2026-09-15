@@ -3892,8 +3892,8 @@ def _derive_geo_recovery_fields(client, vals: dict, rejected: bool = True) -> di
     if client is None:
         return {}
     phone_cur = str(vals.get("Phone", "") or "")
-    phone_bad = (not _is_gap(phone_cur)) and (
-        "*" in phone_cur or sum(ch.isdigit() for ch in phone_cur) < 7)
+    phone_bad = ((not _is_gap(phone_cur))
+                 and _is_gap(sanitize_phone(phone_cur)))
     needs_phone = _is_gap(phone_cur) or phone_bad
     needs_education = (
         _is_gap(vals.get("Education"))
@@ -4988,7 +4988,8 @@ def validate_row(app_id: str) -> None:
     # Columns that P2 owns and can re-derive — same set as _P2_CONTENT_COLS minus Resume URL/Path
     # (those are file-system artifacts, not derivable fields shown in the comparison table).
     _COL_KEY = [
-        "Full Name", "Phone", "Location", "Country", "Current Skills", "Looking For Role",
+        "Full Name", "Phone", "Location", "Country", "Years Exp", "Current Skills",
+        "Looking For Role", "Education", "Education Start Date", "Education End Date",
         "Suggested Role 1", "Suggested Role 2", "Suggested Role 3",
         "Portfolio 1", "Portfolio 2", "Portfolio 3",
     ]

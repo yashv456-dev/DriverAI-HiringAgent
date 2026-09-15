@@ -116,6 +116,11 @@ ok(normalize_education("AND TRAINING") == "Not extracted",
 ok(_extract_education("EDUCATION AND TRAINING\n05/10/2018 - 05/10/2022\nBS-INFORMATION TECHNOLOGY The Islamia University of Bahawalpur") ==
    "BS-INFORMATION TECHNOLOGY The Islamia University of Bahawalpur",
    "Education and Training header skips date line and captures degree line")
+ok(_extract_education(
+    "EDUCATION\nElectronics And Communication Engineering Sep 2023 to 2027\n"
+    "Government Engineering College Bikaner, Bikaner") ==
+   "Electronics And Communication Engineering, Government Engineering College Bikaner",
+   "a stated field of study is paired with the college on the next line without inventing a degree")
 
 print("\n=== B2b. EDUCATION START/END DATE EXTRACTION (added 2026-08-18) ===")
 from hiring_agent.extraction import _extract_education_dates
@@ -1004,6 +1009,10 @@ ok(_extract_phone("(555) 867-5309\nData Scientist") == "(555) 867-5309",
 ok(_extract_phone(
     "Published app: https://apps.apple.com/us/app/vendcell/id6677036994") is None,
    "numeric App Store URL ID is not misclassified as a phone")
+ok(_extract_phone(
+    "EDUCATION\nMBA Degree, Finance and Controlling | 2023 - 2025\n"
+    "Bachelor's Degree, Marketing | 2016 - 2019") is None,
+   "education year ranges are not misclassified as phone numbers")
 
 
 # â”€â”€ F. LOCATION + COUNTRY PARSING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -6864,6 +6873,55 @@ ok(_edu_dates(_z24_present) == ("Aug 2024", "Present"),
 ok(_edu_dates("EDUCATION\nMaster of Science, Computer Science") == ("", ""),
    "a resume with no stated dates still yields a blank pair")
 
+# APP-20260810-1751-MC9A (Victor): the Education section is one collapsed line and the
+# next line starts Professional Experience.  The old fixed five-line window crossed that
+# boundary and selected the newer founder-job range (2026-Present) as education.
+_z24_victor = """Education:
+USP | ESALQ MBA Degree, Finance and Controlling Bachelor's Degree, Marketing and Graphic Design São Paulo, Brazil | 2023 - 2025 São Paulo, Brazil | 2016 - 2019
+Professional Experience:
+Founder at YouPlaya Marketing Agency São Paulo, Brazil | February/2026 - Currently"""
+ok(_edu_dates(_z24_victor) == ("2023", "2025"),
+   f"education date scan stops at Professional Experience (got {_edu_dates(_z24_victor)})")
+
+_z24_mona = """Education
+PG Diploma in Advanced Japanese Language – Univ. of Delhi (2018–2019)
+Basic & Intermediate Japanese – MOSAI Institute (2014–2016)
+B.Sc. in Animation and Film Making – Punjab Technical University (2011–2014)"""
+ok(_edu_dates(_z24_mona) == ("2011", "2014"),
+   f"dates stay attached to the B.Sc. entry selected for Education (got {_edu_dates(_z24_mona)})")
+
+_z24_yash = """EDUCATION
+California State University Los Angeles _August 2023 - May 2025 Master of Science in Computer Science_
+University of Mumbai _July 2015 - May 2019 Bachelor of Engineering in Computer Engineering_"""
+ok(_edu_dates(_z24_yash) == ("Aug 2023", "May 2025"),
+   f"markdown emphasis does not erase education month precision (got {_edu_dates(_z24_yash)})")
+
+# Live: Sankalp Sharma / APP-20260804-1923-MDKA. His PDF draws 2014 at the far
+# right of the BCA row. Markdown reading order moved it below LANGUAGES, while the
+# coordinate-sorted text correctly keeps "BCA 2014" together. Preserve just that
+# row and let the anchored date pass use the second, layout-aware copy.
+from hiring_agent.extraction import _pdf_layout_education_rows as _layout_edu_rows
+
+_z24_sankalp_primary = """Android Development Contest Winner - College Level: Recognised for innovation
+EDUCATION
+Bachelor of Computer Applications (BCA)
+SSLD Varshney Institute of Management & Engineering, Aligarh, Uttar Pradesh
+LANGUAGES
+English - Professional Working Proficiency
+2014"""
+
+class _Z24LayoutPage:
+    def get_text(self, mode, sort=False):
+        assert mode == "text" and sort is True
+        return "Bachelor of Computer Applications (BCA)                         2014\n"
+
+_z24_layout_rows = _layout_edu_rows([_Z24LayoutPage()], _z24_sankalp_primary)
+ok(_z24_layout_rows == ["Bachelor of Computer Applications (BCA) 2014"],
+   f"the visual BCA/date row is recovered once (got {_z24_layout_rows!r})")
+_z24_sankalp_text = _z24_sankalp_primary + "\n" + "\n".join(_z24_layout_rows)
+ok(_edu_dates(_z24_sankalp_text) == ("", "2014"),
+   f"the date aligned with BCA survives Markdown reordering (got {_edu_dates(_z24_sankalp_text)})")
+
 # ── Z25. 2026-09-14 LIVE-ROW REVIEW FIXES ────────────────────────────────────
 # Found by opening the resumes behind APP-20260908-1304-MCLA and APP-20260902-2155-MCPA and
 # checking every published column against them.
@@ -6886,16 +6944,33 @@ ok(complete_education("B.S. Physics", "Education\no B.S. Physics\no Ohio State U
 ok(complete_education("M.S. Computer Science", "EDUCATION\nM.S. Computer Science, Arizona State University (3.72/4) Tempe, AZ")
    == "M.S. Computer Science, Arizona State University",
    "a GPA ends the school name, so the campus city after it is not captured")
+ok(complete_education(
+       "Bachelor of Computer Applications (BCA)", _z24_sankalp_primary) ==
+   "Bachelor of Computer Applications (BCA), SSLD Varshney Institute of Management & Engineering",
+   "an award sentence containing 'College' cannot replace the school below the degree")
 ok(complete_education("MBA", "EDUCATION\nMBA\nSKILLS\nPython") == "MBA",
    "no school is invented when none is near the degree (stops at the next section)")
+ok(complete_education(
+       "MBA", "Contest Winner - College Level\nEDUCATION\nMBA\nSKILLS\nPython") == "MBA",
+   "the Education heading also blocks an institution-like phrase from the prior section")
 ok(complete_education("M.S. Data Science, Arizona State University", "unrelated") ==
    "M.S. Data Science, Arizona State University", "a value that already names a school is unchanged")
+ok(complete_education(
+    "Bachelor in Computer Science",
+    "EDUCATION\nNational University of Computer and Emerging Sciences (NUCES) | June 2025\n"
+    "Bachelor in Computer Science\nEXPERIENCE") ==
+   "Bachelor in Computer Science, National University of Computer and Emerging Sciences (NUCES)",
+   "a 'Bachelor in' degree gains the school from the line immediately above it")
 ok(normalize_education("B.Sc. (Design and Computing), BITS Pilani (WILP) | 2025") ==
    "B.Sc. (Design and Computing), BITS Pilani (WILP)",
    "a trailing '| 2025' is removed - the year already lives in Education End Date")
 ok(normalize_education("Master of Science, University of Texas, Aug 2019 - May 2021") ==
    "Master of Science, University of Texas", "a trailing date range is removed")
 ok(normalize_education("B.Tech in CSE (Expected 2026)") == "B.Tech in CSE", "a trailing (Expected YYYY) is removed")
+ok(normalize_education(
+    "MCA – GNDU Regional Campus (2009–2012) BCA – DAV College (2006–2009)") ==
+   "MCA – GNDU Regional Campus BCA – DAV College",
+   "parenthesized ranges are removed from every degree in a multi-degree Education value")
 ok(normalize_education("Seattle University, MS in Computer Science Sept 2023 - June 2025") ==
    "Seattle University, MS in Computer Science",
    "a whole trailing range is removed, never just its second half")

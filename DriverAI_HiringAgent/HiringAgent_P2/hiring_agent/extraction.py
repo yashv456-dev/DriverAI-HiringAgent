@@ -1000,8 +1000,8 @@ def _extract_location(text: str) -> str | None:
 # line was invisible to the degree scan. Live case 2026-08-11: APP-20260507-2235-813F, whose
 # CV reads "Master’s in computer science, University of North Texas".
 _DEGREE_RE = re.compile(
-    r"\b(Bachelor(?:['’]s|s)\b|Bachelor\s+of\s+\w+|Master(?:['’]s|s)\b|"
-    r"Master\s+of\s+\w+|Associate(?:['’]s|s)\b|Associate\s+of\s+\w+|"
+    r"\b(Bachelor(?:['’]s|s)\b|Bachelor\s+(?:of|in)\s+\w+|Master(?:['’]s|s)\b|"
+    r"Master\s+(?:of|in)\s+\w+|Associate(?:['’]s|s)\b|Associate\s+of\s+\w+|"
     r"Ph\.?D\.?|MBA|B\.?Tech\.?|M\.?Tech\.?|"
     r"B\.?S\.?[Cc]?\.?|M\.?S\.?[Cc]?\.?|B\.?A\.?|M\.?A\.?|B\.?E\.?|M\.?E\.?)\b"
 )
@@ -1011,6 +1011,21 @@ _DEGREE_RE = re.compile(
 _SECTION_SPLIT_RE = re.compile(
     r"(?=\b(?:Education|Work\s+Experience|Experience|Skills|Projects|Certifications|"
     r"Publications|Summary|Other\s+Experiences)\b)")
+
+# Exact section headings that terminate a bounded resume section.  Keep this narrower than
+# config.SECTION_WORDS: that set contains ordinary title words such as "engineer" and
+# "manager", which can appear inside an education entry.  This predicate is used by the
+# education date reader so a nearby employment date can never be attached to a degree.
+_SECTION_HEADING_RE = re.compile(
+    r"(?i)^(?:education|(?:(?:professional|work|employment)\s+)?(?:experience|history)|"
+    r"(?:hard|technical|core)\s+skills?|skills?|projects?|certifications?|"
+    r"publications?|achievements?|awards?|languages?|references?|summary|profile|"
+    r"objective|interests?|hobbies)\s*:?$")
+
+
+def _is_section_heading(line: str) -> bool:
+    return bool(_SECTION_HEADING_RE.fullmatch(
+        _collapse_letter_spacing(str(line or "")).strip()))
 
 
 def _split_collapsed_sections(lines: list) -> list:
@@ -1108,6 +1123,12 @@ _INSTITUTION_RE = re.compile(
     r"seminary|conservatory|gymnasium|iit|nit|iiit)\b"
 )
 
+# Some resumes state a field of study but omit a degree label, then put the institution on
+# the next line.  Consult this only inside an explicit Education section.
+_EDUCATION_SUBJECT_RE = re.compile(
+    r"(?i)\b(?:engineering|computer\s+science|information\s+technology|data\s+science|"
+    r"business\s+administration|finance|accounting|marketing|graphic\s+design)\b")
+
 
 _EDUCATION_FUSED_RE = re.compile(
     r"(?i)(?:master|bachelor|associate|university|college|institute)"
@@ -1192,6 +1213,12 @@ def normalize_education(value: str) -> str:
     text = re.sub(r"\s+([,;])", r"\1", text)
     text = re.sub(r"([,;])(?=\S)", r"\1 ", text)
     text = re.sub(r"\s{2,}", " ", text).strip(" ,;-|")
+    # Multi-degree entries can carry a parenthesized range before the next degree, so the
+    # trailing-date cleanup below never reaches it. Date columns own this data; remove only
+    # an unmistakable four-digit year range wherever it appears.
+    text = re.sub(
+        r"\s*\(\s*(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}\s*\)",
+        "", text)
     # A trailing date is not part of the degree: Education Start/End Date carry it, and live
     # row APP-20260902-2155-MCPA published 'B.Sc. (Design and Computing), BITS Pilani (WILP)
     # | 2025' with the same 2025 already in Education End Date (2026-09-14).
@@ -1280,6 +1307,7 @@ def _extract_education(text: str) -> str | None:
             if candidate != "Not extracted" and _DEGREE_RE.search(candidate):
                 return candidate
         fallback = None
+        subject = None
         for nxt in lines[i + 1:i + 6]:
             if nxt.lower().rstrip(":").strip() in SECTION_WORDS:
                 break
@@ -1296,8 +1324,14 @@ def _extract_education(text: str) -> str | None:
             # A line with neither a degree nor an institution is not education, and a blank
             # cell is honest where a wrong value is not - the missing-info nudge also keys off
             # Education being blank, so garbage here actively suppresses that follow-up.
-            if fallback is None and _INSTITUTION_RE.search(cleaned):
-                fallback = cleaned
+            if _INSTITUTION_RE.search(cleaned):
+                if subject:
+                    school = _institution_on_line(cleaned) or cleaned
+                    return normalize_education(f"{subject}, {school}")
+                if fallback is None:
+                    fallback = cleaned
+            elif subject is None and _EDUCATION_SUBJECT_RE.search(cleaned):
+                subject = cleaned
         if fallback:
             return fallback
         break
@@ -1424,9 +1458,9 @@ def complete_education(value, resume_text: str) -> str:
     while its resume reads that line followed directly by 'National University of Computer &
     Emerging Sciences (FAST-NUCES), Lahore, Pakistan' (2026-09-14). The extractors are asked
     for the school and a sibling row got it; this one did not, so the column was
-    inconsistent. The school is taken only from the degree's own line or the two lines
-    right under it, and only its name - never the city or country after it, which say
-    where the candidate studied, not where they live.
+    inconsistent. The school is taken only from the degree's own line or the two adjacent
+    lines in the same section, and only its name - never the city or country after it,
+    which say where the candidate studied, not where they live.
     """
     val = normalize_education(value)
     if val == "Not extracted" or _INSTITUTION_RE.search(val) or not resume_text:
@@ -1438,12 +1472,21 @@ def complete_education(value, resume_text: str) -> str:
     for i, line in enumerate(lines):
         if core not in re.sub(r"[^a-z0-9]+", " ", line.lower()):
             continue
-        for candidate in [line] + lines[i + 1:i + 3]:
-            if candidate is not line and candidate.lower().rstrip(":").strip() in SECTION_WORDS:
-                break
-            school = _institution_on_line(candidate)
-            if school and school.lower() not in val.lower():
-                return normalize_education(f"{val}, {school}")
+        # Prefer the lines after the degree.  That is the usual degree-then-school layout
+        # and avoids treating an immediately preceding achievement such as "College Level:
+        # Recognised ..." as the institution (live: Sankalp Sharma).  Some two-column PDFs
+        # put the school immediately before the degree, so use those lines only if the
+        # forward pass found nothing.  Each direction stops at its own section boundary.
+        directions = ([line] + lines[i + 1:i + 3],
+                      list(reversed(lines[max(0, i - 2):i])))
+        for direction in directions:
+            for candidate in direction:
+                if candidate != line and (_is_section_heading(candidate)
+                                          or _DEGREE_RE.search(candidate)):
+                    break
+                school = _institution_on_line(candidate)
+                if school and school.lower() not in val.lower():
+                    return normalize_education(f"{val}, {school}")
         break
     return val
 
@@ -1521,6 +1564,10 @@ def _extract_education_dates(text: str) -> tuple[str, str]:
         saw. This is the same rule Location already follows (see _recency_location): among
         dated entries, the current one describes the candidate.
         """
+        # pymupdf4llm represents italic text as ``_August 2023 - May 2025_``. Underscore
+        # is a regex word character, so the boundary before the month disappears and the
+        # parser falls through to a less precise bare year.
+        window = window.replace("_", " ")
         explicit = [(_normalize_edu_date_token(m.group(1)),
                      _normalize_edu_date_token(m.group(2)))
                     for m in _EDU_DATE_RANGE_RE.finditer(window)]
@@ -1555,12 +1602,60 @@ def _extract_education_dates(text: str) -> tuple[str, str]:
     lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
     lines = _split_collapsed_sections(lines)
     lines = _rejoin_word_fragmented_lines(lines)
+
+    # Anchor dates to the exact education value selected for the row whenever that entry can
+    # be located.  Selecting the newest date in the whole section is wrong when the text
+    # extractor chose a different entry.  APP-20260819-0140-MCRA selected the candidate's
+    # B.Sc. line but attached a newer Japanese-diploma range from two lines above it.
+    selected_education = _extract_education(text)
+    if selected_education and selected_education != "Not extracted":
+        selected_norm = normalize_education(selected_education)
+        for i, line in enumerate(lines):
+            line_norm = normalize_education(line.rstrip(".,;"))
+            # A PDF layout supplement may repeat the same visible degree row with a date
+            # restored from its right-hand column ("Bachelor ...                 2014").
+            # Keep looking after a date-free occurrence and accept that longer row too.
+            if (line_norm != selected_norm
+                    and not line_norm.startswith(selected_norm + " ")):
+                continue
+            # Most layouts keep the range on the selected line.  This strongest association
+            # also handles a collapsed two-column education row such as Victor's.
+            found = _best_effort(_EDU_GLUED_MONTH_RE.sub(" ", line))
+            if found:
+                return found
+            # A school/date line can precede the degree line in multi-column templates.
+            if i:
+                previous = lines[i - 1]
+                if not _is_section_heading(previous):
+                    found = _best_effort(_EDU_GLUED_MONTH_RE.sub(
+                        " ", previous + "\n" + line))
+                    if found:
+                        return found
+            # Or the school and range can follow it.  Stop at the next degree or section so
+            # a sibling education entry cannot donate its dates.
+            entry = [line]
+            for candidate in lines[i + 1:i + 3]:
+                if (_is_section_heading(candidate)
+                        or _DEGREE_RE.search(candidate)):
+                    break
+                entry.append(candidate)
+                found = _best_effort(_EDU_GLUED_MONTH_RE.sub(" ", "\n".join(entry)))
+                if found:
+                    return found
+            # Do not stop at a date-free copy.  A coordinate-preserving supplement can
+            # contain a second copy with the visually aligned date restored.
+
     header_re = re.compile(r"^education\b[:\-]?\s*(.*)$", re.IGNORECASE)
     for i, ln in enumerate(lines):
         m = header_re.match(_collapse_letter_spacing(ln))
         if not m:
             continue
-        window = "\n".join([m.group(1)] + lines[i + 1:i + 6])
+        section = [m.group(1)]
+        for candidate in lines[i + 1:i + 6]:
+            if _is_section_heading(candidate):
+                break
+            section.append(candidate)
+        window = "\n".join(section)
         window = _EDU_GLUED_MONTH_RE.sub(" ", window)
         found = _best_effort(window)
         if found:
@@ -2391,6 +2486,11 @@ def sanitize_phone(phone: str) -> str:
     raw = str(phone or "").strip()
     if raw.lower() in _GAP_LITERALS:
         return raw
+    # A broad international-phone regex can otherwise accept an education range such as
+    # "2023 - 2025" (eight digits plus a valid phone separator).  A pair of calendar years
+    # is evidence about dates, never a callable number.
+    if re.fullmatch(r"(?:19|20)\d{2}\s*[-–—/]\s*(?:19|20)\d{2}", raw):
+        return "Not extracted"
     if re.fullmatch(r"(?:\d\s+){6,}\d", raw):
         return "Not extracted"
     if "*" in raw or sum(c.isdigit() for c in raw) < 7:
@@ -2400,18 +2500,21 @@ def sanitize_phone(phone: str) -> str:
 
 def _extract_phone(text: str) -> str | None:
     """Extract the best phone number from text, preferring labeled numbers."""
+    def acceptable(value: str) -> bool:
+        return sanitize_phone(value).strip().lower() not in _GAP_LITERALS
+
     for line in (text or "").splitlines():
         low = line.lower().strip()
         if any(k in low for k in ("phone", "mobile", "cell", "tel:", "contact")):
             searchable = _RAW_URL_RE.sub(" ", line)
             for pat in _PHONE_PATTERNS:
                 m = pat.search(searchable)
-                if m:
+                if m and acceptable(m.group(0).strip()):
                     return m.group(0).strip()
     searchable_text = _RAW_URL_RE.sub(" ", text or "")
     for pat in _PHONE_PATTERNS:
         m = pat.search(searchable_text)
-        if m:
+        if m and acceptable(m.group(0).strip()):
             return m.group(0).strip()
     return None
 
@@ -2923,6 +3026,39 @@ def _demarkdown(text: str) -> str:
     return text
 
 
+def _pdf_layout_education_rows(doc, extracted_text: str) -> list[str]:
+    """Recover education rows whose right-hand date was separated by Markdown ordering.
+
+    PyMuPDF4LLM normally gives the best reading order, but a wide date column can be emitted
+    after the following section.  PyMuPDF's coordinate-sorted plain text keeps words sharing
+    a visual row together.  Add only degree rows that contain an explicit date and are absent
+    from the primary text, so the scorer gains the missing evidence without duplicating the
+    whole resume or changing its normal reading order.
+    """
+    existing = {re.sub(r"\s+", " ", line).strip()
+                for line in str(extracted_text or "").splitlines() if line.strip()}
+    recovered = []
+    for page in doc:
+        try:
+            visual_lines = page.get_text("text", sort=True).splitlines()
+        except Exception:
+            continue
+        for line in visual_lines:
+            row = re.sub(r"\s+", " ", line).strip()
+            if not row or row in existing or not _DEGREE_RE.search(row):
+                continue
+            if not (_EDU_DATE_RANGE_RE.search(row)
+                    or _EDU_DATE_RANGE_RE_LOOSE.search(row)
+                    or _EDU_EXPECTED_RE.search(row)
+                    or _EDU_GRADUATED_RE.search(row)
+                    or _EDU_MONTH_YEAR_RE.search(row)
+                    or _EDU_ANY_SINGLE_DATE_RE.search(row)):
+                continue
+            recovered.append(row)
+            existing.add(row)
+    return recovered
+
+
 def _docx_text(raw: bytes) -> str:
     """Text of a .docx, paragraphs plus table cells, with any hyperlinks appended."""
     import docx
@@ -3065,6 +3201,9 @@ def extract_text_from_bytes(raw: bytes, filename: str) -> str:
                 import pymupdf4llm
                 doc = pymupdf.open(stream=raw, filetype="pdf")
                 text = _demarkdown(pymupdf4llm.to_markdown(doc) or "")
+                layout_rows = _pdf_layout_education_rows(doc, text)
+                if layout_rows:
+                    text = text.rstrip() + "\n\n" + "\n".join(layout_rows) + "\n"
                 doc.close()
             except Exception as e:
                 logger.debug(f"   pymupdf4llm extraction failed ({e}); trying pypdf.")
