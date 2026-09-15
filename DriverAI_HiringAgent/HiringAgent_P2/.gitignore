@@ -21,8 +21,10 @@ P2_Preview/
 resume_cache/
 processing_artifacts/
 benchmark_resumes/
+tmp/
 *.pdf
 *.docx
+*.png
 
 # ── Environment and build noise ─────────────────────────────────────────────
 .venv/

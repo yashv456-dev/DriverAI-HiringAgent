@@ -1,0 +1,16 @@
+{
+  "application_id": "APP-20260804-2313-MDFA",
+  "changed": {
+    "Education Start Date": {
+      "before": "Feb 2026",
+      "after": "Missing"
+    },
+    "Education End Date": {
+      "before": "Present",
+      "after": "Jun 2025"
+    }
+  },
+  "evidence": "National University of Computer and Emerging Sciences (NUCES) | June 2025 | Bachelor in Computer Science. No start date is stated. February 2026-Present is Software Engineer employment.",
+  "database_backup": "..\\..\\review_artifacts\\p2_rejected_row_sadiq_20260914_162706\\candidates_before_sadiq.db",
+  "database_backup_sha256": "cdde454a08c860492d508633dd2c90bbdef7eebd0f0b5c3ef66840e02f736c61"
+}

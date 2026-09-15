@@ -1,0 +1,16 @@
+{
+  "application_id": "APP-20260804-1923-MDKA",
+  "changed": {
+    "Education": {
+      "before": "Bachelor of Computer Applications (BCA) - SSDL Varshney Institute of Management & Engineering, Aligarh, Uttar Pradesh",
+      "after": "Bachelor of Computer Applications (BCA) - SSLD Varshney Institute of Management & Engineering, Aligarh, Uttar Pradesh"
+    }
+  },
+  "preserved": {
+    "Education Start Date": "Missing",
+    "Education End Date": "2014"
+  },
+  "evidence": "Visual PDF page 2 states Bachelor of Computer Applications (BCA), SSLD Varshney Institute of Management & Engineering, and 2014 on the same row. Start year is not stated.",
+  "database_backup": "..\\..\\review_artifacts\\p2_rejected_row_sankalp_20260914_195310\\candidates_before_sankalp.db",
+  "database_backup_sha256": "14ceb2a7208c257365e3f6daf2458de76baddeae60f65775f7c9731ecc33f3a3"
+}

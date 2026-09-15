@@ -1,0 +1,130 @@
+{
+  "reviewed_results_rows": 18,
+  "changed_candidate_rows": 9,
+  "changed_fields": 19,
+  "publication_before": {
+    "id": 1,
+    "revision": 101,
+    "published_revision": 101,
+    "error": ""
+  },
+  "publication_after_patch": {
+    "id": 1,
+    "revision": 110,
+    "published_revision": 101,
+    "error": ""
+  },
+  "backup": "C:\\Users\\yash9\\Downloads\\HiringAgent2\\review_artifacts\\p2_results_row_review_20260914_204900\\candidates_before_repairs.db",
+  "changes": [
+    {
+      "application_id": "APP-20260821-0812-MCQA",
+      "full_name": "Renu Jaitly",
+      "before": {
+        "Education Start Date": "Jun 2021",
+        "Education End Date": "Dec 2025"
+      },
+      "after": {
+        "Education Start Date": "1999",
+        "Education End Date": "2002"
+      }
+    },
+    {
+      "application_id": "APP-20260817-1859-MCSA",
+      "full_name": "Shashank Kumar Singh",
+      "before": {
+        "Education": "M.S. in Computer Science Dec 2026 (expected) Arizona State University : Tempe, AZ, USA"
+      },
+      "after": {
+        "Education": "M.S. in Computer Science, Arizona State University"
+      }
+    },
+    {
+      "application_id": "APP-20260817-1239-MCUA",
+      "full_name": "Nimish Goel",
+      "before": {
+        "Years Exp": "Missing",
+        "Education": "M.S. in Information Systems & Management, R.V. College of Engineering"
+      },
+      "after": {
+        "Years Exp": "3 years",
+        "Education": "M.S. in Information Systems & Management, W.P. Carey School of Business, Arizona State University"
+      }
+    },
+    {
+      "application_id": "APP-20260816-1338-MCWA",
+      "full_name": "Kshitij Sahu",
+      "before": {
+        "Education": "Master of Science in Electrical Engineering Aug 2024 – May 2026, Arizona State University (3.52/4) Arizona, USA; Bachelor of Technology in EEE Aug 2018 – May 2022, Kalinga Institute of Industrial Technology (8.27/10) Odisha, India",
+        "Suggested Role 1": "Software Developer - AI/ML, Computer Vision (85%)",
+        "Suggested Role 2": "Cybersecurity IT Administrator (40%)",
+        "Suggested Role 3": "Cybersecurity IT Admin Manager (35%)",
+        "Category": "AI/ML/CV (SIN2)"
+      },
+      "after": {
+        "Education": "Master of Science in Electrical Engineering, Arizona State University; Bachelor of Technology in EEE, Kalinga Institute of Industrial Technology",
+        "Suggested Role 1": "RF Communications Engineer R&D (60%)",
+        "Suggested Role 2": "Satellite Systems Flight Software Engineer (50%)",
+        "Suggested Role 3": "IoT Developer (35%)",
+        "Category": "Satellite"
+      }
+    },
+    {
+      "application_id": "APP-20260815-0504-MCXA",
+      "full_name": "Bharath Dibbadahalli Hanumanthappa",
+      "before": {
+        "Education": "University of Maryland College Park, MD - Master of Engineering, Cybersecurity | GPA: 3.8 May 2026 | Relevant Courses: Digital Forensics & Incident Response, Penetration Testing, Cloud Security, Information Assurance"
+      },
+      "after": {
+        "Education": "Master of Engineering in Cybersecurity, University of Maryland, College Park"
+      }
+    },
+    {
+      "application_id": "APP-20260805-0931-PMCA",
+      "full_name": "Vibha Swaminathan",
+      "before": {
+        "Education": "Master of Science, Computer Science - Arizona State University, Tempe, USA | _May 2026_ Bachelor of Technology, Computer Science Engineering - Shiv Nadar Institute of Eminence, India | _May 2024_",
+        "Education End Date": "Missing"
+      },
+      "after": {
+        "Education": "Master of Science in Computer Science, Arizona State University; Bachelor of Technology in Computer Science Engineering, Shiv Nadar Institute of Eminence",
+        "Education End Date": "May 2026"
+      }
+    },
+    {
+      "application_id": "APP-20260805-0805-MDBA",
+      "full_name": "Pragya Mittal",
+      "before": {
+        "Education Start Date": "2023",
+        "Education End Date": "2024"
+      },
+      "after": {
+        "Education Start Date": "Aug 2023",
+        "Education End Date": "May 2025"
+      }
+    },
+    {
+      "application_id": "APP-20260805-0743-MDCA",
+      "full_name": "Shruti Kamath",
+      "before": {
+        "Education Start Date": "Missing",
+        "Education End Date": "Missing"
+      },
+      "after": {
+        "Education Start Date": "Aug 2023",
+        "Education End Date": "May 2025"
+      }
+    },
+    {
+      "application_id": "APP-20260804-2019-MDJA",
+      "full_name": "Mithilesh Kothandaraman",
+      "before": {
+        "Education": "Master's, Data Science, Arizona State University (August 2024 - August 2026) | Bachelor's, Computer Science, SRM University",
+        "Education Start Date": "Missing"
+      },
+      "after": {
+        "Education": "Master's in Data Science, Arizona State University; Bachelor's in Computer Science, SRM University",
+        "Education Start Date": "Aug 2024"
+      }
+    }
+  ]
+}

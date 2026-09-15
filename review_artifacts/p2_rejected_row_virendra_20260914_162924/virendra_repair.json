@@ -1,0 +1,12 @@
+{
+  "application_id": "APP-20260804-1910-MDLA",
+  "changed": {
+    "Education": {
+      "before": "Government Engineering College Bikaner, Bikaner",
+      "after": "Electronics And Communication Engineering, Government Engineering College Bikaner"
+    }
+  },
+  "evidence": "EDUCATION: Electronics And Communication Engineering Sep 2023 to 2027; Government Engineering College Bikaner, Bikaner. No degree type is stated, so none was invented.",
+  "database_backup": "..\\..\\review_artifacts\\p2_rejected_row_virendra_20260914_162924\\candidates_before_virendra.db",
+  "database_backup_sha256": "826ad6c153ebb867e69482a537dacf22158b9a3ad1177762690f7588538b76cc"
+}

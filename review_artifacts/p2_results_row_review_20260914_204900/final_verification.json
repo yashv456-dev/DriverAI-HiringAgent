@@ -1,0 +1,128 @@
+{
+  "publication_revision": 110,
+  "result_rows": 18,
+  "expected_scored_rows": 18,
+  "master_main_rows": 20,
+  "expected_main_rows": 20,
+  "master_rejected_rows": 11,
+  "expected_rejected_rows": 11,
+  "result_ids_exact": true,
+  "result_duplicates": 0,
+  "result_field_mismatches": [],
+  "master_main_ids_exact": true,
+  "master_rejected_ids_exact": true,
+  "remote_sha256": {
+    "Candidate_List_Results.live.xlsx": "a45339165a8c5d074c4376232cac893a42714cbd6b6d29553779c8bb793daf4f",
+    "P2-MasterFile.live.xlsx": "db9d37461c010f8cce34b47f0845a6da144142b1e19eae7249d31275391e244f"
+  },
+  "row_review": [
+    {
+      "application_id": "APP-20260908-1304-MCLA",
+      "full_name": "Muhammad Awais Tahir",
+      "verdict": "verified",
+      "note": "Resume identity, contact, education, experience handling, and three AI/ML role matches are supported."
+    },
+    {
+      "application_id": "APP-20260821-0812-MCQA",
+      "full_name": "Renu Jaitly",
+      "verdict": "corrected",
+      "note": "Education dates now use the IGNOU degree (1999?2002), not Walgreens employment dates."
+    },
+    {
+      "application_id": "APP-20260817-1859-MCSA",
+      "full_name": "Shashank Kumar Singh",
+      "verdict": "corrected",
+      "note": "Education is cleaned to the degree and school; the expected graduation remains in its date column."
+    },
+    {
+      "application_id": "APP-20260817-1239-MCUA",
+      "full_name": "Nimish Goel",
+      "verdict": "corrected",
+      "note": "Current MS is paired with W. P. Carey/ASU, and the stated 3+ years is retained."
+    },
+    {
+      "application_id": "APP-20260817-0617-MCVA",
+      "full_name": "Charusneha Laguduva Ravitha",
+      "verdict": "verified",
+      "note": "Education, extracted fields, and AI/ML role matches are supported."
+    },
+    {
+      "application_id": "APP-20260816-1338-MCWA",
+      "full_name": "Kshitij Sahu",
+      "verdict": "corrected",
+      "note": "Hardware profile now maps to RF/satellite/IoT roles and Satellite category; unsupported AI/cyber matches were removed."
+    },
+    {
+      "application_id": "APP-20260815-0504-MCXA",
+      "full_name": "Bharath Dibbadahalli Hanumanthappa",
+      "verdict": "corrected",
+      "note": "Education is limited to the degree and school; graduation remains in its date column."
+    },
+    {
+      "application_id": "APP-20260814-0841-MC0A",
+      "full_name": "Manay Lodha",
+      "verdict": "verified",
+      "note": "Mobile/full-stack experience and all three mobile role matches are supported."
+    },
+    {
+      "application_id": "APP-20260813-1733-MC1A",
+      "full_name": "Jeffrey John Kennedy",
+      "verdict": "verified",
+      "note": "Analytics skills and the three data/analytics role matches are supported."
+    },
+    {
+      "application_id": "APP-20260812-1126-MC3A",
+      "full_name": "Muhammad Ahsan Hussain",
+      "verdict": "verified",
+      "note": "React Native/mobile stack and all three mobile role matches are supported."
+    },
+    {
+      "application_id": "APP-20260812-0009-MC6A",
+      "full_name": "Prerna Saluja",
+      "verdict": "verified",
+      "note": "Finance/analytics background and the published roles are supported; no education dates are stated."
+    },
+    {
+      "application_id": "APP-20260810-1014-PMCA",
+      "full_name": "Shalin Edward",
+      "verdict": "verified",
+      "note": "Stated three years, education, and analytics roles are supported."
+    },
+    {
+      "application_id": "APP-20260805-0931-PMCA",
+      "full_name": "Vibha Swaminathan",
+      "verdict": "corrected",
+      "note": "Education markup/date leakage was removed and the stated May 2026 MS end date was restored."
+    },
+    {
+      "application_id": "APP-20260805-0805-MDBA",
+      "full_name": "Pragya Mittal",
+      "verdict": "corrected",
+      "note": "MS dates now use Texas A&M Aug 2023?May 2025, not fellowship years."
+    },
+    {
+      "application_id": "APP-20260805-0743-MDCA",
+      "full_name": "Shruti Kamath",
+      "verdict": "corrected",
+      "note": "Syracuse MS dates Aug 2023?May 2025 were restored."
+    },
+    {
+      "application_id": "APP-20260804-2114-MDHA",
+      "full_name": "Samarth Agasthya Mandya Subramanya",
+      "verdict": "verified",
+      "note": "Education, stated May 2027 end date, skills, and published roles are supported."
+    },
+    {
+      "application_id": "APP-20260804-2019-MDJA",
+      "full_name": "Mithilesh Kothandaraman",
+      "verdict": "corrected",
+      "note": "ASU MS start date Aug 2024 was restored and dates were removed from the Education text."
+    },
+    {
+      "application_id": "APP-20260804-1156-MDOA",
+      "full_name": "Bharat Gupta",
+      "verdict": "verified",
+      "note": "Android stack, education dates, and all three mobile role matches are supported."
+    }
+  ]
+}

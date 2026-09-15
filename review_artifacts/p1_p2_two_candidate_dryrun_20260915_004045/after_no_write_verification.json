@@ -1,0 +1,15 @@
+{
+  "database_sha256_after": "8d22d35419313683f846f953362076f95c85a715c4831c1c12fea750913eaa04",
+  "database_publication_after": {
+    "id": 1,
+    "revision": 110,
+    "published_revision": 110,
+    "error": ""
+  },
+  "remote_hashes_after": {
+    "P1-Sharepoint-Master.live.xlsx": "8d3f9ed6e82de679369ee2d22c733d1c71b281f40b4c11db6ff675fed2eeeda7",
+    "P2-MasterFile.live.xlsx": "db9d37461c010f8cce34b47f0845a6da144142b1e19eae7249d31275391e244f",
+    "Candidate_List_Results.live.xlsx": "a45339165a8c5d074c4376232cac893a42714cbd6b6d29553779c8bb793daf4f"
+  },
+  "remote_hashes_unchanged": true
+}

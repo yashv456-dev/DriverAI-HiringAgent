@@ -1,0 +1,57 @@
+{
+  "artifact_dir": "..\\..\\review_artifacts\\p2_rejected_final_verification_20260914_195942",
+  "publication": {
+    "id": 1,
+    "revision": 101,
+    "published_revision": 101,
+    "error": ""
+  },
+  "counts": {
+    "p1_candidate": 31,
+    "p1_rejected": 0,
+    "p2_main": 20,
+    "p2_rejected": 11,
+    "results": 18
+  },
+  "checks": {
+    "publication_current": true,
+    "p1_candidate_count": true,
+    "p1_rejected_empty": true,
+    "p2_main_matches_db": true,
+    "p2_rejected_matches_db": true,
+    "p2_total_31": true,
+    "p2_disjoint": true,
+    "results_18": true,
+    "results_match_scored": true,
+    "all_repaired_fields_live": true
+  },
+  "field_checks": {
+    "APP-20260810-1751-MC9A": {
+      "Phone": true,
+      "Education Start Date": true,
+      "Education End Date": true
+    },
+    "APP-20260819-0140-MCRA": {
+      "Education Start Date": true,
+      "Education End Date": true
+    },
+    "APP-20260804-2313-MDFA": {
+      "Education Start Date": true,
+      "Education End Date": true
+    },
+    "APP-20260804-1910-MDLA": {
+      "Education": true
+    },
+    "APP-20260815-0302-MCYA": {
+      "Education Start Date": true,
+      "Education End Date": true
+    },
+    "APP-20260804-1923-MDKA": {
+      "Education End Date": true
+    },
+    "APP-20260804-1557-MDNA": {
+      "Education Start Date": true,
+      "Education End Date": true
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "backup_dir": "C:\\Users\\yash9\\Downloads\\HiringAgent2\\review_artifacts\\august_recovery_20260914_144919",
+  "restored_p1_rows": [
+    "APP-20260813-1733-MC1A",
+    "APP-20260805-0805-MDBA"
+  ],
+  "reactivated_db_rows": [
+    "APP-20260813-1733-MC1A",
+    "APP-20260805-0805-MDBA"
+  ],
+  "rejected_destination_verified": 11,
+  "rejected_sources_removed": [
+    "Mona_Rawat_MCRA.pdf",
+    "Yash_Shah_MCYA.pdf",
+    "Peter_Vishal_MC5A.docx",
+    "Victor_Oliveira_MC9A.pdf",
+    "Awais_Ahmad_MDDA.pdf",
+    "Muhammad_Sadiq_MDFA.pdf",
+    "Muhammad_Anas_MDGA.pdf",
+    "Saad_Ullah_MDIA.pdf",
+    "Sankalp_Sharma_MDKA.pdf",
+    "Virendra_Saini_MDLA.pdf",
+    "Amanpreet_Singh_MDNA.pdf"
+  ],
+  "publication": {
+    "id": 1,
+    "revision": 93,
+    "published_revision": 93,
+    "error": ""
+  }
+}

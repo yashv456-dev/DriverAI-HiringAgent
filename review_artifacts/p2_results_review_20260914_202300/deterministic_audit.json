@@ -1,0 +1,2612 @@
+[
+  {
+    "app_id": "APP-20260908-1304-MCLA",
+    "name": "Muhammad Awais Tahir",
+    "stored": {
+      "Category": "AI/ML/CV (SIN2)",
+      "Years Exp": "Missing",
+      "Education": "Bachelor of Science in Computer Science, National University of Computer & Emerging Sciences (FAST-NUCES)",
+      "Education Start Date": "Missing",
+      "Education End Date": "Missing",
+      "Looking For Role": "AI / ML Engineer",
+      "Suggested Role 1": "SIN2 Software Developer AgAI ML CV 3D (85%)",
+      "Suggested Role 2": "SIN2 SWDev AI ML CV (75%)",
+      "Suggested Role 3": "Software Developer - AI/ML, Computer Vision (75%)"
+    },
+    "deterministic": {
+      "full_name": "Muhammad Awais Tahir",
+      "email": "awaistahir0001@gmail.com",
+      "phone": "+1(732) 997-5324",
+      "location": "North Brunswick, NJ",
+      "country": "United States",
+      "skills": "Generative AI, LLM, RAG, Transformers, Prompt Engineering, LangChain, Machine Learning, TensorFlow, PyTorch, Python, Java, JavaScript, C++, Flask, REST, SQL, PostgreSQL, MySQL, AWS, Azure, Docker, Kubernetes, CI/CD, GitHub Actions, Automation, OAuth, Gmail API, RSS",
+      "looking_for_role": "AI / ML Engineer",
+      "education": "Bachelor of Science in Computer Science, National University of Computer & Emerging Sciences (FAST-NUCES)",
+      "education_start_date": "",
+      "education_end_date": "",
+      "experience": "",
+      "notes": "North Brunswick, NJ | +1(732) 997-5324 | US Permanent Resident \nMuhammad Awais Tahir \n\n<u>awaistahir0001@gmail.com | Linkedin</u> | <u>GitHub</u> \n<u>SUMMARY</u> \n\nComputer science graduate who designs, builds, and deploys AI systems end to end. Built an LLM-driven automation platform processing ~7,000 job postings weekly with an 80% reduction in duplicates, and shipped CNN-based diagnostic models to AWS at 97% validation accuracy. Strong in Python, Flask, Docker, and RAG pipelines. AWS certified. \n<u>Technical Projects</u> \n\nAI-Powered Job Discovery and Application Support Automation \n\nTechnologies: _n8n, Docker, Gmail, LLM APIs, RSS, OAuth_ \nArchitected & implemented an AI-powered automation platform to ingest, normalize, deduplicate, and enrich job postings from RSS feeds, achieving an ",
+      "portfolio_1": "https://www.linkedin.com/in/muhammad-awais-tahir-605643278",
+      "portfolio_2": "https://github.com/awaistahir0001",
+      "portfolio_3": "https://drive.google.com/file/d/1rlqXumoCNAGbsWDLh_phk3UW4h3wPJE8/view?usp=sharing"
+    },
+    "keyword_top10": [
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        100
+      ],
+      [
+        "Computer Vision 3D Eng  PD",
+        93
+      ],
+      [
+        "SIN 2   AI ML ENg Job Announcement",
+        90
+      ],
+      [
+        "SIN3 AI ML CV Engineering Intern Position Description",
+        81
+      ],
+      [
+        "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
+        80
+      ],
+      [
+        "SIN2 SWDev AI ML CV Job Announcement",
+        80
+      ],
+      [
+        "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Job Description",
+        73
+      ],
+      [
+        "SIN3 3D CV Position Announcement",
+        73
+      ],
+      [
+        "SIN3 3D CV IoT Intern Position Description",
+        73
+      ],
+      [
+        "DriverAI Senior Manager AWS Cloud DevOps Agile Job Announcement",
+        73
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "SIN2 Software Developer AgAI ML CV 3D (85%)",
+        "evidence": {
+          "doc": "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
+          "opening_id": "sin2-software-developer-agai-ml-cv-3d",
+          "overlap_count": 12,
+          "required_count": 20,
+          "overlap": [
+            "agentic",
+            "automation",
+            "aws",
+            "embeddings",
+            "llm",
+            "machine learning",
+            "neural networks",
+            "prompt engineering",
+            "python",
+            "pytorch",
+            "tensorflow",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "SIN2 SWDev AI ML CV (75%)",
+        "evidence": {
+          "doc": "SIN2 SWDev AI ML CV Job Announcement",
+          "opening_id": "sin2-swdev-ai-ml-cv",
+          "overlap_count": 7,
+          "required_count": 10,
+          "overlap": [
+            "embeddings",
+            "machine learning",
+            "neural networks",
+            "python",
+            "pytorch",
+            "tensorflow",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "Software Developer - AI/ML, Computer Vision (75%)",
+        "evidence": {
+          "doc": "Software Developer - AI/ML, Computer Vision",
+          "opening_id": "software-developer-ai-ml-computer-vision",
+          "overlap_count": 4,
+          "required_count": 5,
+          "overlap": [
+            "machine learning",
+            "python",
+            "pytorch",
+            "tensorflow"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Muhammad_Tahir_MCLA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260821-0812-MCQA",
+    "name": "Renu Jaitly",
+    "stored": {
+      "Category": "Data Analytics",
+      "Years Exp": "16 years",
+      "Education": "Master of Science in Computer Applications | Indira Gandhi National Open University",
+      "Education Start Date": "Jun 2021",
+      "Education End Date": "Dec 2025",
+      "Looking For Role": "Data Leader / Cloud Data Architect",
+      "Suggested Role 1": "Data Engineer (90%)",
+      "Suggested Role 2": "Software Cloud Developer (85%)",
+      "Suggested Role 3": "Software and AWS Developer (75%)"
+    },
+    "deterministic": {
+      "full_name": "Not extracted",
+      "email": "Not extracted",
+      "phone": "Not extracted",
+      "location": "Mundelein, IL",
+      "country": "United States",
+      "skills": "Computer Vision, Machine Learning, scikit-learn, Pandas, NumPy, Data Science, Data Engineering, Python, Java, C++, REST, SQL, MySQL, Snowflake, Databricks, Airflow, ETL, dbt, Azure, Docker, Git, Automation, Compliance, Agile, Jira, Stakeholder Management, Excel, Power BI, Tableau, Looker, Google Analytics, Financial Reporting, Forecasting, Payroll",
+      "looking_for_role": "Healthcare Data Specialist",
+      "education": "Master of Science in Computer Applications | Indira Gandhi National Open University",
+      "education_start_date": "1999",
+      "education_end_date": "2002",
+      "experience": "16 years",
+      "notes": "Renu Jaitly\t\t\t\t\t\t\t\t\t\t\tMundelein, IL\nData & Analytics Leader | Cloud Data Architecture | Healthcare Data Specialist\n\nPROFESSIONAL SUMMARY:\t\t\t\t\t\t\t\t\t\t\t\t\nData and analytics leader with 16+ years of experience building enterprise data platforms, designing data warehousing solutions, and leading analytics organizations. Specialize in establishing end-to-end data infrastructure, governance frameworks, and reporting systems that deliver actionable insights across healthcare, insurance, and regulated industries.\nCloud data architect with deep expertise in Databricks, Snowflake, and Microsoft Azure. Design dimensional and relational models using entity-relationship architecture and metadata standards. Build scalable data warehouses and lakes that support analytics at enterprise scale.\nData engineeri",
+      "portfolio_1": "N/A",
+      "portfolio_2": "N/A",
+      "portfolio_3": "N/A"
+    },
+    "keyword_top10": [
+      [
+        "AWS Lead Position Description",
+        98
+      ],
+      [
+        "Software and AWS Developer Position Description",
+        96
+      ],
+      [
+        "Cloud Database Engineer  PD",
+        86
+      ],
+      [
+        "DriverAI Senior Manager AWS Cloud DevOps Agile Job Announcement",
+        82
+      ],
+      [
+        "Software Cloud Developer Position Description",
+        79
+      ],
+      [
+        "Data Engineer Job Announcement",
+        77
+      ],
+      [
+        "SIN3 AI ML CV Engineering Intern Position Description",
+        71
+      ],
+      [
+        "Data Analyst Job Announcement rev",
+        61
+      ],
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        60
+      ],
+      [
+        "AWS Senior Engineer Position",
+        60
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Data Engineer (90%)",
+        "evidence": {
+          "doc": "Data Engineer Job Announcement",
+          "opening_id": "data-engineer",
+          "overlap_count": 17,
+          "required_count": 22,
+          "overlap": [
+            "airflow",
+            "automation",
+            "compliance",
+            "data engineering",
+            "data science",
+            "dbt",
+            "docker",
+            "etl",
+            "git",
+            "jira",
+            "looker",
+            "machine learning",
+            "pandas",
+            "power bi",
+            "python",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": false
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Software Cloud Developer (85%)",
+        "evidence": {
+          "doc": "Software Cloud Developer Position Description",
+          "opening_id": "software-cloud-developer",
+          "overlap_count": 12,
+          "required_count": 31,
+          "overlap": [
+            "agile",
+            "automation",
+            "azure",
+            "compliance",
+            "data science",
+            "docker",
+            "git",
+            "java",
+            "jira",
+            "machine learning",
+            "python",
+            "sql"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "Software and AWS Developer (75%)",
+        "evidence": {
+          "doc": "Software and AWS Developer Position Description",
+          "opening_id": "software-and-aws-developer",
+          "overlap_count": 9,
+          "required_count": 16,
+          "overlap": [
+            "agile",
+            "automation",
+            "compliance",
+            "data science",
+            "docker",
+            "git",
+            "java",
+            "jira",
+            "python"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Renu_Jaitly_MCQA.docx.txt"
+  },
+  {
+    "app_id": "APP-20260817-1859-MCSA",
+    "name": "Shashank Kumar Singh",
+    "stored": {
+      "Category": "AI/ML/CV (SIN2)",
+      "Years Exp": "Missing",
+      "Education": "M.S. in Computer Science Dec 2026 (expected) Arizona State University : Tempe, AZ, USA",
+      "Education Start Date": "Missing",
+      "Education End Date": "Dec 2026",
+      "Looking For Role": "AI / ML Engineer",
+      "Suggested Role 1": "SIN2 Software Developer AgAI ML CV 3D (65%)",
+      "Suggested Role 2": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT (60%)",
+      "Suggested Role 3": "SIN2 SWDev AI ML CV (55%)"
+    },
+    "deterministic": {
+      "full_name": "Shashank Kumar Singh",
+      "email": "sksing32@asu.edu",
+      "phone": "+1-(602)-3398985",
+      "location": "Tempe, AZ",
+      "country": "United States",
+      "skills": "LLM, RAG, Transformers, NLP, Machine Learning, Pandas, NumPy, Python, JavaScript, C++, C#, Rust, MATLAB, HTML, CSS, REST, SQL, PostgreSQL, Redis, ETL, AWS, Azure, Docker, Git, CI/CD, Selenium, Network Security, Compliance, Power BI, Forecasting",
+      "looking_for_role": "AI / ML Engineer",
+      "education": "M.S. in Computer Science Dec 2026 (expected) Arizona State University : Tempe, AZ, USA GPA: 4.00 / 4.00 Relevant coursework: Artificial Intelligence and Machine Learning B.Tech in Electrical and Electronics Nov 2023 Manipal Institute of Technology : Manipal, India CGPA: 8.01 / 10.00 Relevant coursework: Minor in Computing and Interactive Programming in Python",
+      "education_start_date": "",
+      "education_end_date": "Dec 2026",
+      "experience": "",
+      "notes": "SHASHANK KUMAR SINGH \n\n+1-(602)-3398985 • sksing32@asu.edu • LinkedIn • Website \nEDUCATION \n\nM.S. in Computer Science Dec 2026 (expected) Arizona State University : Tempe, AZ, USA GPA: 4.00 / 4.00 Relevant coursework: Artificial Intelligence and Machine Learning B.Tech in Electrical and Electronics Nov 2023 Manipal Institute of Technology : Manipal, India CGPA: 8.01 / 10.00 Relevant coursework: Minor in Computing and Interactive Programming in Python \nSKILLS SUMMARY \n\nLanguages & Tools: Python, C, C#, C++, JavaScript, HTML/CSS, SQL, MATLAB, Git, Redis Frameworks & Platforms: .NET 6, AngularJS, AWS, Azure, Docker Data & Analysis: Pandas, NumPy, Power BI, Alteryx, OpenTelemetry, OSRM Systems: Cryptography (AES, RSA), Network Security, REST API services, PostgreSQL \nWORK EXPERIENCE \n\nPark My ",
+      "portfolio_1": "https://www.linkedin.com/in/shashankk117",
+      "portfolio_2": "https://github.com/harishchaurasia",
+      "portfolio_3": "https://rpxcjq2y8j.wixsite.com/my-site-1"
+    },
+    "keyword_top10": [
+      [
+        "Computer Vision 3D Eng  PD",
+        93
+      ],
+      [
+        "SIN3 AI ML CV Engineering Intern Position Description",
+        87
+      ],
+      [
+        "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Job Description",
+        83
+      ],
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        80
+      ],
+      [
+        "Cybersecurity IT Admin Manager JA AI Tools Updated",
+        80
+      ],
+      [
+        "SIN3 3D CV IoT Intern Position Description",
+        77
+      ],
+      [
+        "DriverAI Data Center Supply Chain Specialist Job Announcement",
+        73
+      ],
+      [
+        "DriverAI Senior Manager AWS Cloud DevOps Agile Job Announcement",
+        73
+      ],
+      [
+        "SIN2 SWDev AI ML CV Job Announcement",
+        70
+      ],
+      [
+        "AI ML Mobile Applications Developer Job Announcement",
+        66
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "SIN2 Software Developer AgAI ML CV 3D (65%)",
+        "evidence": {
+          "doc": "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
+          "opening_id": "sin2-software-developer-agai-ml-cv-3d",
+          "overlap_count": 9,
+          "required_count": 20,
+          "overlap": [
+            "aws",
+            "embeddings",
+            "git",
+            "llm",
+            "machine learning",
+            "neural networks",
+            "prompt engineering",
+            "python",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT (60%)",
+        "evidence": {
+          "doc": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Job Description",
+          "opening_id": "driverai-sin3-3d-ai-ml-cv-iot-engineer-opt",
+          "overlap_count": 9,
+          "required_count": 21,
+          "overlap": [
+            "c++",
+            "docker",
+            "git",
+            "machine learning",
+            "matlab",
+            "numpy",
+            "pandas",
+            "python",
+            "rest"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "SIN2 SWDev AI ML CV (55%)",
+        "evidence": {
+          "doc": "SIN2 SWDev AI ML CV Job Announcement",
+          "opening_id": "sin2-swdev-ai-ml-cv",
+          "overlap_count": 6,
+          "required_count": 10,
+          "overlap": [
+            "embeddings",
+            "git",
+            "machine learning",
+            "neural networks",
+            "python",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Shashank_Singh_MCSA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260817-1239-MCUA",
+    "name": "Nimish Goel",
+    "stored": {
+      "Category": "Data Analytics",
+      "Years Exp": "Missing",
+      "Education": "M.S. in Information Systems & Management, R.V. College of Engineering",
+      "Education Start Date": "Aug 2024",
+      "Education End Date": "Sep 2025",
+      "Looking For Role": "Business Analyst",
+      "Suggested Role 1": "Data Analyst (75%)",
+      "Suggested Role 2": "Business Data Analyst (70%)",
+      "Suggested Role 3": "DriverAI Dual Business Analytics Marketing Intern (65%)"
+    },
+    "deterministic": {
+      "full_name": "Nimish Goel",
+      "email": "ngoel20@asu.edu",
+      "phone": "+1 602-770-5282",
+      "location": "Tempe, AZ",
+      "country": "United States",
+      "skills": "Generative AI, LLM, LLMs, RAG, Claude, Agentic AI, Python, C++, Go, REST, SQL, AWS, Docker, Git, CI/CD, Firebase, Unity, Figma, Wireframing, Prototyping, B2B, Cybersecurity, Compliance, Project Management, Agile, Scrum, Jira, Stakeholder Management, Risk Management, Business Analysis, Requirements Gathering, Excel, Power BI, Tableau",
+      "looking_for_role": "Business Analyst _",
+      "education": "M.S. in Information Systems & Management<br>_Tempe, AZ, USA_, R.V. College of Engineering",
+      "education_start_date": "Aug 2024",
+      "education_end_date": "Sep 2025",
+      "experience": "",
+      "notes": "Nimish Goel \nBUSINESS ANALYST _|_ B2B SaaS, AI Agents & Platforms \n\n� +1 602-770-5282 �<sup>ngoel20@asu.edu</sup> �<sup>linkedin.com/in/nimish-goel/</sup> \nSUMMARY \n\nProduct specialist with 3+ years owning end-to-end delivery across B2B SaaS, Generative AI, cloud security, and digital media. Leads customer discovery, product strategy, roadmaps, backlog prioritization, Agile/Scrum delivery, launches, and stakeholder alignment. Hands-on with LLMs, multimodal and agentic workflows, model evaluation, REST APIs, AWS, product analytics, and Power BI, balancing quality, latency, cost, and reliability to deliver measurable outcomes. \nEDUCATION \n W.P. Carey School of Business, Arizona State University<br>Aug 2024 – Sept 2025|\n\n M.S. in Information Systems & Management<br>_Tempe, AZ, USA_|\n _•_ Rele",
+      "portfolio_1": "https://linkedin.com/in/nimish-goel",
+      "portfolio_2": "N/A",
+      "portfolio_3": "https://doi.org/10.1007/978-3-031-75164-6_16"
+    },
+    "keyword_top10": [
+      [
+        "Data Analyst Job Announcement rev",
+        90
+      ],
+      [
+        "DriverAI Dual Business Analytics Marketing Intern Job Announcement (2)",
+        75
+      ],
+      [
+        "Business Data Analyst Position Description",
+        75
+      ],
+      [
+        "Business Analytics Marketing Intern Job Announcement",
+        75
+      ],
+      [
+        "DriverAI Data Center Supply Chain Specialist Job Announcement",
+        67
+      ],
+      [
+        "DriverAI Senior Manager AWS Cloud DevOps Agile Job Announcement",
+        67
+      ],
+      [
+        "Software and AWS Developer Position Description",
+        62
+      ],
+      [
+        "AWS Senior Engineer Position",
+        60
+      ],
+      [
+        "Cybersecurity IT Admin Manager JA AI Tools Updated",
+        60
+      ],
+      [
+        "Cybersecurity IT Administrator Position",
+        60
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Data Analyst (75%)",
+        "evidence": {
+          "doc": "Data Analyst Position Description",
+          "opening_id": "data-analyst",
+          "overlap_count": 9,
+          "required_count": 25,
+          "overlap": [
+            "aws",
+            "compliance",
+            "cybersecurity",
+            "excel",
+            "jira",
+            "power bi",
+            "python",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Business Data Analyst (70%)",
+        "evidence": {
+          "doc": "Business Data Analyst Position Description",
+          "opening_id": "business-data-analyst",
+          "overlap_count": 9,
+          "required_count": 26,
+          "overlap": [
+            "aws",
+            "compliance",
+            "cybersecurity",
+            "excel",
+            "jira",
+            "power bi",
+            "python",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "DriverAI Dual Business Analytics Marketing Intern (65%)",
+        "evidence": {
+          "doc": "DriverAI Dual Business Analytics Marketing Intern Job Announcement (2)",
+          "opening_id": "driverai-dual-business-analytics-marketing-intern",
+          "overlap_count": 6,
+          "required_count": 17,
+          "overlap": [
+            "excel",
+            "generative ai",
+            "power bi",
+            "python",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Nimish_Goel_MCUA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260817-0617-MCVA",
+    "name": "Charusneha Laguduva Ravitha",
+    "stored": {
+      "Category": "AI/ML/CV (SIN2)",
+      "Years Exp": "Missing",
+      "Education": "Master of Science, Software Engineering, Arizona State University, Tempe, AZ (Full-time) GPA - 4.0/4.0, Bachelor of Engineering, Computer Science, Anna University (TCE), Chennai, India GPA - 3.82/4.0",
+      "Education Start Date": "Aug 2024",
+      "Education End Date": "May 2026",
+      "Looking For Role": "AI / ML Engineer",
+      "Suggested Role 1": "SIN2 Software Developer AgAI ML CV 3D (93%)",
+      "Suggested Role 2": "SIN2 SWDev AI ML CV (90%)",
+      "Suggested Role 3": "AI ML Mobile Applications Developer (85%)"
+    },
+    "deterministic": {
+      "full_name": "Not extracted",
+      "email": "charusneha266@gmail.com",
+      "phone": "+1 (623) 271-5755",
+      "location": "Tempe, AZ",
+      "country": "United States",
+      "skills": "LLM, LLMs, RAG, Fine-Tuning, Transformers, Prompt Engineering, LangChain, Embeddings, NLP, Deep Learning, MLOps, Agentic AI, PyTorch, scikit-learn, Pandas, NumPy, Python, Java, TypeScript, Go, React, Node.js, FastAPI, Next.js, REST, SQL, PostgreSQL, Redis, Kafka, AWS, GCP, Docker, Kubernetes, CI/CD, Bash, Agile, Power BI",
+      "looking_for_role": "AI / ML Engineer",
+      "education": "Master of Science, Software Engineering Aug 2024 - May 2026 Arizona State University, Tempe, AZ _(Full-time)_ GPA - 4.0/4.0 Bachelor of Engineering, Computer Science Aug 2019 - July 2023 Anna University (TCE), Chennai, India GPA - 3.82/4.0",
+      "education_start_date": "Aug 2024",
+      "education_end_date": "May 2026",
+      "experience": "",
+      "notes": "CHARU SNEHA LAGUDUVA RAVI \n\nTempe, AZ _|_ +1 (623) 271-5755 _|_ charusneha266@gmail.com _|_ charusneha.vercel.app _|_ linkedin.com/in/charusnehalr26 _|_ github.com/charusnehalr \nSUMMARY \n\nSoftware engineer with experience building intelligent systems that ship - NLP pipelines processing millions of documents, RAGpowered search, and LLM agent systems with tool-calling and persistent memory. Experienced across the full ML stack - from model training, fine-tuning to agentic orchestration, and deploying scalable AI systems in fast-paced agile environments. \nEDUCATION \n\nMaster of Science, Software Engineering Aug 2024 - May 2026 Arizona State University, Tempe, AZ _(Full-time)_ GPA - 4.0/4.0 Bachelor of Engineering, Computer Science Aug 2019 - July 2023 Anna University (TCE), Chennai, India GPA",
+      "portfolio_1": "https://linkedin.com/in/charusnehalr26",
+      "portfolio_2": "https://github.com/charusnehalr",
+      "portfolio_3": "https://charusneha.vercel.app/"
+    },
+    "keyword_top10": [
+      [
+        "Computer Vision 3D Eng  PD",
+        93
+      ],
+      [
+        "SIN 2   AI ML ENg Job Announcement",
+        90
+      ],
+      [
+        "SIN3 AI ML CV Engineering Intern Position Description",
+        87
+      ],
+      [
+        "SIN2 SWDev AI ML CV Job Announcement",
+        80
+      ],
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        80
+      ],
+      [
+        "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Job Description",
+        78
+      ],
+      [
+        "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
+        75
+      ],
+      [
+        "SIN3 3D CV Position Announcement",
+        73
+      ],
+      [
+        "AI ML Mobile Applications Developer Job Announcement",
+        72
+      ],
+      [
+        "SIN3 3D CV IoT Intern Position Description",
+        70
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "SIN2 Software Developer AgAI ML CV 3D (93%)",
+        "evidence": {
+          "doc": "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
+          "opening_id": "sin2-software-developer-agai-ml-cv-3d",
+          "overlap_count": 10,
+          "required_count": 20,
+          "overlap": [
+            "agentic",
+            "agile",
+            "embeddings",
+            "llm",
+            "neural networks",
+            "prompt engineering",
+            "python",
+            "pytorch",
+            "scikit-learn",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "SIN2 SWDev AI ML CV (90%)",
+        "evidence": {
+          "doc": "SIN2 SWDev AI ML CV Job Announcement",
+          "opening_id": "sin2-swdev-ai-ml-cv",
+          "overlap_count": 6,
+          "required_count": 10,
+          "overlap": [
+            "embeddings",
+            "neural networks",
+            "python",
+            "pytorch",
+            "scikit-learn",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "AI ML Mobile Applications Developer (85%)",
+        "evidence": {
+          "doc": "AI ML Mobile Applications Developer Job Announcement",
+          "opening_id": "ai-ml-mobile-applications-developer",
+          "overlap_count": 10,
+          "required_count": 31,
+          "overlap": [
+            "agile",
+            "ci/cd",
+            "docker",
+            "embeddings",
+            "java",
+            "python",
+            "pytorch",
+            "react",
+            "scikit-learn",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Charusneha_Ravitha_MCVA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260816-1338-MCWA",
+    "name": "Kshitij Sahu",
+    "stored": {
+      "Category": "AI/ML/CV (SIN2)",
+      "Years Exp": "Missing",
+      "Education": "Master of Science in Electrical Engineering Aug 2024 – May 2026, Arizona State University (3.52/4) Arizona, USA; Bachelor of Technology in EEE Aug 2018 – May 2022, Kalinga Institute of Industrial Technology (8.27/10) Odisha, India",
+      "Education Start Date": "Aug 2024",
+      "Education End Date": "May 2026",
+      "Looking For Role": "Hardware Engineer",
+      "Suggested Role 1": "Software Developer - AI/ML, Computer Vision (85%)",
+      "Suggested Role 2": "Cybersecurity IT Administrator (40%)",
+      "Suggested Role 3": "Cybersecurity IT Admin Manager (35%)"
+    },
+    "deterministic": {
+      "full_name": "Kshitij Sahu",
+      "email": "kshitij.sahu3@gmail.com",
+      "phone": "480-875-4195",
+      "location": "Tempe, AZ",
+      "country": "United States",
+      "skills": "Python, C++, Linux, Prototyping, Compliance",
+      "looking_for_role": "Software Developer / Backend Engineer",
+      "education": "Master of Science in Electrical Engineering Aug 2024 – May 2026 _Arizona State University (3.52/4) Arizona, USA_ Bachelor of Technology in EEE Aug 2018 – May 2022 _Kalinga Institute of Industrial Technology (8.27/10) Odisha, India_",
+      "education_start_date": "Aug 2024",
+      "education_end_date": "May 2026",
+      "experience": "",
+      "notes": "Kshitij Sahu \n\n480-875-4195 _|_ kshitij.sahu3@gmail.com _|_ linkedin.com/in/kshitij-sahu-4b173519a _|_ Tempe, AZ \nEducation \n\nMaster of Science in Electrical Engineering Aug 2024 – May 2026 _Arizona State University (3.52/4) Arizona, USA_ Bachelor of Technology in EEE Aug 2018 – May 2022 _Kalinga Institute of Industrial Technology (8.27/10) Odisha, India_ \nTechnical Skills \n\nHDL/Verification: SystemVerilog, TCL, C++, Python, SystemVerilog Assertions, constrained-random verification, coveragedriven verification \n\nDesign Flows & Methodologies: GDSII, Multi-Corner/Multi-Mode STA, CDC / RDC Analysis, Sign-off, Clock Gating, Physical Design \n\nTools & Verification Environments: ModelSim, VCS, Synopsys Design Compiler, Synopsys Verdi, Cadence Innovus, Cadence Genus, Xilinx Vivado \nExperience and ",
+      "portfolio_1": "https://linkedin.com/in/kshitij-sahu-4b173519a",
+      "portfolio_2": "N/A",
+      "portfolio_3": "N/A"
+    },
+    "keyword_top10": [
+      [
+        "RF Communications Engineer R&D Job Announcement",
+        60
+      ],
+      [
+        "RF Phased Array Systems Engineer Position Description Internal",
+        40
+      ],
+      [
+        "Satellite Systems Flight Software Engineer Position Description",
+        30
+      ],
+      [
+        "Cloud Database Engineer  PD",
+        23
+      ],
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        20
+      ],
+      [
+        "AWS Senior Engineer Position",
+        20
+      ],
+      [
+        "Cybersecurity IT Admin Manager JA AI Tools Updated",
+        20
+      ],
+      [
+        "Cybersecurity IT Administrator Position",
+        20
+      ],
+      [
+        "Cybersecurity IT Intern Position",
+        20
+      ],
+      [
+        "CISO LinkedIn Announcement",
+        20
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Software Developer - AI/ML, Computer Vision (85%)",
+        "evidence": {
+          "doc": "Software Developer - AI/ML, Computer Vision",
+          "opening_id": "software-developer-ai-ml-computer-vision",
+          "overlap_count": 1,
+          "required_count": 5,
+          "overlap": [
+            "python"
+          ],
+          "pref_match": false
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Cybersecurity IT Administrator (40%)",
+        "evidence": {
+          "doc": "Cybersecurity IT Administrator JA",
+          "opening_id": "cybersecurity-it-administrator",
+          "overlap_count": 1,
+          "required_count": 6,
+          "overlap": [
+            "compliance"
+          ],
+          "pref_match": false
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "Cybersecurity IT Admin Manager (35%)",
+        "evidence": {
+          "doc": "Cybersecurity IT Admin Manager JA AI Tools Updated",
+          "opening_id": "cybersecurity-it-admin-manager",
+          "overlap_count": 1,
+          "required_count": 5,
+          "overlap": [
+            "compliance"
+          ],
+          "pref_match": false
+        }
+      }
+    ],
+    "resume_text_file": "Kshitij_Sahu_MCWA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260815-0504-MCXA",
+    "name": "Bharath Dibbadahalli Hanumanthappa",
+    "stored": {
+      "Category": "Cybersecurity and IT Admin",
+      "Years Exp": "Missing",
+      "Education": "University of Maryland College Park, MD - Master of Engineering, Cybersecurity | GPA: 3.8 May 2026 | Relevant Courses: Digital Forensics & Incident Response, Penetration Testing, Cloud Security, Information Assurance",
+      "Education Start Date": "Missing",
+      "Education End Date": "May 2026",
+      "Looking For Role": "Cybersecurity Analyst",
+      "Suggested Role 1": "Cybersecurity Analyst (85%)",
+      "Suggested Role 2": "Cybersecurity IT Administrator (80%)",
+      "Suggested Role 3": "Cybersecurity IT Admin Manager (75%)"
+    },
+    "deterministic": {
+      "full_name": "Bharath Dibbadahalli Hanumanthappa",
+      "email": "bharhanu@terpmail.umd.edu",
+      "phone": "(240) 432-7015",
+      "location": "College Park, MD",
+      "country": "United States",
+      "skills": "Python, Java, Flask, SQL, AWS, Docker, Jenkins, Linux, Bash, Cybersecurity, SIEM, Penetration Testing, Network Security, Firewalls, Incident Response",
+      "looking_for_role": "DevOps / SRE Engineer",
+      "education": "University of Maryland College Park, MD _Master of Engineering, Cybersecurity | GPA: 3.8 May 2026_ Relevant Courses: Digital Forensics & Incident Response, Penetration Testing, Cloud Security, Information Assurance",
+      "education_start_date": "",
+      "education_end_date": "May 2026",
+      "experience": "",
+      "notes": "Bharath Dibbadahalli Hanumanthappa \n\nbharhanu@terpmail.umd.edu  |  (240) 432-7015  |  LinkedIn | <u>Medium</u> |  Portfolio  | <u>GitHub</u> \nEDUCATION \n\nUniversity of Maryland College Park, MD _Master of Engineering, Cybersecurity  |  GPA: 3.8 May 2026_ Relevant Courses: Digital Forensics & Incident Response, Penetration Testing, Cloud Security, Information Assurance \n\nPES University Bengaluru, India _Bachelor of Technology, Computer Science and Engineering May 2024_ <u>Relevant Courses:</u> <u>Computer Network Security, Applied Cryptography, Information Security, Blockchain</u> \nTECHNICAL SKILLS \n\nSIEM & Log Analysis : Splunk, Windows Event Logs, Sysmon, Linux/Bash Log Analysis \n\nNetwork & Offensive Security : Suricata, Wireshark, Snort, Nmap, Metasploit, Nessus, Firewalls/ACLs, Web Prox",
+      "portfolio_1": "https://www.linkedin.com/in/bharath-d-h-ba22a2003",
+      "portfolio_2": "https://github.com/Bharath-2204",
+      "portfolio_3": "https://bharath-2204.github.io/bharathdhportfolio/"
+    },
+    "keyword_top10": [
+      [
+        "Cybersecurity IT Admin Manager JA AI Tools Updated",
+        100
+      ],
+      [
+        "Cybersecurity IT Administrator Position",
+        100
+      ],
+      [
+        "Cybersecurity Analyst Position Description Incident Response Updated",
+        90
+      ],
+      [
+        "CISO Position Description Updated v2",
+        78
+      ],
+      [
+        "Cybersecurity IT Intern Position",
+        60
+      ],
+      [
+        "Corporate Facilities Security Officer Job Announcement",
+        40
+      ],
+      [
+        "Software and AWS Developer Job Announcement",
+        36
+      ],
+      [
+        "Satellite Systems Flight Software Engineer Position Description",
+        30
+      ],
+      [
+        "AWS Lead Job Announcement",
+        27
+      ],
+      [
+        "Cloud Database Engineer  PD",
+        23
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Cybersecurity Analyst (85%)",
+        "evidence": {
+          "doc": "Cybersecurity Analyst Position Description Incident Response Updated",
+          "opening_id": "cybersecurity-analyst",
+          "overlap_count": 4,
+          "required_count": 8,
+          "overlap": [
+            "cybersecurity",
+            "incident response",
+            "network security",
+            "siem"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Cybersecurity IT Administrator (80%)",
+        "evidence": {
+          "doc": "Cybersecurity IT Administrator JA",
+          "opening_id": "cybersecurity-it-administrator",
+          "overlap_count": 3,
+          "required_count": 6,
+          "overlap": [
+            "cybersecurity",
+            "incident response",
+            "siem"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "Cybersecurity IT Admin Manager (75%)",
+        "evidence": {
+          "doc": "Cybersecurity IT Admin Manager JA AI Tools Updated",
+          "opening_id": "cybersecurity-it-admin-manager",
+          "overlap_count": 3,
+          "required_count": 5,
+          "overlap": [
+            "cybersecurity",
+            "incident response",
+            "siem"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Bharath_Hanumanthappa_MCXA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260814-0841-MC0A",
+    "name": "Manay Lodha",
+    "stored": {
+      "Category": "Mobile Apps (Android IOS)",
+      "Years Exp": "Missing",
+      "Education": "B.S. in Computer Engineering, The Pennsylvania State University",
+      "Education Start Date": "Aug 2021",
+      "Education End Date": "Aug 2025",
+      "Looking For Role": "Founding Engineer (Full-Stack & AI)",
+      "Suggested Role 1": "Software Cloud Developer (85%)",
+      "Suggested Role 2": "Full Stack Web Developer (80%)",
+      "Suggested Role 3": "AI ML Mobile Applications Developer (75%)"
+    },
+    "deterministic": {
+      "full_name": "Manay Lodha",
+      "email": "manaylodha0@gmail.com",
+      "phone": "+1 (814) 826-8923",
+      "location": "Not extracted",
+      "country": "",
+      "skills": "LLM, RAG, Claude, Machine Learning, Pandas, Python, Java, JavaScript, TypeScript, C++, Go, React, Node.js, FastAPI, Next.js, CSS, SQL, MongoDB, Redis, AWS, Docker, Kubernetes, Git, CI/CD, Jenkins, Linux, GitHub Actions, Automation, React Native, Flutter, iOS, Android, Firebase, Dart, Incident Response, Excel",
+      "looking_for_role": "Founding Engineer (Full-Stack & AI)",
+      "education": "_The Pennsylvania State University_ Aug 2021 - Aug 2025 B.S. in Computer Engineering | Coursework: Distributed Systems, Data Structures & Algorithms, Machine Learning",
+      "education_start_date": "Aug 2021",
+      "education_end_date": "Aug 2025",
+      "experience": "",
+      "notes": "MANAY LODHA \n\n+1 (814) 826-8923 | manaylodha0@gmail.com | linkedin.com/in/manaylodha | github.com/viper9503 | manaylodha.com \nSUMMARY \n\nFull-stack engineer who owns production systems end to end: a catering platform solo-built on Next.js, TypeScript, and Postgres doing ~$40K/month behind Stripe, Clover, and DoorDash integrations, plus event-driven services and MCP servers non-engineers actually use. \nWORK EXPERIENCE \nFounding Engineer (Full-Stack & AI) \n\n_CaterBundles_ June 2026 - Present \nDesigned, built, and deployed a multi-restaurant catering platform solo in under a month (Next.js, React 19, TypeScript, Postgres 16), now processing ~$40K/month in orders across 42 onboarded restaurants; shipped through a Jenkins CI/CD pipeline. \nEngineered the order-fulfillment pipeline across three li",
+      "portfolio_1": "https://linkedin.com/in/manaylodha",
+      "portfolio_2": "https://github.com/viper9503",
+      "portfolio_3": "N/A"
+    },
+    "keyword_top10": [
+      [
+        "Software and AWS Developer Job Announcement",
+        100
+      ],
+      [
+        "Software Cloud Developer Job Announcement",
+        100
+      ],
+      [
+        "Satellite Systems Flight Software Engineer Position Description",
+        100
+      ],
+      [
+        "Full Stack Web Developer Job Announcement Revised",
+        100
+      ],
+      [
+        "Web Dev  Full Stack Position",
+        100
+      ],
+      [
+        "Web Developer (Full Stack)  Position Announcement",
+        100
+      ],
+      [
+        "Website Developer Lead Developer Full Stack Job Announcement",
+        100
+      ],
+      [
+        "Mobile Application Lead Developer Job Announcement",
+        98
+      ],
+      [
+        "IoT Developer Job Announcement",
+        96
+      ],
+      [
+        "Mobile Application Software Developer Job Announcement",
+        96
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Software Cloud Developer (85%)",
+        "evidence": {
+          "doc": "Software Cloud Developer Job Announcement",
+          "opening_id": "software-cloud-developer",
+          "overlap_count": 19,
+          "required_count": 29,
+          "overlap": [
+            "automation",
+            "aws",
+            "ci/cd",
+            "docker",
+            "fastapi",
+            "git",
+            "github actions",
+            "go",
+            "java",
+            "javascript",
+            "kubernetes",
+            "machine learning",
+            "mongodb",
+            "next.js",
+            "node.js",
+            "python",
+            "react",
+            "sql",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Full Stack Web Developer (80%)",
+        "evidence": {
+          "doc": "Full Stack Web Developer Job Announcement Revised",
+          "opening_id": "full-stack-web-developer",
+          "overlap_count": 18,
+          "required_count": 28,
+          "overlap": [
+            "android",
+            "aws",
+            "ci/cd",
+            "css",
+            "docker",
+            "fastapi",
+            "git",
+            "ios",
+            "java",
+            "javascript",
+            "kubernetes",
+            "mongodb",
+            "next.js",
+            "node.js",
+            "python",
+            "react",
+            "sql",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "AI ML Mobile Applications Developer (75%)",
+        "evidence": {
+          "doc": "AI ML Mobile Applications Developer Job Announcement",
+          "opening_id": "ai-ml-mobile-applications-developer",
+          "overlap_count": 17,
+          "required_count": 31,
+          "overlap": [
+            "android",
+            "aws",
+            "ci/cd",
+            "dart",
+            "docker",
+            "embeddings",
+            "firebase",
+            "flutter",
+            "git",
+            "ios",
+            "java",
+            "javascript",
+            "machine learning",
+            "python",
+            "react",
+            "react native",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Manay_Lodha_MC0A.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260813-1733-MC1A",
+    "name": "Jeffrey John Kennedy",
+    "stored": {
+      "Category": "Data Analytics",
+      "Years Exp": "Missing",
+      "Education": "Master of Science in Business Analytics, Arizona State University",
+      "Education Start Date": "Aug 2024",
+      "Education End Date": "Dec 2025",
+      "Looking For Role": "Data Analyst",
+      "Suggested Role 1": "Data Analyst (85%)",
+      "Suggested Role 2": "Business Data Analyst (80%)",
+      "Suggested Role 3": "DriverAI Dual Business Analytics Marketing Intern (75%)"
+    },
+    "deterministic": {
+      "full_name": "Jeffrey John Kennedy",
+      "email": "jeffreysajjlins@gmail.com",
+      "phone": "+1 480-297-1930",
+      "location": "Tempe, Arizona",
+      "country": "United States",
+      "skills": "LLM, LLMs, RAG, Fine-Tuning, Transformers, LangChain, Claude, NLP, TensorFlow, PyTorch, scikit-learn, Pandas, NumPy, Python, JavaScript, React, Flask, REST, SQL, PostgreSQL, Snowflake, Databricks, Kafka, ETL, AWS, Azure, Docker, Git, CI/CD, Power Automate, Salesforce, Agile, Scrum, Jira, Excel, Power BI, Tableau, Looker, Marketing, Content",
+      "looking_for_role": "Automation / RPA Engineer",
+      "education": "Arizona State University<br>August",
+      "education_start_date": "Aug 2024",
+      "education_end_date": "Dec 2025",
+      "experience": "",
+      "notes": "Jeffrey John Kennedy \n\nTempe, Arizona \n\n� +1 480-297-1930 � <u>jeffreysajjlins@gmail.com</u> �<sup>linkedin.com/in/jeffrey-john-kennedy</sup> �<sup><u>Portfolio</u></sup> \nEducation \n Arizona State University<br>August 2024 – December 2025|\n\n _Master of Science in Business Analytics | GPA: 4.0/4.0 | Beta Gamma Sigma, 2x Hackathon Winner_<br>_Arizona, USA_|\n SRM University<br>July 2021 – May 2024|\n _Bachelor of Business Administration | GPA: 3.67/4.0_<br>_Chennai, India_|\nProfessional Experience \nArizona State University, W. P. Carey School of Business January 2026 – Present _AI Research Assistant Tempe, AZ_ \nDeveloped a Medicare fraud detection pipeline combining XGBoost anomaly detection and a GraphSAGE GNN to flag fraud rings with 100% precision. \nApplied causal inference (difference-in-",
+      "portfolio_1": "https://linkedin.com/in/jeffrey-john-kennedy",
+      "portfolio_2": "N/A",
+      "portfolio_3": "https://jeffreyjohnkennedy.framer.website/"
+    },
+    "keyword_top10": [
+      [
+        "Data Analyst Job Announcement rev",
+        100
+      ],
+      [
+        "DriverAI Dual Business Analytics Marketing Intern Job Announcement (2)",
+        87
+      ],
+      [
+        "Business Analytics Marketing Intern Job Announcement",
+        87
+      ],
+      [
+        "Business Data Analyst Job Announcement",
+        83
+      ],
+      [
+        "SIN3 AI ML CV Engineering Intern Position Description",
+        76
+      ],
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        60
+      ],
+      [
+        "Software and AWS Developer Job Announcement",
+        55
+      ],
+      [
+        "Cloud Database Engineer  PD",
+        54
+      ],
+      [
+        "Computer Vision 3D Eng  PD",
+        53
+      ],
+      [
+        "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Job Description",
+        52
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Data Analyst (85%)",
+        "evidence": {
+          "doc": "Data Analyst Position Description",
+          "opening_id": "data-analyst",
+          "overlap_count": 14,
+          "required_count": 25,
+          "overlap": [
+            "automation",
+            "aws",
+            "azure",
+            "excel",
+            "forecasting",
+            "javascript",
+            "jira",
+            "looker",
+            "marketing",
+            "postgresql",
+            "python",
+            "snowflake",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Business Data Analyst (80%)",
+        "evidence": {
+          "doc": "Business Data Analyst Position Description",
+          "opening_id": "business-data-analyst",
+          "overlap_count": 12,
+          "required_count": 26,
+          "overlap": [
+            "automation",
+            "aws",
+            "content",
+            "excel",
+            "javascript",
+            "jira",
+            "looker",
+            "marketing",
+            "python",
+            "salesforce",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "DriverAI Dual Business Analytics Marketing Intern (75%)",
+        "evidence": {
+          "doc": "DriverAI Dual Business Analytics Marketing Intern Position Description (2)",
+          "opening_id": "driverai-dual-business-analytics-marketing-intern",
+          "overlap_count": 10,
+          "required_count": 18,
+          "overlap": [
+            "automation",
+            "content",
+            "excel",
+            "forecasting",
+            "looker",
+            "marketing",
+            "natural language processing",
+            "python",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Jeffrey_Kennedy_MC1A.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260812-1126-MC3A",
+    "name": "Muhammad Ahsan Hussain",
+    "stored": {
+      "Category": "Mobile Apps (Android IOS)",
+      "Years Exp": "5 years",
+      "Education": "Advanced Level Graduate — British Schooling System (equivalent to USA High School Diploma), Full-Stack Web Development — Aptech Computer Education, React.js, React Native, Node.js, TypeScript, Redux Saga, Redux Toolkit Query — Udemy",
+      "Education Start Date": "Missing",
+      "Education End Date": "Missing",
+      "Looking For Role": "Senior React Native Developer",
+      "Suggested Role 1": "Mobile Application Software Developer (95%)",
+      "Suggested Role 2": "Mobile Application Lead Developer (93%)",
+      "Suggested Role 3": "Website Developer Lead Developer Full Stack (75%)"
+    },
+    "deterministic": {
+      "full_name": "Muhammad Ahsan Hussain",
+      "email": "Mhussain@webtechexpertapp.com",
+      "phone": "630-806-4687",
+      "location": "Aurora, IL",
+      "country": "United States",
+      "skills": "JavaScript, TypeScript, React, Node.js, Express, GraphQL, SQL, MySQL, MongoDB, AWS, Azure, Docker, Kubernetes, Git, CI/CD, Jenkins, GitHub Actions, Automation, React Native, iOS, Android, Firebase, Figma, B2B, Agile, Scrum, Jira, SEO, OAuth",
+      "looking_for_role": "Senior React Native Developer",
+      "education": "Not extracted",
+      "education_start_date": "",
+      "education_end_date": "",
+      "experience": "5 years",
+      "notes": "Muhammad Ahsan Hussain \n\nSenior React Native Developer   |   Full-Stack Engineer (MERN) \n\nMhussain@webtechexpertapp.com  |   630-806-4687   |   linkedin.com/in/ahsan-hussain-6b02181b8 \n\nAurora, IL   |   Open to Relocate Nationwide   |   Green Card Holder   |   Available Immediately \nPROFES S ION AL S UM M ARY \n5 years of experience building production mobile and web applications — 3 of those at Walmart (Fortune 1), where internal apps reach 1.6M+ US associates every day \nPrimary stack: React Native and React.js with TypeScript, shipping cross-platform iOS and Android apps to the App Store and Google Play with React Navigation, CodePush OTA updates, and Fastlane-automated releases \nBackend built on Node.js and Express.js with RESTful and GraphQL APIs, MongoDB and Firebase for data and realt",
+      "portfolio_1": "https://linkedin.com/in/ahsan-hussain-6b02181b8",
+      "portfolio_2": "N/A",
+      "portfolio_3": "N/A"
+    },
+    "keyword_top10": [
+      [
+        "Software and AWS Developer Job Announcement",
+        100
+      ],
+      [
+        "Mobile Application Lead Developer Job Announcement",
+        100
+      ],
+      [
+        "Mobile Application Software Developer Job Announcement",
+        100
+      ],
+      [
+        "Website Developer Lead Developer Full Stack Job Announcement",
+        99
+      ],
+      [
+        "DriverAI Senior Manager AWS Cloud DevOps Agile Job Announcement",
+        98
+      ],
+      [
+        "Full Stack Web Developer Job Announcement Revised",
+        97
+      ],
+      [
+        "Web Dev  Full Stack Position",
+        96
+      ],
+      [
+        "IoT Developer Job Announcement",
+        92
+      ],
+      [
+        "Software Cloud Developer Job Announcement",
+        92
+      ],
+      [
+        "Software Website Developer Intern PD",
+        85
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Mobile Application Software Developer (95%)",
+        "evidence": {
+          "doc": "Mobile Application Software Developer Job Announcement",
+          "opening_id": "mobile-application-software-developer",
+          "overlap_count": 16,
+          "required_count": 25,
+          "overlap": [
+            "agile",
+            "android",
+            "aws",
+            "azure",
+            "ci/cd",
+            "firebase",
+            "git",
+            "github actions",
+            "graphql",
+            "ios",
+            "javascript",
+            "jira",
+            "oauth",
+            "react",
+            "react native",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Mobile Application Lead Developer (93%)",
+        "evidence": {
+          "doc": "Mobile Application Lead Developer Job Announcement With Overview",
+          "opening_id": "mobile-application-lead-developer",
+          "overlap_count": 16,
+          "required_count": 26,
+          "overlap": [
+            "agile",
+            "android",
+            "aws",
+            "azure",
+            "ci/cd",
+            "firebase",
+            "git",
+            "github actions",
+            "graphql",
+            "ios",
+            "javascript",
+            "jira",
+            "oauth",
+            "react",
+            "react native",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "Website Developer Lead Developer Full Stack (75%)",
+        "evidence": {
+          "doc": "Website Developer Lead Developer Full Stack Job Announcement",
+          "opening_id": "website-developer-lead-developer-full-stack",
+          "overlap_count": 17,
+          "required_count": 29,
+          "overlap": [
+            "agile",
+            "android",
+            "automation",
+            "aws",
+            "azure",
+            "ci/cd",
+            "docker",
+            "git",
+            "ios",
+            "javascript",
+            "kubernetes",
+            "mongodb",
+            "mysql",
+            "node.js",
+            "react",
+            "seo",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Muhammad_Hussain_MC3A.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260812-0009-MC6A",
+    "name": "Prerna Saluja",
+    "stored": {
+      "Category": "Data Analytics",
+      "Years Exp": "Missing",
+      "Education": "Master of Science in Finance, W. P. Carey School of Business, Arizona State University",
+      "Education Start Date": "Missing",
+      "Education End Date": "Missing",
+      "Looking For Role": "Data Analyst / Financial Analyst",
+      "Suggested Role 1": "Data Analyst (85%)",
+      "Suggested Role 2": "Finance Intern (65%)",
+      "Suggested Role 3": "Business Data Analyst (60%)"
+    },
+    "deterministic": {
+      "full_name": "Prerna Saluja",
+      "email": "Not extracted",
+      "phone": "(623)-242-3627",
+      "location": "Tempe, AZ",
+      "country": "United States",
+      "skills": "Data Analysis, Excel, Financial Reporting, Financial Modeling, Financial Analysis, Financial Planning, Financial Statement Analysis, Variance Analysis, Budgeting, Forecasting, Cash Flow Analysis, Accounting, Valuation, Due Diligence, SAP, ERP",
+      "looking_for_role": "Data Scientist / Analyst",
+      "education": "Not extracted",
+      "education_start_date": "",
+      "education_end_date": "",
+      "experience": "",
+      "notes": "Prerna Saluja \nTempe, AZ | (623)-242-3627 | LinkedIn | Gmail \n<u>EXPERIENCE</u> \nPareto Inc. _Financial AI Analyst (Data Labeler)_ 2025 – 2026 \nLeveraged AI-assisted analytics tools to support rolling forecasts, variance analysis, and financial reporting, enabling faster identification of financial trends and business performance drivers. \nImproved data quality and analytical consistency by validating AI-generated outputs, reviewing assumptions, and streamlining reporting workflows, reducing manual review effort by approximately 20%. \nArizona State University _Research Assistant (Volunteer)_ 2025 – 2026 \nDesigned and executed input/output analysis in Excel, evaluating the impact of variable changes on outcomes to determine the most effective approaches. \nMonitored and analyzed 500+ transac",
+      "portfolio_1": "https://www.linkedin.com/in/prernasaluja",
+      "portfolio_2": "N/A",
+      "portfolio_3": "N/A"
+    },
+    "keyword_top10": [
+      [
+        "Finance Intern Job Announcement",
+        87
+      ],
+      [
+        "DriverAI Dual Business Analytics Marketing Intern Job Announcement (2)",
+        58
+      ],
+      [
+        "Business Analytics Marketing Intern Job Announcement",
+        58
+      ],
+      [
+        "DriverAI Data Center Supply Chain Specialist Position Description(1)",
+        57
+      ],
+      [
+        "Data Analyst Position Description",
+        52
+      ],
+      [
+        "Business Data Analyst Position Description",
+        48
+      ],
+      [
+        "CMO Position Description Updated",
+        30
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Data Analyst (85%)",
+        "evidence": {
+          "doc": "Data Analyst Position Description",
+          "opening_id": "data-analyst",
+          "overlap_count": 3,
+          "required_count": 25,
+          "overlap": [
+            "data analysis",
+            "excel",
+            "forecasting"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Finance Intern (65%)",
+        "evidence": {
+          "doc": "Finance Intern Position Description",
+          "opening_id": "finance-intern",
+          "overlap_count": 9,
+          "required_count": 22,
+          "overlap": [
+            "accounting",
+            "budgeting",
+            "erp",
+            "excel",
+            "financial analysis",
+            "financial modeling",
+            "financial planning",
+            "financial reporting",
+            "forecasting"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "Business Data Analyst (60%)",
+        "evidence": {
+          "doc": "Business Data Analyst Position Description",
+          "opening_id": "business-data-analyst",
+          "overlap_count": 2,
+          "required_count": 26,
+          "overlap": [
+            "data analysis",
+            "excel"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Prerna_Saluja_MC6A.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260810-1014-PMCA",
+    "name": "Shalin Edward",
+    "stored": {
+      "Category": "Data Analytics",
+      "Years Exp": "3 years",
+      "Education": "Master of Science in Computer Science & Information Systems, University of Michigan, Flint, MI; Bachelor of Engineering in Electronics & Telecommunication Engineering, Fr. C. Rodrigues Institute of Technology, University of Mumbai, Mumbai, India",
+      "Education Start Date": "Missing",
+      "Education End Date": "May 2026",
+      "Looking For Role": "Business, Data, Operations, Project, or Product Analyst",
+      "Suggested Role 1": "Business Data Analyst (95%)",
+      "Suggested Role 2": "DriverAI Dual Business Analytics Marketing Intern (90%)",
+      "Suggested Role 3": "Business Analytics Marketing Intern (85%)"
+    },
+    "deterministic": {
+      "full_name": "Shalin Edward",
+      "email": "shalin.edward2000@gmail.com",
+      "phone": "+1 857-351-8670",
+      "location": "Columbus, OH",
+      "country": "United States",
+      "skills": "Data Analysis, Python, Java, C++, MATLAB, HTML, CSS, SQL, MySQL, MongoDB, BigQuery, Automation, Cybersecurity, SIEM, Incident Response, Compliance, Project Management, Agile, Stakeholder Management, Requirements Gathering, Excel, Power BI, Tableau, Looker, Google Analytics, Microsoft Office, Forecasting, SAP",
+      "looking_for_role": "or Product Analyst role.",
+      "education": "Master of Science in Computer Science & Information Systems May 2026 _University of Michigan | CGPA: 3.88/4.00 Flint, MI_ Bachelor of Engineering in Electronics & Telecommunication Engineering Jun 2022 _Fr. C. Rodrigues Institute of Technology, University of Mumbai | CGPA: 8.68/10.00 Mumbai, India_",
+      "education_start_date": "",
+      "education_end_date": "May 2026",
+      "experience": "3 years",
+      "notes": "Columbus, OH | +1 857-351-8670 | <u>shalin.edward2000@gmail.com</u> | www.linkedin.com/in/shalin-edward \nSHALIN EDWARD \nPROFESSIONAL SUMMARY \n\nAnalytical, results-driven professional with 3+ years of experience turning complex data into clear, actionable insights across cybersecurity, education, and enterprise technology environments. Skilled in building KPI dashboards, automating reporting, and applying predictive analytics to support planning, process improvement, and stakeholder decision-making. Holds an MS in Computer Science & Information Systems from the University of Michigan (CGPA 3.88/4.00). Seeking to bring a versatile analytics and BI skill set to a Business, Data, Operations, Project, or Product Analyst role. \nCORE COMPETENCIES \n\nAnalysis & Strategy: Business & Data Analysis, R",
+      "portfolio_1": "https://www.linkedin.com/in/shalin-edward",
+      "portfolio_2": "N/A",
+      "portfolio_3": "N/A"
+    },
+    "keyword_top10": [
+      [
+        "DriverAI Dual Business Analytics Marketing Intern Position Description (2)",
+        96
+      ],
+      [
+        "Business Analytics Marketing Intern Position Description",
+        96
+      ],
+      [
+        "Business Data Analyst Position Description",
+        82
+      ],
+      [
+        "Cybersecurity IT Admin Manager JA AI Tools Updated",
+        80
+      ],
+      [
+        "Cybersecurity IT Administrator Position",
+        80
+      ],
+      [
+        "DriverAI Data Center Supply Chain Specialist Job Announcement",
+        67
+      ],
+      [
+        "Sales and Business Development Representative Position Description",
+        65
+      ],
+      [
+        "Cybersecurity Analyst Position Description Incident Response Updated",
+        62
+      ],
+      [
+        "RF Communications Engineer R&D Position Description",
+        62
+      ],
+      [
+        "Corporate Facilities Security Officer Job Announcement",
+        60
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Business Data Analyst (95%)",
+        "evidence": {
+          "doc": "Business Data Analyst Position Description",
+          "opening_id": "business-data-analyst",
+          "overlap_count": 11,
+          "required_count": 26,
+          "overlap": [
+            "automation",
+            "compliance",
+            "cybersecurity",
+            "data analysis",
+            "excel",
+            "google analytics",
+            "looker",
+            "power bi",
+            "python",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "DriverAI Dual Business Analytics Marketing Intern (90%)",
+        "evidence": {
+          "doc": "DriverAI Dual Business Analytics Marketing Intern Position Description (2)",
+          "opening_id": "driverai-dual-business-analytics-marketing-intern",
+          "overlap_count": 10,
+          "required_count": 18,
+          "overlap": [
+            "automation",
+            "data analysis",
+            "excel",
+            "forecasting",
+            "google analytics",
+            "looker",
+            "power bi",
+            "python",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "Business Analytics Marketing Intern (85%)",
+        "evidence": {
+          "doc": "Business Analytics Marketing Intern Position Description",
+          "opening_id": "business-analytics-marketing-intern",
+          "overlap_count": 10,
+          "required_count": 18,
+          "overlap": [
+            "automation",
+            "data analysis",
+            "excel",
+            "forecasting",
+            "google analytics",
+            "looker",
+            "power bi",
+            "python",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Shalin_Edward_PMCA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260805-0931-PMCA",
+    "name": "Vibha Swaminathan",
+    "stored": {
+      "Category": "AI/ML/CV (SIN2)",
+      "Years Exp": "Missing",
+      "Education": "Master of Science, Computer Science - Arizona State University, Tempe, USA | _May 2026_ Bachelor of Technology, Computer Science Engineering - Shiv Nadar Institute of Eminence, India | _May 2024_",
+      "Education Start Date": "Missing",
+      "Education End Date": "Missing",
+      "Looking For Role": "AI / ML Engineer",
+      "Suggested Role 1": "SIN2 Software Developer AgAI ML CV 3D (80%)",
+      "Suggested Role 2": "SIN2 SWDev AI ML CV (75%)",
+      "Suggested Role 3": "AI ML Mobile Applications Developer (65%)"
+    },
+    "deterministic": {
+      "full_name": "Vibha Swaminathan",
+      "email": "vibha.work.1212@gmail.com",
+      "phone": "(480) 742-3174",
+      "location": "Tempe, AZ",
+      "country": "United States",
+      "skills": "GenAI, LLM, LLMs, RAG, Fine-Tuning, Hugging Face, Transformers, Prompt Engineering, LangChain, Embeddings, NLP, Computer Vision, Neural Networks, MLOps, Agentic AI, TensorFlow, PyTorch, scikit-learn, Pandas, NumPy, Data Analysis, Data Science, Python, Java, JavaScript, TypeScript, C++, React, Node.js, FastAPI, REST, SQL, PostgreSQL, MySQL, MongoDB, ETL, AWS, Azure, GCP, Docker",
+      "looking_for_role": "AI / ML Engineer",
+      "education": "Master of Science, Computer Science - Arizona State University, Tempe, USA | _May 2026_ Bachelor of Technology, Computer Science Engineering - Shiv Nadar Institute of Eminence, India | _May 2024_",
+      "education_start_date": "",
+      "education_end_date": "May 2026",
+      "experience": "",
+      "notes": "Vibha Swaminathan \n\n(480) 742-3174 | Tempe, AZ, USA | <u>vibha.work.1212@gmail.com</u> | linkedin.com/in/vibha-s-120203s/ | github.com/Vibhas1212 \nSUMMARY \n\nAI/ML Engineer and Data Scientist with hands-on experience building production-grade RAG pipelines, LLM systems, and ML models for healthcare and industrial applications, delivering end-to-end systems from data ingestion through deployment. \nEDUCATION \n\nMaster of Science, Computer Science - Arizona State University, Tempe, USA | _May 2026_ Bachelor of Technology, Computer Science Engineering - Shiv Nadar Institute of Eminence, India | _May 2024_ \nTECHNICAL SKILLS \n\nProgramming Languages: Python, SQL, Java, C++, TypeScript, JavaScript, Node.js \n\nAI/ML & GenAI: Large Language Models (LLMs), Retrieval-Augmented Generation (RAG), Natural L",
+      "portfolio_1": "https://linkedin.com/in/vibha-s-120203s",
+      "portfolio_2": "https://github.com/Vibhas1212",
+      "portfolio_3": "N/A"
+    },
+    "keyword_top10": [
+      [
+        "Computer Vision 3D Eng  PD",
+        100
+      ],
+      [
+        "SIN3 AI ML CV Engineering Intern Position Description",
+        100
+      ],
+      [
+        "SIN 2   AI ML ENg Job Announcement",
+        100
+      ],
+      [
+        "SIN2 SWDev AI ML CV Job Announcement",
+        100
+      ],
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        100
+      ],
+      [
+        "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Job Description",
+        92
+      ],
+      [
+        "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
+        90
+      ],
+      [
+        "SIN3 3D CV IoT Intern Position Description",
+        88
+      ],
+      [
+        "SIN3 3D CV Position Announcement",
+        82
+      ],
+      [
+        "AI ML Mobile Applications Developer Job Announcement",
+        82
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "SIN2 Software Developer AgAI ML CV 3D (80%)",
+        "evidence": {
+          "doc": "SIN2 Software Developer AgAI ML CV 3D Position Description",
+          "opening_id": "sin2-software-developer-agai-ml-cv-3d",
+          "overlap_count": 14,
+          "required_count": 22,
+          "overlap": [
+            "agentic",
+            "agile",
+            "automation",
+            "computer vision",
+            "data analysis",
+            "embeddings",
+            "llm",
+            "neural networks",
+            "prompt engineering",
+            "python",
+            "pytorch",
+            "scikit-learn",
+            "tensorflow",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "SIN2 SWDev AI ML CV (75%)",
+        "evidence": {
+          "doc": "SIN2 SWDev AI ML CV Position Description",
+          "opening_id": "sin2-swdev-ai-ml-cv",
+          "overlap_count": 9,
+          "required_count": 12,
+          "overlap": [
+            "computer vision",
+            "data analysis",
+            "embeddings",
+            "neural networks",
+            "python",
+            "pytorch",
+            "scikit-learn",
+            "tensorflow",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "AI ML Mobile Applications Developer (65%)",
+        "evidence": {
+          "doc": "AI ML Mobile Applications Developer Job Announcement",
+          "opening_id": "ai-ml-mobile-applications-developer",
+          "overlap_count": 13,
+          "required_count": 31,
+          "overlap": [
+            "agile",
+            "ci/cd",
+            "computer vision",
+            "docker",
+            "embeddings",
+            "java",
+            "javascript",
+            "python",
+            "pytorch",
+            "react",
+            "scikit-learn",
+            "tensorflow",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Vibha_Swaminathan_PMCA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260805-0805-MDBA",
+    "name": "Pragya Mittal",
+    "stored": {
+      "Category": "AI/ML/CV (SIN2)",
+      "Years Exp": "Missing",
+      "Education": "Masters, Computer Science, Texas A&M University",
+      "Education Start Date": "2023",
+      "Education End Date": "2024",
+      "Looking For Role": "Data Scientist • ML Engineer",
+      "Suggested Role 1": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT (65%)",
+      "Suggested Role 2": "SIN3 AI ML CV Engineering Intern (65%)",
+      "Suggested Role 3": "SIN2 SWDev AI ML CV (60%)"
+    },
+    "deterministic": {
+      "full_name": "Pragya Mittal",
+      "email": "pragyamittal926@gmail.com",
+      "phone": "Not extracted",
+      "location": "South Brunswick, NJ",
+      "country": "United States",
+      "skills": "Generative AI, GenAI, LLM, LLMs, OpenAI, NLP, Machine Learning, TensorFlow, PyTorch, scikit-learn, Pandas, NumPy, Data Engineering, Python, C++, React, SQL, PostgreSQL, MongoDB, Databricks, BigQuery, Spark, ETL, AWS, GCP, Docker, Git, CI/CD, Linux, Bash, Automation, Selenium, Jira, Power BI, Tableau, Marketing, Forecasting",
+      "looking_for_role": "Data Scientist • ML Engineer",
+      "education": "Masters, Computer Science <br>Fellowship Scholar 2023–2024 ·|- Texas A&M University, College Station, TX<br>_Aug 202_<br>Coursework: Machine Learning, Data Mining, Information Retrieval, Deep RL|_3 – May 2025_",
+      "education_start_date": "2023",
+      "education_end_date": "2024",
+      "experience": "",
+      "notes": "Pragya Mittal \nData Scientist • ML Engineer \n\nNew Jersey (open to relocation) • pragyamittal926@gmail.com • linkedin.com/in/pragyamittal10 • github.com/pragyamittal0 • impragyamittal.netlify.app \n\nData Scientist and ML Engineer with an M.S. in Computer Science from Texas A&M, building production ETL pipelines, ML models, and LLM evaluation frameworks with 99%+ uptime. Delivered measurable impact across 5+ roles, cutting data-quality failures 25%, reliability incidents 30%, and manual data work up to 90%. \nWork Experience \n\nAHInfotech - Data Scientist · South Brunswick, NJ \n\n_Jan 2026 – Present_ \nAchieved 99%+ pipeline uptime in production by designing scalable ETL pipelines in Python and AWS (S3, Lambda) ingesting from 5+ data sources . \nReduced reliability incidents 30% by building anomal",
+      "portfolio_1": "https://linkedin.com/in/pragyamittal10",
+      "portfolio_2": "https://github.com/pragyamittal0",
+      "portfolio_3": "https://impragyamittal.netlify.app"
+    },
+    "keyword_top10": [
+      [
+        "SIN3 AI ML CV Engineering Intern Position Description",
+        100
+      ],
+      [
+        "SIN2 SWDev AI ML CV Job Announcement",
+        100
+      ],
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        100
+      ],
+      [
+        "Computer Vision 3D Eng  PD",
+        98
+      ],
+      [
+        "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Job Description",
+        92
+      ],
+      [
+        "SIN3 3D CV IoT Intern Position Description",
+        88
+      ],
+      [
+        "DriverAI Dual Business Analytics Marketing Intern Position Description (2)",
+        84
+      ],
+      [
+        "SIN2 Software Developer AgAI ML CV 3D Job Announcement",
+        80
+      ],
+      [
+        "Satellite Systems Flight Software Engineer Position Description",
+        80
+      ],
+      [
+        "SIN 2   AI ML ENg Job Announcement",
+        78
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT (65%)",
+        "evidence": {
+          "doc": "DriverAI SIN3 3D AI ML CV IoT Engineer OPT Position Description",
+          "opening_id": "driverai-sin3-3d-ai-ml-cv-iot-engineer-opt",
+          "overlap_count": 13,
+          "required_count": 25,
+          "overlap": [
+            "automation",
+            "c++",
+            "docker",
+            "git",
+            "jira",
+            "linux",
+            "machine learning",
+            "numpy",
+            "pandas",
+            "python",
+            "pytorch",
+            "scikit-learn",
+            "tensorflow"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "SIN3 AI ML CV Engineering Intern (65%)",
+        "evidence": {
+          "doc": "SIN3 AI ML CV Engineering Intern Position Description",
+          "opening_id": "sin3-ai-ml-cv-engineering-intern",
+          "overlap_count": 11,
+          "required_count": 17,
+          "overlap": [
+            "docker",
+            "git",
+            "jira",
+            "linux",
+            "machine learning",
+            "numpy",
+            "pandas",
+            "python",
+            "pytorch",
+            "scikit-learn",
+            "tensorflow"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "SIN2 SWDev AI ML CV (60%)",
+        "evidence": {
+          "doc": "SIN2 SWDev AI ML CV Job Announcement",
+          "opening_id": "sin2-swdev-ai-ml-cv",
+          "overlap_count": 8,
+          "required_count": 10,
+          "overlap": [
+            "git",
+            "machine learning",
+            "neural networks",
+            "python",
+            "pytorch",
+            "scikit-learn",
+            "tensorflow",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Pragya_Mittal_MDBA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260805-0743-MDCA",
+    "name": "Shruti Kamath",
+    "stored": {
+      "Category": "Data Analytics",
+      "Years Exp": "4 years",
+      "Education": "Master of Science in Information Systems (Data Science), Syracuse University | Bachelor of Engineering in Computer Science, University of Mumbai",
+      "Education Start Date": "Missing",
+      "Education End Date": "Missing",
+      "Looking For Role": "Data Analyst",
+      "Suggested Role 1": "Data Analyst (95%)",
+      "Suggested Role 2": "Business Data Analyst (90%)",
+      "Suggested Role 3": "DriverAI Dual Business Analytics Marketing Intern (85%)"
+    },
+    "deterministic": {
+      "full_name": "Shruti Kamath",
+      "email": "shrutikamath769@gmail.com",
+      "phone": "(315) 883-9568",
+      "location": "Jersey City, NJ",
+      "country": "United States",
+      "skills": "Pandas, NumPy, Data Science, Data Engineering, Python, SQL, PostgreSQL, Snowflake, BigQuery, ETL, AWS, Azure, GCP, Power Automate, Automation, CRM, Salesforce, Excel, Power BI, Tableau, Forecasting",
+      "looking_for_role": "Automation / RPA Engineer",
+      "education": "Databases & Warehousing: Microsoft SQL Server, PostgreSQL, Snowflake, MS Access",
+      "education_start_date": "",
+      "education_end_date": "",
+      "experience": "4 years",
+      "notes": "SHRUTI KAMATH \n<u>shrutikamath769@gmail.com</u> | (315) 883-9568 | Jersey City,NJ | <u>LinkedIn</u> \n<u>SUMMARY</u> \n\nData Analyst with 4+ years of experience analyzing large datasets, building interactive dashboards, and delivering actionable insights to support business decision-making. Proficient in SQL, Python, and BI tools including Power BI and Tableau, with hands-on experience in data visualization, ETL processes, and data validation. Experienced in collaborating with cross-functional stakeholders to define KPIs, improve reporting efficiency, and support business and operational goals \nTECHNICAL SKILLS \nData Visualization & BI Tools: Power BI (advanced DAX, Power Query), Tableau (LOD expressions, parameters, calculated fields), Excel (Power Query, PivotTables) \nData Engineering & ET",
+      "portfolio_1": "https://www.linkedin.com/in/shruti-pravin-kamath-2923a6199",
+      "portfolio_2": "https://github.com/kamathshruti",
+      "portfolio_3": "N/A"
+    },
+    "keyword_top10": [
+      [
+        "Data Analyst Position Description",
+        92
+      ],
+      [
+        "Business Data Analyst Job Announcement",
+        88
+      ],
+      [
+        "DriverAI Dual Business Analytics Marketing Intern Position Description (2)",
+        84
+      ],
+      [
+        "Business Analytics Marketing Intern Position Description",
+        84
+      ],
+      [
+        "Cloud Database Engineer  PD",
+        46
+      ],
+      [
+        "Data Engineer Job Announcement",
+        45
+      ],
+      [
+        "Computer Vision 3D Eng  PD",
+        42
+      ],
+      [
+        "Finance Intern Job Announcement",
+        41
+      ],
+      [
+        "Automation Process Developer Position Description",
+        40
+      ],
+      [
+        "Cybersecurity Analyst Position Description Incident Response Updated",
+        38
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Data Analyst (95%)",
+        "evidence": {
+          "doc": "Data Analyst Position Description",
+          "opening_id": "data-analyst",
+          "overlap_count": 13,
+          "required_count": 25,
+          "overlap": [
+            "automation",
+            "aws",
+            "azure",
+            "bigquery",
+            "data science",
+            "excel",
+            "forecasting",
+            "postgresql",
+            "power bi",
+            "python",
+            "snowflake",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Business Data Analyst (90%)",
+        "evidence": {
+          "doc": "Business Data Analyst Job Announcement",
+          "opening_id": "business-data-analyst",
+          "overlap_count": 10,
+          "required_count": 21,
+          "overlap": [
+            "automation",
+            "aws",
+            "crm",
+            "data science",
+            "excel",
+            "power bi",
+            "python",
+            "salesforce",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "DriverAI Dual Business Analytics Marketing Intern (85%)",
+        "evidence": {
+          "doc": "DriverAI Dual Business Analytics Marketing Intern Position Description (2)",
+          "opening_id": "driverai-dual-business-analytics-marketing-intern",
+          "overlap_count": 8,
+          "required_count": 18,
+          "overlap": [
+            "automation",
+            "crm",
+            "excel",
+            "forecasting",
+            "power bi",
+            "python",
+            "sql",
+            "tableau"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Shruti_Kamath_MDCA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260804-2114-MDHA",
+    "name": "Samarth Agasthya Mandya Subramanya",
+    "stored": {
+      "Category": "Mobile Apps (Android IOS)",
+      "Years Exp": "Missing",
+      "Education": "Master's student in Computer Science at Arizona State University",
+      "Education Start Date": "Missing",
+      "Education End Date": "May 2027",
+      "Looking For Role": "Frontend Developer",
+      "Suggested Role 1": "AI ML Mobile Applications Developer (75%)",
+      "Suggested Role 2": "Full Stack Web Developer (65%)",
+      "Suggested Role 3": "UI UX Mobile Web Developer (65%)"
+    },
+    "deterministic": {
+      "full_name": "Not extracted",
+      "email": "ms.samarth43@gmail.com",
+      "phone": "480-930-2876",
+      "location": "Tempe, AZ",
+      "country": "United States",
+      "skills": "RAG, Claude, NLP, Agentic AI, TensorFlow, PyTorch, Python, Java, JavaScript, TypeScript, C++, Kotlin, Swift, React, Node.js, Next.js, Express, HTML, CSS, PostgreSQL, MySQL, MongoDB, Redis, AWS, React Native, Flutter, iOS, Android, Dart",
+      "looking_for_role": "Frontend Developer",
+      "education": "Master's student in Computer Science at Arizona State University with Professional experience in auto<br>and IT sectors. Experienced in architecting and developing real-time, responsive systems.<br>EDUCATION|motive, manufacturing",
+      "education_start_date": "",
+      "education_end_date": "May 2027",
+      "experience": "",
+      "notes": "Samarth Agasthya Mandya Subramanya \n\n480-930-2876 • ms.samarth43@gmail.com• linkedin.com/in/samarth-agasthya-m-s/ • github.com/samarthsubramanya \n\n•samarthagasthya.dev \nSUMMARY \n Master’s student in Computer Science at Arizona State University with Professional experience in auto<br>and IT sectors. Experienced in architecting and developing real-time, responsive systems.<br>EDUCATION|motive, manufacturing|\n\n M.S. Computer Science|May 2027|\n Arizona State University, Tempe, AZ, USA|4.0 CGPA|\n Courses:Algorithms, Agentic AI, NLP||\n Clubs:TheAISociety, TheQuantumClub , GDSC, DevLabs||\n B.E. Electronics & Communications Engineering|August 2021|\n Visvesvaraya Technological University, Bengaluru, KA, India|9.15 CGPA|\n Courses:Embedded Systems, IoT, Digital Design||\n TECHNICAL SKILLS||\n\n\n\nProgram",
+      "portfolio_1": "https://linkedin.com/in/samarth-agasthya-m-s",
+      "portfolio_2": "https://github.com/samarthsubramanya",
+      "portfolio_3": "https://ieeexplore.ieee.org/document/9688455_"
+    },
+    "keyword_top10": [
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        100
+      ],
+      [
+        "Web Developer (Full Stack)  Position Announcement",
+        100
+      ],
+      [
+        "Web Dev  Full Stack Position",
+        92
+      ],
+      [
+        "Full Stack Web Developer Job Announcement Revised",
+        90
+      ],
+      [
+        "UI UX Mobile Web Developer Job Announcement Final",
+        90
+      ],
+      [
+        "Website Developer Lead Developer Full Stack Job Announcement",
+        88
+      ],
+      [
+        "Mobile Application Lead Developer Job Announcement",
+        86
+      ],
+      [
+        "AI ML Mobile Applications Developer Job Announcement",
+        85
+      ],
+      [
+        "IoT Developer Job Announcement",
+        84
+      ],
+      [
+        "Mobile Application Software Developer Job Announcement",
+        84
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "AI ML Mobile Applications Developer (75%)",
+        "evidence": {
+          "doc": "AI ML Mobile Applications Developer Job Announcement",
+          "opening_id": "ai-ml-mobile-applications-developer",
+          "overlap_count": 15,
+          "required_count": 31,
+          "overlap": [
+            "android",
+            "dart",
+            "embeddings",
+            "flutter",
+            "ios",
+            "java",
+            "javascript",
+            "kotlin",
+            "python",
+            "pytorch",
+            "react",
+            "react native",
+            "swift",
+            "tensorflow",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Full Stack Web Developer (65%)",
+        "evidence": {
+          "doc": "Full Stack Web Developer Job Announcement Revised",
+          "opening_id": "full-stack-web-developer",
+          "overlap_count": 14,
+          "required_count": 28,
+          "overlap": [
+            "android",
+            "css",
+            "html",
+            "ios",
+            "java",
+            "javascript",
+            "mongodb",
+            "mysql",
+            "next.js",
+            "node.js",
+            "postgresql",
+            "python",
+            "react",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "UI UX Mobile Web Developer (65%)",
+        "evidence": {
+          "doc": "UI UX Mobile Web Developer Job Announcement Final",
+          "opening_id": "ui-ux-mobile-web-developer",
+          "overlap_count": 13,
+          "required_count": 26,
+          "overlap": [
+            "android",
+            "css",
+            "flutter",
+            "html",
+            "ios",
+            "javascript",
+            "kotlin",
+            "node.js",
+            "python",
+            "react",
+            "react native",
+            "swift",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Samarth_Subramanya_MDHA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260804-2019-MDJA",
+    "name": "Mithilesh Kothandaraman",
+    "stored": {
+      "Category": "AI/ML/CV (SIN2)",
+      "Years Exp": "Missing",
+      "Education": "Master's, Data Science, Arizona State University (August 2024 - August 2026) | Bachelor's, Computer Science, SRM University",
+      "Education Start Date": "Missing",
+      "Education End Date": "Aug 2026",
+      "Looking For Role": "Software Engineer",
+      "Suggested Role 1": "SIN2 Software Developer AgAI ML CV 3D (85%)",
+      "Suggested Role 2": "Software Developer - AI/ML, Computer Vision (85%)",
+      "Suggested Role 3": "SIN2 SWDev AI ML CV (80%)"
+    },
+    "deterministic": {
+      "full_name": "Mithilesh Kothandaraman",
+      "email": "Mithil.k2024@gmail.com",
+      "phone": "+1(480)331-2331",
+      "location": "Scientist Atlanta, GA",
+      "country": "United States",
+      "skills": "LLMs, RAG, Hugging Face, Transformers, LoRA, PEFT, Prompt Engineering, LangChain, Embeddings, Agentic AI, Machine Learning, PyTorch, Data Science, Python, Java, C++, FastAPI, REST, SQL, Databricks, Spark, Airflow, ETL, AWS, GCP, Docker, Git, CI/CD, Linux, Bash, Automation",
+      "looking_for_role": "Software Engineer",
+      "education": "~~Arizona State University August2024- August 2026~~ _Master's, Data Science GPA: 3.78_ SRMUniversity June2019- May2023 _Bachelor's degree in Computer Science GPA: 3.85_",
+      "education_start_date": "",
+      "education_end_date": "Aug 2026",
+      "experience": "",
+      "notes": "MITHILESH KOTHANDARAMAN \n\n+1(480)331-2331 <u>Mithil.k2024@gmail.com</u> | Software Engineer |AI/ML | Distributed Systems | Production ML | LinkedIn | GitHub \nPROFESSIONAL SUMMARY \n\nAI/ML Engineer with over a year of experience designing, building, and deploying production AI systems, multimodal machine learning models, and agentic AI applications. Experienced developing RAG pipelines, AI agents, evaluation frameworks, cloudnative ML services, and scalable backend systems using Python, PyTorch, LangGraph, FastAPI, Docker, and AWS. \nPROFESSIONAL EXPERIENCE \n~~Data Scientist Atlanta,GA, USA~~ _Corpay_ _June 2026 - Present_ • Built and deployed an enterprise AI assistant using AWS Bedrock, SageMaker, Lambda, and S3, integrating RAG, vector search, and knowledge graph-based retrieval into inter",
+      "portfolio_1": "https://linkedin.com/in/mithilesh-kothandaraman-8940461b9",
+      "portfolio_2": "https://github.com/Mithil-hub",
+      "portfolio_3": "N/A"
+    },
+    "keyword_top10": [
+      [
+        "Software Developer - AI/ML, Computer Vision",
+        100
+      ],
+      [
+        "Software and AWS Developer Job Announcement",
+        100
+      ],
+      [
+        "Satellite Systems Flight Software Engineer Position Description",
+        100
+      ],
+      [
+        "SIN2 SWDev AI ML CV Job Announcement",
+        90
+      ],
+      [
+        "SIN2 Software Developer AgAI ML CV 3D Position Description",
+        81
+      ],
+      [
+        "Software Cloud Developer Job Announcement",
+        81
+      ],
+      [
+        "Full Stack Web Developer Position Description Revised",
+        74
+      ],
+      [
+        "IoT Developer Job Announcement",
+        73
+      ],
+      [
+        "Web Developer (Full Stack)  Position Announcement",
+        73
+      ],
+      [
+        "AI ML Mobile Applications Developer Job Announcement",
+        72
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "SIN2 Software Developer AgAI ML CV 3D (85%)",
+        "evidence": {
+          "doc": "SIN2 Software Developer AgAI ML CV 3D Position Description",
+          "opening_id": "sin2-software-developer-agai-ml-cv-3d",
+          "overlap_count": 13,
+          "required_count": 22,
+          "overlap": [
+            "agentic",
+            "automation",
+            "aws",
+            "data science",
+            "embeddings",
+            "git",
+            "llm",
+            "machine learning",
+            "neural networks",
+            "prompt engineering",
+            "python",
+            "pytorch",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Software Developer - AI/ML, Computer Vision (85%)",
+        "evidence": {
+          "doc": "Software Developer - AI/ML, Computer Vision",
+          "opening_id": "software-developer-ai-ml-computer-vision",
+          "overlap_count": 3,
+          "required_count": 5,
+          "overlap": [
+            "machine learning",
+            "python",
+            "pytorch"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "SIN2 SWDev AI ML CV (80%)",
+        "evidence": {
+          "doc": "SIN2 SWDev AI ML CV Position Description",
+          "opening_id": "sin2-swdev-ai-ml-cv",
+          "overlap_count": 8,
+          "required_count": 12,
+          "overlap": [
+            "data science",
+            "embeddings",
+            "git",
+            "machine learning",
+            "neural networks",
+            "python",
+            "pytorch",
+            "transformer"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Mithilesh_Kothandaraman_MDJA.pdf.txt"
+  },
+  {
+    "app_id": "APP-20260804-1156-MDOA",
+    "name": "Bharat Gupta",
+    "stored": {
+      "Category": "Mobile Apps (Android IOS)",
+      "Years Exp": "Missing",
+      "Education": "The University of Texas at Dallas, MS in Information Technology and Management, Pune Institute of Computer Technology, BE in Computer Engineering",
+      "Education Start Date": "Aug 2024",
+      "Education End Date": "May 2026",
+      "Looking For Role": "Android Developer",
+      "Suggested Role 1": "Mobile Application Lead Developer (85%)",
+      "Suggested Role 2": "Mobile Application Software Developer (75%)",
+      "Suggested Role 3": "AI ML Mobile Applications Developer (70%)"
+    },
+    "deterministic": {
+      "full_name": "Bharat Gupta",
+      "email": "guptabharat297@gmail.com",
+      "phone": "Not extracted",
+      "location": "Dallas, TX",
+      "country": "United States",
+      "skills": "Claude, Python, Java, JavaScript, TypeScript, Kotlin, React, Node.js, FastAPI, Spring, SQL, PostgreSQL, MySQL, MongoDB, AWS, Docker, Git, CI/CD, Jenkins, GitHub Actions, React Native, Android, Firebase, Jetpack Compose, Android SDK, JUnit",
+      "looking_for_role": "DevOps / SRE Engineer",
+      "education": "The University of Texas at Dallas, MS in Information Technology and Management Pune Institute of Computer Technology, BE in Computer Engineering",
+      "education_start_date": "Aug 2024",
+      "education_end_date": "May 2026",
+      "experience": "",
+      "notes": "Bharat Gupta \n\nDallas, TX (Open to Relocation) _|_ guptabharat297@gmail.com _|_ linkedin.com/in/bharatgupta77 \n\ngithub.com/bharatgupta77 _|_ iambharat.netlify.app \nSummary \n\nAndroid engineer who shipped production mobile banking features at HSBC for 10M+ users across 15 countries, strong in Kotlin, Jetpack Compose, MVVM, and Coroutines. Builds testable, maintainable Android apps end-to-end with full-stack exposure in Python, React, and AWS. Passionate about shipping things that actually work. \nEducation \n\nThe University of Texas at Dallas , MS in Information Technology and Management Pune Institute of Computer Technology , BE in Computer Engineering \n\nAug 2024 – May 2026 Aug 2016 – Jun 2020 \nSkills \nAndroid: Kotlin, Java, MVVM, Coroutines, Android SDK, Jetpack Compose, Retrofit, Room, Espr",
+      "portfolio_1": "https://linkedin.com/in/bharatgupta77",
+      "portfolio_2": "https://github.com/bharatgupta77",
+      "portfolio_3": "https://iambharat.netlify.app"
+    },
+    "keyword_top10": [
+      [
+        "Mobile Application Lead Developer Job Announcement",
+        90
+      ],
+      [
+        "Mobile Application Software Developer Job Announcement",
+        88
+      ],
+      [
+        "AI ML Mobile Applications Developer Job Announcement",
+        82
+      ],
+      [
+        "UI UX Mobile Web Developer Job Announcement Final",
+        82
+      ],
+      [
+        "Web Developer (Full Stack)  Position Announcement",
+        67
+      ],
+      [
+        "Software and AWS Developer Job Announcement",
+        64
+      ],
+      [
+        "Cloud Database Engineer  PD",
+        54
+      ],
+      [
+        "Full Stack Web Developer Job Announcement Revised",
+        54
+      ],
+      [
+        "Mobile Animation Design Intern  PD",
+        52
+      ],
+      [
+        "Web Dev  Full Stack Position",
+        52
+      ]
+    ],
+    "published_evidence": [
+      {
+        "column": "Suggested Role 1",
+        "published": "Mobile Application Lead Developer (85%)",
+        "evidence": {
+          "doc": "Mobile Application Lead Developer Job Announcement",
+          "opening_id": "mobile-application-lead-developer",
+          "overlap_count": 12,
+          "required_count": 24,
+          "overlap": [
+            "android",
+            "android sdk",
+            "ci/cd",
+            "firebase",
+            "git",
+            "github actions",
+            "java",
+            "javascript",
+            "kotlin",
+            "react",
+            "react native",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 2",
+        "published": "Mobile Application Software Developer (75%)",
+        "evidence": {
+          "doc": "Mobile Application Software Developer Job Announcement",
+          "opening_id": "mobile-application-software-developer",
+          "overlap_count": 12,
+          "required_count": 25,
+          "overlap": [
+            "android",
+            "android sdk",
+            "ci/cd",
+            "firebase",
+            "git",
+            "github actions",
+            "java",
+            "javascript",
+            "kotlin",
+            "react",
+            "react native",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      },
+      {
+        "column": "Suggested Role 3",
+        "published": "AI ML Mobile Applications Developer (70%)",
+        "evidence": {
+          "doc": "AI ML Mobile Applications Developer Job Announcement",
+          "opening_id": "ai-ml-mobile-applications-developer",
+          "overlap_count": 13,
+          "required_count": 31,
+          "overlap": [
+            "android",
+            "ci/cd",
+            "docker",
+            "firebase",
+            "git",
+            "java",
+            "javascript",
+            "jetpack compose",
+            "kotlin",
+            "python",
+            "react",
+            "react native",
+            "typescript"
+          ],
+          "pref_match": true
+        }
+      }
+    ],
+    "resume_text_file": "Bharat_Gupta_MDOA.pdf.txt"
+  }
+]

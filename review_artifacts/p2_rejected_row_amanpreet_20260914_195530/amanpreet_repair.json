@@ -1,0 +1,16 @@
+{
+  "application_id": "APP-20260804-1557-MDNA",
+  "changed": {
+    "Education": {
+      "before": "MCA \u2013 GNDU Regional Campus, Mukandpur (2009\u20132012) BCA \u2013 DAV College, Amritsar",
+      "after": "MCA - GNDU Regional Campus, Mukandpur; BCA - DAV College, Amritsar"
+    }
+  },
+  "preserved_dates": [
+    "2009",
+    "2012"
+  ],
+  "evidence": "MCA - GNDU Regional Campus, Mukandpur (2009-2012); BCA - DAV College, Amritsar (2006-2009). Dedicated date columns describe the most recent MCA.",
+  "database_backup": "..\\..\\review_artifacts\\p2_rejected_row_amanpreet_20260914_195530\\candidates_before_amanpreet.db",
+  "database_backup_sha256": "b6efe94fc7e921d61c848ba30c1574186ac292858a135aecb07d5f93a98695ac"
+}

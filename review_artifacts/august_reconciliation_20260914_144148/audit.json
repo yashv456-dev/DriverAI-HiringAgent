@@ -1,0 +1,110 @@
+{
+  "generated": "2026-09-14T14:42:08",
+  "p1": {
+    "total_candidate_list": 29,
+    "august_rows": 27,
+    "rejected_formula_spacer_rows": 1,
+    "rejected_candidate_records": 0
+  },
+  "p2_master": {
+    "august_main": 16,
+    "august_main_statuses": {
+      "Scored": 15,
+      "Needs Review - Location Confirmation": 1
+    },
+    "august_rejected": 11,
+    "august_rejected_statuses": {
+      "Rejected - Non-USA Location": 11
+    }
+  },
+  "resume_folders": {
+    "august_top_files": 29,
+    "main_expected_found": 16,
+    "main_missing": [],
+    "rejected_expected_found_in_top": 11,
+    "rejected_missing_everywhere": [],
+    "extra_top_files": [
+      "Jeffrey_Kennedy_MC1A.pdf",
+      "Pragya_Mittal_MDBA.pdf"
+    ],
+    "zero_byte_or_unreadable": [],
+    "year_rejected_folder": "/Candidate_Resumes/2026/Rejected",
+    "year_rejected_files": 100,
+    "current_p2_rejected_exact_files_in_year_rejected": 0,
+    "current_p2_rejected_exact_files_in_august": 11
+  },
+  "inactive_records_for_extras": [
+    {
+      "app_id": "APP-20260813-1733-MC1A",
+      "name": "Jeffrey John Kennedy",
+      "email": "jeffreysajjlins@gmail.com",
+      "status": "Scored",
+      "resume_link": "Jeffrey_Kennedy_MC1A.pdf"
+    },
+    {
+      "app_id": "APP-20260805-0805-MDBA",
+      "name": "Pragya Mittal",
+      "email": "pragyamittal926@gmail.com",
+      "status": "Scored",
+      "resume_link": "Pragya_Mittal_MDBA.pdf"
+    }
+  ],
+  "archive_august": {
+    "total": 38,
+    "read": 38,
+    "unread": 0,
+    "resume_messages": 30,
+    "resume_unique_senders": 29,
+    "no_resume_messages": 8,
+    "resume_senders_without_current_rows": [
+      {
+        "received": "2026-08-05T15:05:35Z",
+        "email": "pragyamittal926@gmail.com",
+        "subject": "Data Science/ML Role - Referred by Tracy Simons",
+        "attachments": [
+          "pragyamittal.pdf"
+        ]
+      },
+      {
+        "received": "2026-08-14T00:33:21Z",
+        "email": "jeffreysajjlins@gmail.com",
+        "subject": "Re: Quick follow-up on your DriverAI application (Ref: APP-20260530-0938-E5A5)",
+        "attachments": [
+          "Jeffrey_ML_Resume.pdf"
+        ]
+      }
+    ]
+  },
+  "results": {
+    "rows": 15,
+    "active_scored_rows": 16,
+    "missing_active_scored_ids": [
+      "APP-20260821-0812-MCQA"
+    ],
+    "extra_non_scored_ids": [],
+    "additional_inactive_scored_candidates": [
+      {
+        "app_id": "APP-20260813-1733-MC1A",
+        "name": "Jeffrey John Kennedy",
+        "email": "jeffreysajjlins@gmail.com",
+        "status": "Scored",
+        "resume_link": "Jeffrey_Kennedy_MC1A.pdf"
+      },
+      {
+        "app_id": "APP-20260805-0805-MDBA",
+        "name": "Pragya Mittal",
+        "email": "pragyamittal926@gmail.com",
+        "status": "Scored",
+        "resume_link": "Pragya_Mittal_MDBA.pdf"
+      }
+    ],
+    "known_stale_or_wrong_rows": [
+      {
+        "app_id": "APP-20260805-0931-PMCA",
+        "expected": "Vibha Swaminathan / Vibha_Swaminathan_PMCA.pdf",
+        "actual": "Shalin Edward / Shalin_Edward_PMCA.pdf"
+      }
+    ],
+    "complete_expected_scored_if_inactive_records_restored": 18
+  }
+}

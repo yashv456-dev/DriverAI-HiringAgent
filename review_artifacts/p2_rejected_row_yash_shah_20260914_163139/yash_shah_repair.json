@@ -1,0 +1,12 @@
+{
+  "application_id": "APP-20260815-0302-MCYA",
+  "changed": {
+    "Education Start Date": {
+      "before": "2023",
+      "after": "Aug 2023"
+    }
+  },
+  "evidence": "California State University Los Angeles - August 2023 to May 2025, Master of Science in Computer Science. Geography left unchanged pending current-location confirmation.",
+  "database_backup": "..\\..\\review_artifacts\\p2_rejected_row_yash_shah_20260914_163139\\candidates_before_yash_shah.db",
+  "database_backup_sha256": "de0bcc6270d52546886d69ddf9bce968c47a0683874280ce44fd3c7f19ac8243"
+}

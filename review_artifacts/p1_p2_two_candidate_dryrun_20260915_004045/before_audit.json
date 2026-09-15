@@ -1,0 +1,25 @@
+{
+  "artifact_dir": "C:\\Users\\yash9\\Downloads\\HiringAgent2\\review_artifacts\\p1_p2_two_candidate_dryrun_20260915_004045",
+  "counts": {
+    "p1_candidate_list": 31,
+    "p1_legacy_rejected": 0,
+    "p2_candidate_list": 20,
+    "p2_rejected": 11,
+    "results": 18
+  },
+  "p1_equals_p2_union": true,
+  "p2_main_rejected_disjoint": true,
+  "results_equal_scored_p2_main": true,
+  "duplicate_counts": {
+    "p1_candidate_list": 0,
+    "p2_candidate_list": 0,
+    "p2_rejected": 0,
+    "results": 0
+  },
+  "p1_p2_status_differences": [],
+  "hashes_before": {
+    "P1-Sharepoint-Master.live.xlsx": "8d3f9ed6e82de679369ee2d22c733d1c71b281f40b4c11db6ff675fed2eeeda7",
+    "P2-MasterFile.live.xlsx": "db9d37461c010f8cce34b47f0845a6da144142b1e19eae7249d31275391e244f",
+    "Candidate_List_Results.live.xlsx": "a45339165a8c5d074c4376232cac893a42714cbd6b6d29553779c8bb793daf4f"
+  }
+}

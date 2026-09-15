@@ -1,0 +1,48 @@
+{
+  "p1_candidate_rows": 31,
+  "p1_unique_ids": 31,
+  "p1_rejected_candidate_rows": 0,
+  "p1_statuses": {
+    "Scored": 18,
+    "Needs Review - Location Confirmation": 2,
+    "Rejected - Non-USA Location": 11
+  },
+  "p1_profile_violations": [],
+  "p1_blank_links": [],
+  "p2_main_rows": 20,
+  "p2_rejected_rows": 11,
+  "p2_total_unique": 31,
+  "p1_only_ids": [],
+  "p2_only_ids": [],
+  "p2_cross_sheet_overlap": [],
+  "p2_statuses": {
+    "Scored": 18,
+    "Needs Review - Location Confirmation": 2,
+    "Rejected - Non-USA Location": 11
+  },
+  "august_main_rows": 18,
+  "august_rejected_rows": 11,
+  "august_folder_files": 18,
+  "august_exact_main_files": 18,
+  "august_unexpected_files": [],
+  "august_missing_main_files": [],
+  "rejected_folder_files_total": 111,
+  "current_rejected_exact_files": 11,
+  "current_rejected_missing": [],
+  "current_rejected_left_in_august": [],
+  "result_rows": 18,
+  "scored_rows": 18,
+  "result_missing_scored": [],
+  "result_non_scored": [],
+  "result_field_differences": [],
+  "sqlite_active": 31,
+  "sqlite_duplicate_active_ids": [],
+  "publication": {
+    "id": 1,
+    "revision": 93,
+    "published_revision": 93,
+    "error": ""
+  },
+  "august_archive_messages": 38,
+  "august_archive_unread": 0
+}

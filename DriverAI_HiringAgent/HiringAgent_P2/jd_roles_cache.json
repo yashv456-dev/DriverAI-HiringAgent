@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-09-14T01:28:28",
+  "built_at": "2026-09-15T08:46:20",
   "signature": "de52962fa0e71284",
   "folder_fingerprint": "4f75930dd45e2ba3",
   "roles": [
@@ -48,6 +48,9 @@
         "docker",
         "git",
         "linux",
+        "uart",
+        "spi",
+        "i2c",
         "unity",
         "unreal",
         "unreal engine",
@@ -77,6 +80,9 @@
         "docker",
         "git",
         "linux",
+        "uart",
+        "spi",
+        "i2c",
         "automation",
         "unity",
         "unreal",
@@ -1829,6 +1835,7 @@
       "skills": [
         "python",
         "matlab",
+        "fpga",
         "prototyping",
         "compliance"
       ],
@@ -1842,6 +1849,7 @@
         "python",
         "c++",
         "matlab",
+        "fpga",
         "automation",
         "prototyping",
         "compliance",
@@ -1856,7 +1864,8 @@
       "title": "RF Phased Array Systems Engineer Job Announcement Internal",
       "skills": [
         "python",
-        "matlab"
+        "matlab",
+        "fpga"
       ],
       "opening": "RF Phased Array Systems Engineer",
       "opening_id": "rf-phased-array-systems-engineer",
@@ -1867,6 +1876,7 @@
       "skills": [
         "python",
         "matlab",
+        "fpga",
         "prototyping"
       ],
       "opening": "RF Phased Array Systems Engineer",
@@ -1885,6 +1895,7 @@
         "matlab",
         "git",
         "linux",
+        "fpga",
         "automation",
         "cybersecurity"
       ],
@@ -1903,6 +1914,7 @@
         "matlab",
         "git",
         "linux",
+        "fpga",
         "automation",
         "cybersecurity"
       ],

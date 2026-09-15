@@ -26,6 +26,13 @@ Candidate_Resumes/
 *.xlsx
 !**/P1_Templates/*.xlsx
 
+# review_artifacts/ holds diagnostic JSON/db snapshots from repair & audit
+# runs, which are fine to keep — but some runs also dump raw resumes or
+# extracted resume text for debugging. Those are PII; exclude them.
+review_artifacts/**/resume_files*/
+review_artifacts/**/resumes/
+review_artifacts/**/texts/
+
 # ── logs, runtime state, backups ──────────────────────────────────────────
 P2_Logs/
 Backups/
@@ -34,6 +41,9 @@ archive/backups/
 run_history.jsonl
 app_settings.json
 .agent.lock
+
+# ── full-project backup archives (contain live .env + PII, huge) ──────────
+/DriverAI_HiringAgent.zip
 
 # ── OS noise ──────────────────────────────────────────────────────────────
 Thumbs.db

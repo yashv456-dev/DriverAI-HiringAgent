@@ -1,0 +1,29 @@
+{
+  "application_id": "APP-20260810-1751-MC9A",
+  "sheet": "rejected",
+  "changed": {
+    "Phone": {
+      "before": "2023 - 2025",
+      "after": "Missing"
+    },
+    "Education": {
+      "before": "USP (Universidade de São Paulo) MBA Degree, Finance and Controlling, Bachelor's Degree, Marketing and Graphic Design, São Paulo, Brazil | 2023 - 2025 São Paulo, Brazil",
+      "after": "MBA Degree, Finance and Controlling, USP (Universidade de S?o Paulo) | ESALQ"
+    },
+    "Education Start Date": {
+      "before": "2026",
+      "after": "2023"
+    },
+    "Education End Date": {
+      "before": "Present",
+      "after": "2025"
+    }
+  },
+  "evidence": {
+    "contact": "Contact Information lists email and LinkedIn only; no telephone number is present.",
+    "education": "USP (Universidade de S?o Paulo) | ESALQ ? MBA Degree, Finance and Controlling ? S?o Paulo, Brazil | 2023 - 2025",
+    "excluded": "Professional Experience starts after Education; February/2026 - Currently belongs to Founder at YouPlaya Marketing Agency."
+  },
+  "database_backup": "C:\\Users\\yash9\\Downloads\\HiringAgent2\\review_artifacts\\p2_rejected_row_repairs_20260914_162149\\candidates_before_victor.db",
+  "database_backup_sha256": "80f0f20a0748d84a34c5154f2c74304ca188823154e7ff2a0b156703b735bce9"
+}
