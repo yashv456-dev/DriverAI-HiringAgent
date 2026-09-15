@@ -3760,6 +3760,37 @@ _RECHECK_PROMPT = (
 )
 
 
+def _merge_recheck_skills(old_val: str, new_val: str, evidence_text: str) -> str:
+    """Let the recheck add skills, but never silently drop one the CV actually states.
+
+    The recheck replaces each field wholesale, so a shorter second reading deletes real
+    skills. Live case APP-20260915-1110-OP7A (Ruta Kothari, VLSI/ASIC): the recheck
+    returned 33 of the 39 extracted skills, dropping 'Machine Learning', 'RTL', 'ASIC',
+    'GDSII', 'Design Compiler' and 'Automation' - every one of them written in her resume.
+    Those six tokens were the difference between a 35% top role match and 0% across the
+    board, so she scored nothing and was deferred as an Ollama "failure" on every run,
+    for ever. Phone and geography already have guards here against the same lossy
+    replacement; skills had none.
+
+    A first-pass hallucination with no support in the documents stays dropped - only
+    skills the text actually evidences are put back.
+    """
+    kept = [s.strip() for s in new_val.split(",") if s.strip()]
+    seen = {s.lower() for s in kept}
+    restored = []
+    for skill in (s.strip() for s in old_val.split(",")):
+        if not skill or skill.lower() in seen:
+            continue
+        if re.search(rf"(?<!\w){re.escape(skill)}(?!\w)", evidence_text, re.I):
+            restored.append(skill)
+            seen.add(skill.lower())
+    if not restored:
+        return new_val
+    logger.info("       Recheck   : kept %d skill(s) the recheck dropped but the CV states: %s",
+                len(restored), ", ".join(restored))
+    return ", ".join(kept + restored)
+
+
 def ai_recheck_fields(fields: dict, resume_text: str, mail_body: str) -> dict:
     """Send extracted fields back to Ollama for a final validation pass.
 
@@ -3823,6 +3854,8 @@ def ai_recheck_fields(fields: dict, resume_text: str, mail_body: str) -> dict:
         if key == "phone" and new_val and sum(ch.isdigit() for ch in new_val) < 7:
             new_val = ""
         _both_texts = f"{resume_text or ''}\n{mail_body or ''}"
+        if key == "skills" and new_val and old_val:
+            new_val = _merge_recheck_skills(old_val, new_val, _both_texts)
         if key == "looking_for_role" and new_val:
             new_val = clean_role_text(new_val) or new_val
         # Geography is NOT decided here. Location and Country are one claim and they are

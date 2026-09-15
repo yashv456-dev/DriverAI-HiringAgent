@@ -7029,6 +7029,23 @@ _z25_merged = normalize_skills(_merge_keyword_skills({"skills": _z25_llm}, "AWS 
 ok(all(s in _z25_merged for s in ("Microservices", "SQLite", "n8n")) and "AWS" not in _z25_merged,
    "the skills cap counts a bracketed group once, so genuine skills are not pushed out "
    f"(got {len(_z25_merged)}: tail {_z25_merged[-6:]})")
+
+# The AI recheck replaces each field wholesale, so a shorter second reading silently DELETED
+# real skills. Live: APP-20260915-1110-OP7A lost Machine Learning, RTL, ASIC, GDSII, Design
+# Compiler and Automation - all written in her CV - and those six tokens were the difference
+# between a 35% top role match and 0% across the board.
+from hiring_agent.extraction import _merge_recheck_skills
+_z26_cv = ("Implemented the full ASIC flow from RTL to GDSII using Synopsys Design Compiler. "
+           "Machine Learning with deployment to FPGAs. Streamlined workflow automation.")
+_z26_old = "Verilog, Machine Learning, RTL, ASIC, GDSII, Design Compiler, Automation"
+_z26_kept = _merge_recheck_skills(_z26_old, "Verilog", _z26_cv)
+ok(all(s in _z26_kept for s in ("Machine Learning", "RTL", "ASIC", "GDSII",
+                                "Design Compiler", "Automation")),
+   f"a recheck cannot delete skills the CV actually states (got {_z26_kept!r})")
+ok(_merge_recheck_skills("Verilog, Kubernetes", "Verilog", _z26_cv) == "Verilog",
+   "a first-pass skill with no support anywhere in the documents still gets dropped")
+ok(_merge_recheck_skills("Verilog", "Verilog, Python", _z26_cv) == "Verilog, Python",
+   "the recheck may still ADD skills it newly recognised")
 for _term, _label in (("Zephyr", "Zephyr"), ("Bugzilla", "Bugzilla"), ("DigitalOcean", "DigitalOcean"),
                       ("OAuth", "OAuth"), ("RSS", "RSS"), ("Gmail API", "Gmail API"), ("Supertest", "Supertest")):
     ok(_term.lower() in _scan_skill_keywords(f"Tools: {_term}, Git"), f"{_label} is in the skills vocabulary")
