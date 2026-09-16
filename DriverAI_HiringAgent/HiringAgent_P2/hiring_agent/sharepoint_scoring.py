@@ -5150,10 +5150,15 @@ def _greeting_for(full_name: str, email: str) -> str:
 
     'Full Name' is sometimes just the email's local-part (P1's fallback when the sender had
     no display name, e.g. 'umerta45' from umerta45@gmail.com) rather than a real name -
-    fall back to 'there' instead of greeting someone by their email handle."""
+    fall back to 'there' instead of greeting someone by their email handle.
+
+    A placeholder is not a name either. Only a blank cell used to be screened, so a row whose
+    name was never extracted greeted its candidate with the sheet's own gap marker: the
+    2026-08-15 follow-up to APP-20260817-0617-MCVA opened "Hi Missing," (audit 2026-09-16),
+    and 'Not extracted' would have read "Hi Not,"."""
     name = (full_name or "").strip()
     local_part = email.split("@")[0].strip().lower()
-    if not name or "@" in name or name.lower() == local_part:
+    if _is_gap(name) or "@" in name or name.lower() == local_part:
         return "there"
     return name.split(" ")[0]
 

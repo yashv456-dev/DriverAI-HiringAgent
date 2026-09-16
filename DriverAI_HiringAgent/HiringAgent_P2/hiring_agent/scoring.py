@@ -170,6 +170,28 @@ def is_unmatched_discipline_profile(skills_str: str = "", role_pref: str = "") -
             or is_unmatched_hardware_profile(skills_str, role_pref))
 
 
+#: A role title that is itself a mobile opening ('AI ML Mobile Applications Developer',
+#: 'UI UX Mobile Web Developer'), so a mobile developer matched to it stays under Mobile Apps
+#: even when an earlier rule in the title reads another discipline.
+_MOBILE_TITLE_RE = _re.compile(
+    r"(?<![a-z0-9])(?:mobile|android|ios|swift|kotlin|flutter|react native)(?![a-z0-9])")
+
+
+def _category_rule_matches(rule: dict, title: str) -> bool:
+    """True when one role_categories rule matches a lowercased role title."""
+    needle = rule.get("match", "").lower()
+    if not needle:
+        return False
+    if rule.get("word"):
+        # Opt-in whole-word match (added 2026-08-21 for the C-suite acronyms). Plain
+        # substring is unusable for short tokens: 'cto' is inside contractor/doctor/
+        # factory/sector/director, 'coo' inside coordinator, 'cio' inside suspicious.
+        # Lookarounds rather than \b because a needle may contain non-word characters
+        # (e.g. 'ai/ml'), where \b would anchor in the wrong place.
+        return bool(_re.search(rf"(?<![a-z0-9]){_re.escape(needle)}(?![a-z0-9])", title))
+    return needle in title
+
+
 def assign_category(role_str: str, skills_str: str = "", role_pref: str = "") -> str:
     """Map 'Role Title (NN%)' → business category using config-driven rules.
 
@@ -201,40 +223,39 @@ def assign_category(role_str: str, skills_str: str = "", role_pref: str = "") ->
     if is_unmatched_hardware_profile(skills_str, role_pref):
         return ROLE_CATEGORY_DEFAULT
     skills = {s.strip().lower() for s in _re.split(r"[,;]", str(skills_str or "")) if s.strip()}
-    if skills & _MOBILE_TOOL_SKILLS and not (skills & _GRAPHICS_TOOL_SKILLS):
-        return "Mobile Apps (Android IOS)"
-
     title = _re.sub(r'\s*\(\d+%\)\s*$', '', (role_str or "")).strip().lower()
+
+    if skills & _MOBILE_TOOL_SKILLS and not (skills & _GRAPHICS_TOOL_SKILLS):
+        # The override exists for a mobile developer whose top title is a poor fit - a weak
+        # match ('Gaming Position (23%)') or a title that only states a level ('... Lead
+        # Developer' -> Senior). It must not overrule a STRONG match to another discipline:
+        # one Flutter or Kotlin line filed full-stack and cloud engineers under Mobile Apps
+        # while their matched roles were 'Software Cloud Developer (85%)', 'Full Stack Web
+        # Developer (80%)' and 'Software and AWS Developer (80%)' (CandidateList audit
+        # 2026-09-16). Same reading as the AI-stack rule below: Category is what the
+        # candidate was matched to. A title that is itself mobile keeps the override.
+        domain = next((rule["category"] for rule in ROLE_CATEGORY_RULES
+                       if rule.get("category") not in ("Senior Manager", "Executive")
+                       and _category_rule_matches(rule, title)), None)
+        pct = role_match_percent(role_str)
+        strong_other_match = (domain not in (None, "Mobile Apps (Android IOS)")
+                              and pct is not None and pct >= SCORING_PUBLISH_MIN
+                              and not _MOBILE_TITLE_RE.search(title))
+        if not strong_other_match:
+            return "Mobile Apps (Android IOS)"
 
     # Precedence 1: Senior Manager and Executive titles
     for rule in ROLE_CATEGORY_RULES:
         if rule.get("category") not in ("Senior Manager", "Executive"):
             continue
-        needle = rule.get("match", "").lower()
-        if not needle:
-            continue
-        if rule.get("word"):
-            if _re.search(rf"(?<![a-z0-9]){_re.escape(needle)}(?![a-z0-9])", title):
-                return rule["category"]
-        elif needle in title:
+        if _category_rule_matches(rule, title):
             return rule["category"]
 
     _AUTOMATION_SKILLS = {"uipath", "rpa", "blue prism", "power automate", "automation anywhere"}
     _automation_title = any(k in title for k in ("automation", "rpa", "uipath", "process developer"))
 
     for rule in ROLE_CATEGORY_RULES:
-        needle = rule.get("match", "").lower()
-        if not needle:
-            continue
-        if rule.get("word"):
-            # Opt-in whole-word match (added 2026-08-21 for the C-suite acronyms). Plain
-            # substring is unusable for short tokens: 'cto' is inside contractor/doctor/
-            # factory/sector/director, 'coo' inside coordinator, 'cio' inside suspicious.
-            # Lookarounds rather than \b because a needle may contain non-word characters
-            # (e.g. 'ai/ml'), where \b would anchor in the wrong place.
-            if _re.search(rf"(?<![a-z0-9]){_re.escape(needle)}(?![a-z0-9])", title):
-                return rule["category"]
-        elif needle in title:
+        if _category_rule_matches(rule, title):
             return rule["category"]
 
     # Precedence 2: an uncontested AI / agentic tool stack (3+ specialised AI skills) - but only

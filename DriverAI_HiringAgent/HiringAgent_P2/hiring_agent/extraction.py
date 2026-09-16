@@ -2228,7 +2228,25 @@ _SKILL_EXCLUDE_PHRASES = {
     # Word-boundary matching already rejects "sketched"/"sketching"; this catches "sketch out".
     "sketch": (r"sketch(?:es)?\s+out\b", r"rough\s+sketch"),
     # 'Quota' as a sales metric vs. storage/system quotas in an infra resume.
-    "quota": (r"(?:disk|storage|memory|api|rate)\s+quota", r"quota\s+(?:limit|exceeded)"),
+    "quota": (r"(?:disk|storage|memory|api|rate)\s+quota", r"quota\s+(?:limit|exceeded)",
+              r"out\s+of\s+quota"),
+}
+
+#: Keywords too common to count on a bare mention. Excluding the non-skill phrasings one by one
+#: never closes the list, so for these the skill counts only when the text ALSO shows it in the
+#: sense the vocabulary means. 'quota' was the case (CandidateList audit 2026-09-16): an Android
+#: developer, APP-20260915-1133-OP8A, was given the sales skill 'Quota Attainment' from "Cut PM
+#: quota response time 40%" and "real-time survey quota visibility" - uses the storage/API
+#: exclusions above had no entry for. A sales resume says "exceeded quota", "120% of quota",
+#: "quota attainment", or lists the word on its own in a skills list.
+_SKILL_REQUIRED_CONTEXT = {
+    "quota": re.compile(
+        r"\b(?:sales|revenue|bookings|annual|quarterly|monthly|exceed(?:ed|ing|s)?|met|"
+        r"meet(?:ing|s)?|achiev(?:e|ed|es|ing)|surpass(?:ed|es|ing)?|beat|hit|of)\s+"
+        r"(?:(?:sales|revenue|annual|quarterly|monthly|my|the|their|team|individual)\s+)?quotas?\b"
+        r"|\bquotas?[\s-]*(?:attainment|achievement|carrying|bearing|targets?)\b"
+        r"|(?:^|[,;|•·:])[ \t]*quotas?[ \t]*(?=$|[,;|•·])",
+        re.IGNORECASE | re.MULTILINE),
 }
 
 
@@ -2246,6 +2264,9 @@ def _scan_skill_keywords(text: str) -> list:
         )
         for phrase in _SKILL_EXCLUDE_PHRASES.get(sk, ()):
             haystack = re.sub(phrase, ' ', haystack, flags=re.IGNORECASE)
+        context = _SKILL_REQUIRED_CONTEXT.get(sk)
+        if context is not None and not context.search(haystack):
+            continue
         if re.search(r'(?<!' + boundary + r')' + re.escape(needle) + r'(?!' + boundary + r')', haystack):
             found.append(sk)
     return found
@@ -2262,7 +2283,8 @@ def _strip_unconfirmed_ambiguous_skills(skills_str: str, text: str) -> str:
     same checks a second way."""
     if not skills_str:
         return skills_str
-    ambiguous = set(_CASE_SENSITIVE_SKILL_FORMS) | set(_SKILL_EXCLUDE_PHRASES)
+    ambiguous = (set(_CASE_SENSITIVE_SKILL_FORMS) | set(_SKILL_EXCLUDE_PHRASES)
+                 | set(_SKILL_REQUIRED_CONTEXT))
     confirmed = set(_scan_skill_keywords(text))
     kept = []
     for part in skills_str.split(","):
@@ -2521,6 +2543,30 @@ _COMPANY_MARKER_RE = re.compile(
     r"(?i)\b(?:inc|llc|ltd|pvt|gmbh|corp|corporation|limited|technologies|solutions)\b\.?")
 
 
+def _bare_site_in_contact_header(token: str, header: list[str]) -> bool:
+    """True when a scheme-less domain is listed as its own item in the CV's contact header.
+
+    Bare domains are refused elsewhere because resumes name libraries and companies that
+    look like sites ('Socket.io', 'Contracts include: Loquatinc.io'). A contact header is
+    the one place a bare domain is the candidate's own: "480-555-0100 • name@gmail.com •
+    linkedin.com/in/... • github.com/..." followed by "•janedoe.dev" - that candidate's own
+    site was dropped while a paper link filled the slot (CandidateList audit 2026-09-16,
+    APP-20260804-2114-MDHA). So the domain must be a whole item on a header line,
+    and the header must be a real contact block (an email or a profile link in it).
+    """
+    host = re.sub(r"^www\.", "", str(token or "").strip().lower().rstrip(".,;:!?)>\"'/"))
+    if not host or "/" in host or host in _SKILL_KEYWORD_SET:
+        return False
+    block = "\n".join(header).lower()
+    if not (_EMAIL_ADDRESS_RE.search(block) or re.search(r"(?:linkedin|github)\.com/", block)):
+        return False
+    for line in header:
+        items = re.split(r"\s*[|•·,;]\s*|\s{2,}", line.lower())
+        if any(re.sub(r"^www\.", "", item.strip().rstrip("/")) == host for item in items):
+            return True
+    return False
+
+
 def _is_employer_product_link(url: str, text: str) -> bool:
     """True when a link sits in an EMPLOYMENT entry - directly under a company-and-role line.
 
@@ -2569,6 +2615,7 @@ def extract_portfolios(text: str) -> tuple[str, str, str]:
         raw,
     )
     linkedin = github = figma = behance = dribbble = personal = None
+    header = _contact_header_lines(raw)
 
     for m in _RAW_URL_RE.finditer(raw):
         token = _normalize_link_artifacts(m.group(0))
@@ -2606,7 +2653,8 @@ def extract_portfolios(text: str) -> tuple[str, str, str]:
             # to use these trendy TLDs; a bare match alone is not enough signal. Missing a
             # genuine bare "janesmith.io" mention (no scheme, no "portfolio" nearby) now
             # falls through to N/A instead - a safe default, not a fabricated wrong link.
-            if ((token.lower().startswith(("http://", "https://")) or "portfolio" in low)
+            if ((token.lower().startswith(("http://", "https://")) or "portfolio" in low
+                    or _bare_site_in_contact_header(token, header))
                     and not _is_employer_site(url, raw)
                     and not _is_employer_product_link(url, raw)):
                 personal = url

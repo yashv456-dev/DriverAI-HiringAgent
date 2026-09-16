@@ -7275,6 +7275,64 @@ for _req in ("Strong experience in computer vision and deep learning with PyTorc
     ok("computer vision" in _scan_skill_keywords(_drop_context_mentions(_req)),
        f"genuine requirement kept: {_req[:60]!r}")
 
+# CandidateList audit 2026-09-16 (C2): a gap marker in Full Name is not a name. A follow-up
+# email went out as "Hi Missing,".
+from hiring_agent.sharepoint_scoring import _greeting_for as _c2_greet
+for _c2_name in ("Missing", "Not extracted", "N/A", "", None):
+    ok(_c2_greet(_c2_name, "jane.doe@example.com") == "there",
+       f"placeholder name {_c2_name!r} greets as 'there'")
+ok(_c2_greet("Jane Doe", "jd@example.com") == "Jane", "a real name still greets by first name")
+ok(_c2_greet("janedoe", "janedoe@example.com") == "there", "an email handle still greets as 'there'")
+
+# C4: 'quota' is a sales skill only in a sales sense. An Android developer got 'Quota
+# Attainment' from "PM quota response time" and "survey quota visibility".
+from hiring_agent.extraction import _scan_skill_keywords as _c4_scan
+for _c4_text in ("Cut PM quota response time 40% by building a native Android app",
+                 "reactive UI for real-time survey quota visibility",
+                 "Handled out of quota errors in the API gateway"):
+    ok("quota" not in _c4_scan(_c4_text), f"no sales skill from {_c4_text[:50]!r}")
+for _c4_text in ("Exceeded quarterly quota by 30% three years running",
+                 "Closed $2M ARR, 120% of quota", "Quota attainment: 115%",
+                 "Skills: Negotiation | Quota | CRM", "Consistently met sales quota"):
+    ok("quota" in _c4_scan(_c4_text), f"sales quota still found in {_c4_text[:50]!r}")
+
+# C3: one mobile skill no longer overrules a strong match to another discipline. The weak-match
+# and level-only cases the override was built for (tested above) are unchanged.
+_c3_fullstack = "Next.js, TypeScript, Docker, Kubernetes, AWS, Python, Dart, Flutter, React, Node.js"
+ok(assign_category("Software Cloud Developer (85%)", _c3_fullstack) == "Cloud and DevOps",
+   "a strong cloud match outranks a Flutter line in the skills")
+ok(assign_category("Full Stack Web Developer (80%)", _c3_fullstack)
+   == "Web Team (Full stack/Back end & UI/UX)",
+   "a strong full-stack match outranks a Flutter line in the skills")
+ok(assign_category("Software Cloud Developer (45%)", _c3_fullstack) == "Mobile Apps (Android IOS)",
+   "under the placement bar the mobile stack still decides")
+ok(assign_category("AI ML Mobile Applications Developer (85%)", "Kotlin, Swift, Python")
+   == "Mobile Apps (Android IOS)",
+   "a mobile title keeps a mobile developer under Mobile Apps even when it also reads AI/ML")
+ok(assign_category("UI UX Mobile Web Developer (85%)", "Kotlin, Jetpack Compose, Android SDK")
+   == "Mobile Apps (Android IOS)",
+   "'UI UX Mobile Web Developer' is a mobile title too")
+ok(assign_category("Mobile Application Lead Developer (95%)", "Kotlin, Jetpack Compose")
+   == "Mobile Apps (Android IOS)",
+   "a level-only title ('lead') still yields to the mobile stack")
+
+# C6: a bare domain listed as its own item in the contact header is the candidate's site. The
+# bare-domain guards (library names, client names, prose) still hold everywhere else.
+ok(extract_portfolios("Jane Doe\n480-555-0100 • jane@example.com• linkedin.com/in/jane/ • "
+                      "github.com/janedoe\n•janedoe.dev\nSUMMARY\nKiosk project "
+                      "https://ieeexplore.ieee.org/document/1000001")[2] == "https://janedoe.dev",
+   "a header-listed personal site wins over a later paper link")
+ok(extract_portfolios("Jane Doe\n(480) 555-0100 | jane@example.com | janedoe.dev\nSUMMARY")[0]
+   == "https://janedoe.dev", "a header site is kept even without LinkedIn")
+ok(extract_portfolios("Jane Doe\njane@example.com | Socket.io | linkedin.com/in/jane\nSUMMARY")[2]
+   == "N/A", "a library name in the header is still not a site")
+ok(extract_portfolios("Jane Doe\nSoftware Engineer at Acme.io | jane@example.com\nSUMMARY")
+   == ("N/A", "N/A", "N/A"), "an employer named inside a header item is not the candidate's site")
+ok(extract_portfolios("Jane Doe\njane@acme.io | 480-555-0100\nSUMMARY") == ("N/A", "N/A", "N/A"),
+   "an email address's domain is not a site")
+ok(extract_portfolios("Jane Doe\n480-555-0100 | janedoe.dev\nSUMMARY") == ("N/A", "N/A", "N/A"),
+   "without an email or profile link the block is not trusted as a contact header")
+
 print(f"\n{'='*64}")
 print(f"  P2 RESULT: {P} passed, {F} failed")
 print(f"{'='*64}")
