@@ -1005,6 +1005,14 @@ ok(_extract_phone("Tel: +44 20 7946 0958") is not None,
    "International phone (UK +44)")
 ok(_extract_phone("Contact: +91-9876543210") is not None,
    "International phone (India +91)")
+# A bracketed trunk prefix used to lose the country code: '+92 (0)333 333 8893' came out as
+# '333 333 8893', a Pakistani mobile reading as a North American number (Saad Ullah,
+# APP-20260804-2021-MDIA, audit 2026-09-16).
+for _z31_text, _z31_want in (("Mobile: +92 (0)333 333 8893", "+92 (0)333 333 8893"),
+                              ("Phone: +44 (0)20 7946 0958", "+44 (0)20 7946 0958"),
+                              ("Mobile: +44 (0) 7911 123456", "+44 (0) 7911 123456")):
+    ok(_extract_phone(_z31_text) == _z31_want,
+       f"a '+CC (0)' number keeps its country code (got {_extract_phone(_z31_text)!r})")
 ok(_extract_phone("Jane Smith\nSoftware Engineer") is None,
    "No phone when none present")
 ok(_extract_phone("(555) 867-5309\nData Scientist") == "(555) 867-5309",
@@ -1195,6 +1203,57 @@ ok(_z28_repo == "https://github.com/harishchaurasia/Benchmarking-Privacy-Aware-A
    f"a GitHub repo URL keeps its full path, never collapsing to someone's profile (got {_z28_repo})")
 ok(extract_portfolios("https://github.com/janedoe")[1] == "https://github.com/janedoe",
    "a bare GitHub profile URL is still stored unchanged")
+
+# The AI gap-fill's anti-hallucination gate accepted a URL whenever its handle appeared
+# anywhere - including inside the candidate's email address or a profile on another site -
+# so an invented link counted as evidenced. Live audit 2026-09-16: Peter Vishal
+# (LinkedIn+GitHub from 'petervishal55@gmail.com'), Saad Ullah (GitHub from his LinkedIn
+# handle), Muhammad Ahsan Hussain (GitHub from 'mhussain@...', on the client results sheet).
+from hiring_agent.extraction import _url_grounded_in_text as _z30_grounded
+for _z30_url, _z30_text, _z30_label in (
+        ("https://github.com/petervishal55", "petervishal55@gmail.com | GitHub, VS Code",
+         "a handle that only appears in the email address"),
+        ("https://github.com/saadsial", "Linkedin: http://www.linkedin.com/in/saadsial",
+         "a handle that only appears in a URL on a different site")):
+    ok(not _z30_grounded(_z30_url, _z30_text), f"an invented link is not grounded by {_z30_label}")
+for _z30_url, _z30_text, _z30_label in (
+        ("https://github.com/janedoe", "jane@x.com | GitHub: janedoe", "the handle written on its own"),
+        ("https://github.com/janedoe", "code at github.com/janedoe", "the full URL"),
+        ("https://linkedin.com/in/jane-d", "[LinkedIn](https://www.linkedin.com/in/jane-d)",
+         "a hyperlink annotation")):
+    ok(_z30_grounded(_z30_url, _z30_text), f"a real link is still grounded by {_z30_label}")
+
+# Keeping the full repo path must not cost candidates their OWN profile. When the repo owner is
+# the candidate (email name, a word of their name, or 2+ linked repos) show the profile; a
+# collaborator's repo keeps its full path. Caught in the 2026-09-16 audit before any row changed:
+# Shruti Kamath would have become '.../kamathshruti/Syracuse-Crime-Analysis'.
+_z32_own = extract_portfolios(
+    "Shruti Kamath\nshrutikamath769@gmail.com\nProjects: github.com/kamathshruti/Syracuse-Crime-Analysis")[1]
+ok(_z32_own == "https://github.com/kamathshruti",
+   f"a repo owned by the candidate is shown as their profile (got {_z32_own})")
+_z32_readme = extract_portfolios(
+    "AMANPREET SINGH\nEmail: amanpreetyatin@gmail.com\nGithub: https://github.com/AmanpreetYatin/amanpreetyatin")[1]
+ok(_z32_readme == "https://github.com/AmanpreetYatin",
+   f"an owner matching the email name is the candidate (got {_z32_readme})")
+_z32_other = extract_portfolios(
+    "Shashank Kumar Singh\nsksing32@asu.edu\nhttps://github.com/harishchaurasia/Benchmarking-Privacy-Aware-Autonomy")[1]
+ok(_z32_other == "https://github.com/harishchaurasia/Benchmarking-Privacy-Aware-Autonomy",
+   f"a collaborator's repo still keeps its full path (got {_z32_other})")
+
+# An organisation the candidate worked for is not their portfolio. Mona Rawat
+# (APP-20260819-0140-MCRA): 'Data Consultant | GoCarbonTracker.net ... June 2025 - September 2025'
+# was stored as her Portfolio 2.
+from hiring_agent.extraction import _is_employer_site as _z33_employer
+_z33_cv = ("Mona Rawat\nVolunteer (Client-Facing) - Data Consultant | GoCarbonTracker.net Remote | "
+           "June 2025 - September 2025\nLinks in document: http://gocarbontracker.net")
+ok(_z33_employer("http://gocarbontracker.net", _z33_cv),
+   "a site named beside a role and its dates is the employer's, not the candidate's")
+ok("gocarbontracker" not in " ".join(extract_portfolios(_z33_cv)).lower(),
+   "an employer's site is never stored as a portfolio")
+ok(not _z33_employer("https://janedoe.dev", "Jane Doe | Software Developer | https://janedoe.dev"),
+   "a portfolio in the header beside a job title (no dates) is still the candidate's")
+ok(not _z33_employer("https://youplaya.com", "Founder at YouPlaya | youplaya.com | 2019 - Present"),
+   "the candidate's own company site is never treated as an employer's")
 
 # Figma â†’ Portfolio 3
 p1, p2, p3 = extract_portfolios("https://figma.com/file/abc123/my-design")
@@ -5719,6 +5778,15 @@ ok(not _cg("Canada", "Austin, TX", "Jane\nAustin, TX 78701\n"),
    "a country contradicting a US location and absent from the text is NOT grounded")
 ok(not _cg("", "Austin, TX", "x") and not _cg("Not extracted", "Austin, TX", "x"),
    "gap literals are never 'grounded'")
+# The foreign counterpart of "Austin, TX implies the United States": a province the candidate
+# wrote beside the SAME city settles the country. Yash Shah (APP-20260815-0302-MCYA) emailed
+# "Mumbai, Maharashtra"; the recheck's 'India' was dropped and his rejected row read Missing.
+ok(_cg("India", "Mumbai", "My current location is Mumbai, Maharashtra. Attaching my resume"),
+   "a province written beside the location's own city grounds that province's country")
+ok(not _cg("India", "Pune", "Worked in Bengaluru, Karnataka 2019. Lives in Pune"),
+   "a province beside a DIFFERENT city grounds nothing")
+ok(not _cg("India", "Lahore", "Address: Township, Lahore, Punjab"),
+   "a province that exists in two countries (Punjab) never settles the country")
 
 # Both AI passes must apply the SAME rule - the recheck used to undo the merge's decision.
 _ex_src = Path(__file__).with_name("hiring_agent").joinpath("extraction.py").read_text(

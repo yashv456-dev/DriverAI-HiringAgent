@@ -2433,6 +2433,78 @@ def _is_meaningful_portfolio(url: str) -> bool:
     return True
 
 
+_EMPLOYMENT_ROLE_RE = re.compile(
+    r"(?i)\b(?:volunteer|consultant|intern(?:ship)?|engineer|developer|analyst|manager|"
+    r"coordinator|associate|specialist|assistant|officer|executive|representative|"
+    r"administrator|scientist|researcher|technician|trainee)\b")
+_SELF_OWNED_RE = re.compile(r"(?i)\b(?:founder|co-?founder|owner|freelance|freelancer|portfolio)\b")
+
+
+def _is_employer_site(url: str, text: str) -> bool:
+    """True when a link is the website of an organisation the candidate WORKED FOR.
+
+    Such a link sits in the experience section beside a role and its dates - 'Volunteer
+    (Client-Facing) - Data Consultant | GoCarbonTracker.net ... June 2025 - September 2025' -
+    and is the organisation's site, not the candidate's own. Live audit 2026-09-16: Mona Rawat
+    (APP-20260819-0140-MCRA) had exactly that link stored as her Portfolio 2. Same family as
+    the GitHub fix, where a collaborator's repo was published as the candidate's profile.
+
+    Deliberately narrow: the full host must appear on a line that ALSO names a role AND
+    carries a year, so a header line such as 'Jane Doe | Developer | janedoe.dev' (no dates)
+    keeps its portfolio, and a candidate's own company ('Founder at ...') is never excluded.
+    """
+    host = re.sub(r"^https?://", "", str(url or "").strip().lower()).split("/")[0]
+    host = re.sub(r"^www\.", "", host)
+    if not host or "." not in host:
+        return False
+    host_re = re.compile(rf"(?<![a-z0-9.\-]){re.escape(host)}(?![a-z0-9\-])")
+    for line in (text or "").splitlines():
+        low = line.lower()
+        if not host_re.search(low) or _SELF_OWNED_RE.search(low):
+            continue
+        if _EMPLOYMENT_ROLE_RE.search(low) and re.search(r"\b(?:19|20)\d{2}\b", low):
+            return True
+    return False
+
+
+_NAME_LINE_STOPWORDS = {
+    "resume", "curriculum", "vitae", "profile", "summary", "contact", "email", "phone",
+    "mobile", "address", "location", "linkedin", "github", "portfolio", "website", "project",
+    "projects", "senior", "junior", "software", "engineer", "developer", "analyst", "manager",
+    "student", "intern", "remote", "united", "states", "india", "pakistan", "https", "http",
+}
+
+
+def _github_profile_if_own(url: str, text: str) -> str:
+    """Show a repository link as the owner's profile - but only when the owner IS the candidate.
+
+    _GITHUB_URL_RE keeps the full repository path so a collaborator's project is never recorded
+    as the candidate's account (Shashank Singh, 'harishchaurasia/...'). Applied blindly, that
+    also replaced candidates' OWN profiles with one arbitrary project of theirs: Shruti Kamath's
+    'github.com/kamathshruti' would have become '.../kamathshruti/Syracuse-Crime-Analysis' on
+    the next re-score (caught in the 2026-09-16 audit, before any row was rewritten).
+
+    The owner counts as the candidate when it matches their email name, contains a word of
+    their own name from the CV's opening lines, or owns two or more of the linked repositories.
+    Otherwise the full repository URL stands. The link itself is always one the CV contains;
+    this only decides which form of it to display.
+    """
+    m = re.match(r"(?i)^(https?://(?:www\.)?github\.com/)([A-Za-z0-9\-_.]+)/\S+$", url or "")
+    if not m:
+        return url
+    owner = m.group(2).lower()
+    low = (text or "").lower()
+    email_names = {e.split("@")[0].replace(".", "") for e in _EMAIL_ADDRESS_RE.findall(low)}
+    head_lines = [ln for ln in (text or "").splitlines() if ln.strip()][:3]
+    head = _ANY_URL_RE.sub(" ", _EMAIL_ADDRESS_RE.sub(" ", " ".join(head_lines).lower()))
+    name_words = {w for w in re.findall(r"[a-z]{4,}", head) if w not in _NAME_LINE_STOPWORDS}
+    repo_owners = re.findall(r"github\.com/([a-z0-9\-_.]+)/[a-z0-9\-_.]+", low)
+    is_own = (owner in email_names
+              or any(w in owner for w in name_words)
+              or repo_owners.count(owner) >= 2)
+    return f"{m.group(1)}{m.group(2)}" if is_own else url
+
+
 def extract_portfolios(text: str) -> tuple[str, str, str]:
     """Return (portfolio_1, portfolio_2, portfolio_3).
 
@@ -2469,7 +2541,7 @@ def extract_portfolios(text: str) -> tuple[str, str, str]:
         if not github:
             gm = _GITHUB_URL_RE.search(token)
             if gm:
-                github = _clean_url(gm.group(0).rstrip("/"))
+                github = _github_profile_if_own(_clean_url(gm.group(0).rstrip("/")), raw)
         if root == "figma" and not figma:
             figma = url
         elif root == "behance" and not behance:
@@ -2490,7 +2562,8 @@ def extract_portfolios(text: str) -> tuple[str, str, str]:
             # to use these trendy TLDs; a bare match alone is not enough signal. Missing a
             # genuine bare "janesmith.io" mention (no scheme, no "portfolio" nearby) now
             # falls through to N/A instead - a safe default, not a fabricated wrong link.
-            if token.lower().startswith(("http://", "https://")) or "portfolio" in low:
+            if ((token.lower().startswith(("http://", "https://")) or "portfolio" in low)
+                    and not _is_employer_site(url, raw)):
                 personal = url
 
     p1 = linkedin or personal or "N/A"
@@ -2504,6 +2577,13 @@ def extract_portfolios(text: str) -> tuple[str, str, str]:
 
 _PHONE_PATTERNS = [
     re.compile(r'\+1[\s.\-]?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}'),
+    # International number written with its trunk prefix in brackets: '+92 (0)333 333 8893',
+    # '+44 (0)20 7946 0958'. The general international pattern below needs 2+ digits inside
+    # the brackets, so it fails on the lone '0', and the US-shape pattern after it then
+    # grabbed just the trailing '333 333 8893' - dropping the country code and leaving a
+    # Pakistani mobile that reads like a North American number. Live: Saad Ullah
+    # (APP-20260804-2021-MDIA), which regressed to that on a re-score (audit 2026-09-16).
+    re.compile(r'\+\d{1,3}[\s.\-]?\(0\)[\s.\-]?\d{1,5}(?:[\s.\-]?\d{2,6}){1,3}'),
     re.compile(r'\+\d{1,3}[\s.\-]?\(?\d{2,5}\)?[\s.\-]?\d{3,5}[\s.\-]?\d{3,5}'),
     re.compile(r'\(?\d{3}\)?[\s.\-]\d{3}[\s.\-]\d{4}'),
     re.compile(r'\+?\(?\d[\d\s().\-]{8,16}\d'),
@@ -3992,6 +4072,11 @@ _PORTFOLIO_INFER_PROMPT = (
 )
 
 
+#: Provinces that exist in more than one country. _PROVINCE_TO_COUNTRY can only name one, so
+#: they are never allowed to settle a country on their own: 'Lahore, Punjab' is Pakistan.
+_AMBIGUOUS_PROVINCES = {"punjab"}
+
+
 def _country_grounded_in_text(country: str, location: str, text: str) -> bool:
     """Is an AI-supplied Country actually supported, or reasoned from circumstantial hints?
 
@@ -4027,6 +4112,25 @@ def _country_grounded_in_text(country: str, location: str, text: str) -> bool:
             return True
         if normalize_country(ctry) == "United States" and is_strong_usa(loc):
             return True
+        # The foreign counterpart of "Austin, TX implies the United States": a state or
+        # province the candidate wrote BESIDE this same city settles its country - "Mumbai,
+        # Maharashtra" is India as surely as the word itself. Anchored to the city already
+        # accepted as the location, so a province named elsewhere (a past employer, an old
+        # degree) still cannot supply it; a dial code still never can. Live audit 2026-09-16:
+        # Yash Shah (APP-20260815-0302-MCYA) emailed "My current location is Mumbai,
+        # Maharashtra", the recheck proposed India, and this gate dropped it - leaving a
+        # rejected non-USA row with Country 'Missing'.
+        city = loc.split(",")[0].strip().lower()
+        if len(city) >= 3:
+            for m in re.finditer(rf"(?<![a-z]){re.escape(city)}\s*,\s*([a-z][a-z ]*?)"
+                                 r"(?=\s*(?:[,.;:|\n)]|$))", low_text):
+                province = m.group(1).strip()
+                if province in _AMBIGUOUS_PROVINCES:
+                    continue
+                parent = _PROVINCE_TO_COUNTRY.get(province) or next(
+                    (c for p, c in _PROVINCE_TO_COUNTRY.items() if province.startswith(p + " ")), "")
+                if parent and parent.lower() == ctry.lower():
+                    return True
     return False
 
 
@@ -4096,6 +4200,10 @@ def _location_grounded_in_contact_block(location: str, text: str) -> bool:
     return bool(lines) and _location_grounded_in_text(location, "\n".join(lines))
 
 
+_EMAIL_ADDRESS_RE = re.compile(r"[\w.+\-]+@[\w\-]+(?:\.[\w\-]+)+")
+_ANY_URL_RE = re.compile(r"(?:https?://)?(?:www\.)?[a-z0-9\-]+(?:\.[a-z0-9\-]+)+/[^\s)\]|,]*")
+
+
 def _url_grounded_in_text(url: str, text: str) -> bool:
     """Reject a URL the AI returned that doesn't actually appear (or whose identifying
     handle doesn't appear) anywhere in the source text.
@@ -4113,7 +4221,21 @@ def _url_grounded_in_text(url: str, text: str) -> bool:
     if bare in low_text:
         return True
     handle = url_low.rsplit("/", 1)[-1]
-    return len(handle) >= 3 and handle in low_text
+    if len(handle) < 3:
+        return False
+    # The handle on its own is weak evidence, and it must not be satisfied by text that
+    # belongs to something else. An email address carries the same name the model uses to
+    # invent a profile ('petervishal55@gmail.com' -> 'github.com/petervishal55'), and a URL on
+    # a DIFFERENT site carries it too ('linkedin.com/in/saadsial' -> 'github.com/saadsial').
+    # Live audit 2026-09-16: 4 portfolio links on 3 candidates had no trace in their CV, one
+    # of them published on the client results sheet (Muhammad Ahsan Hussain,
+    # 'github.com/mhussain' from 'mhussain@webtechexpertapp.com'). Remove both before looking,
+    # so only a handle the CV writes on its own - 'GitHub: petervishal55' - still counts.
+    host = _domain_root(url)
+    scrubbed = _EMAIL_ADDRESS_RE.sub(" ", low_text)
+    scrubbed = _ANY_URL_RE.sub(
+        lambda m: m.group(0) if _domain_root(m.group(0)) == host else " ", scrubbed)
+    return bool(re.search(rf"(?<![a-z0-9]){re.escape(handle)}(?![a-z0-9])", scrubbed))
 
 
 def infer_missing_portfolios(resume_text: str, current_p1: str, current_p2: str,
@@ -4178,6 +4300,8 @@ def infer_missing_portfolios(resume_text: str, current_p1: str, current_p2: str,
         v = _clean_url(v)
         if require_host is not None:
             return v if f"{require_host}/" in v.lower() else ""
+        if _is_employer_site(v, resume_text):
+            return ""
         return v if _domain_root(v) not in _SKIP_DOMAINS else ""
 
     taken = {u.lower().rstrip("/") for u in (p1, p2, p3) if u and u != "N/A"}
