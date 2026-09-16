@@ -124,11 +124,29 @@ def build_master(store, path, generation):
     wb = Workbook()
     wb.remove(wb.active)
     wb.properties.description = f'P2 committed generation {generation}'
+    def _unfamiliar(values):
+        """Read against the whole catalogue and matched nothing in it.
+
+        Keyed on Status, not on Category being 'General': a genuinely scored candidate can
+        land in General when their role maps to no known category, and those people belong
+        on CandidateList with everyone else.
+        """
+        return (str(values.get('Status', '') or '').strip()
+                == cfg.STATUS_NO_MATCHING_ROLE)
+
     seen = set()
     expected_by_sheet = {}
-    for sheet, title, columns, table_name in (
-            ('main', 'CandidateList', cfg.COLUMNS, 'HiringAgent_P1_Candidates'),
-            ('rejected', 'Rejected', cfg.REJECTED_COLUMNS, 'RejectedCandidates')):
+    # 'main' is written twice, split by _unfamiliar into complementary halves - so the
+    # duplicate guard below still holds (every application lands on exactly one sheet) and
+    # no candidate is listed in two places. Rejected is the non-USA outcome and is separate
+    # from having no opening to match, which is why this is a third sheet and not that one.
+    for sheet, title, columns, table_name, keep in (
+            ('main', 'CandidateList', cfg.COLUMNS, 'HiringAgent_P1_Candidates',
+             lambda values: not _unfamiliar(values)),
+            ('rejected', 'Rejected', cfg.REJECTED_COLUMNS, 'RejectedCandidates',
+             lambda values: True),
+            ('main', 'Unfamiliar Role List', cfg.COLUMNS, 'UnfamiliarRoleCandidates',
+             _unfamiliar)):
         ws = wb.create_sheet(title)
         ws.append(columns)
         # header / blank spacer / first candidate, matching P1's intake workbook and the
@@ -138,6 +156,8 @@ def build_master(store, path, generation):
         expected_by_sheet[title] = []
         for row in store.all_rows(sheet):
             if not row.app_id:
+                continue
+            if not keep(row.values):
                 continue
             if row.app_id in seen:
                 raise ValueError(f'Ambiguous active application {row.app_id}; publication deferred')
@@ -183,7 +203,10 @@ def build_master(store, path, generation):
     wb.close()
     check = load_workbook(temp)
     try:
-        if check.sheetnames != ['CandidateList', 'Rejected'] or any(not ws.tables for ws in check):
+        # The Unfamiliar sheet is always written, empty or not, so this stays an exact match
+        # rather than a subset test - a missing sheet is still a schema failure.
+        if (check.sheetnames != ['CandidateList', 'Rejected', 'Unfamiliar Role List']
+                or any(not ws.tables for ws in check)):
             raise ValueError('Master workbook schema validation failed')
         # Application ID need not remain column A forever.
         expected = len(seen)

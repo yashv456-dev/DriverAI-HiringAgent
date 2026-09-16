@@ -163,8 +163,62 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(second['processed'], 0)
         self.assertFalse(any(name == 'Sharepoint_Master_File.xlsx' for _, name in remote.uploads))
         wb = load_workbook(self.root/'results'/'generation_2'/'P2-MasterFile.xlsx')
-        self.assertEqual(wb.sheetnames, ['CandidateList', 'Rejected'])
+        self.assertEqual(wb.sheetnames, ['CandidateList', 'Rejected', 'Unfamiliar Role List'])
         self.assertTrue(all(ws.tables for ws in wb)); wb.close()
+
+    def _publish_and_open(self, remote):
+        """Publish the current store and return the master workbook."""
+        from hiring_agent.publisher import publish_results
+        store = SQLiteCandidateStore(database_path())
+        self.addCleanup(store.conn.close)
+        store.sync_from_client(remote)
+        out = Path(str(publish_results(store, remote, upload=False)))
+        master = next(Path(out).parent.rglob('P2-MasterFile.xlsx')) if out.is_dir() else \
+            next(out.parent.rglob('P2-MasterFile.xlsx'))
+        return store, load_workbook(master)
+
+    @staticmethod
+    def _ids(ws):
+        headers = [c.value for c in ws[1]]
+        col = headers.index('Application ID') + 1
+        return [str(ws.cell(i, col).value) for i in range(2, ws.max_row + 1)
+                if ws.cell(i, col).value]
+
+    def test_no_matching_role_candidate_is_listed_on_its_own_sheet(self):
+        """A candidate with no opening belongs on 'Unfamiliar Role List', and only there.
+
+        Live: Ruta Kothari and Kshitij Sahu, both silicon engineers against a catalogue with
+        no chip-design role. Listing them on CandidateList beside genuinely matched people
+        misrepresents them; leaving them off the workbook entirely loses them.
+        """
+        from hiring_agent import config as cfg
+        remote = Remote([candidate('APP-MATCHED'), candidate('APP-NOMATCH')])
+        store, wb = self._publish_and_open(remote)
+        store.save_by_id('APP-MATCHED', {'Status': 'Scored', 'Category': 'Engineering'})
+        store.save_by_id('APP-NOMATCH', {'Status': cfg.STATUS_NO_MATCHING_ROLE,
+                                         'Category': 'General',
+                                         'Suggested Role 1': cfg.NO_ROLE_MATCH_LABEL})
+        wb.close()
+        _, wb = self._publish_and_open(remote)
+        try:
+            self.assertEqual(wb.sheetnames,
+                             ['CandidateList', 'Rejected', 'Unfamiliar Role List'])
+            self.assertEqual(self._ids(wb['CandidateList']), ['APP-MATCHED'])
+            self.assertEqual(self._ids(wb['Unfamiliar Role List']), ['APP-NOMATCH'])
+            # Every sheet stays a real Excel table, so the workbook opens the same way.
+            self.assertTrue(all(ws.tables for ws in wb))
+        finally:
+            wb.close()
+
+    def test_unfamiliar_sheet_is_published_even_when_empty(self):
+        """The schema is fixed, so a run with nobody in it still writes the sheet."""
+        remote = Remote()
+        _, wb = self._publish_and_open(remote)
+        try:
+            self.assertIn('Unfamiliar Role List', wb.sheetnames)
+            self.assertEqual(self._ids(wb['Unfamiliar Role List']), [])
+        finally:
+            wb.close()
 
     def test_upload_failure_retries_without_scoring(self):
         remote = Remote(); remote.fail_upload = True

@@ -41,7 +41,12 @@ def seed_from_snapshot(snapshot_path: Path = SNAPSHOT_PATH):
     wb = openpyxl.load_workbook(snapshot_path, data_only=True)
     
     total_added = 0
-    for sheet_name, target_sheet in [("CandidateList", "main"), ("Rejected", "rejected")]:
+    # 'Unfamiliar Role List' is a presentation split of the main sheet, not a third place a
+    # candidate lives - they are ordinary main rows whose Status says nothing matched. It has
+    # to be listed here or rebuilding the database from a published workbook would silently
+    # drop every one of them.
+    for sheet_name, target_sheet in [("CandidateList", "main"), ("Rejected", "rejected"),
+                                     ("Unfamiliar Role List", "main")]:
         if sheet_name not in wb.sheetnames:
             continue
         ws = wb[sheet_name]
