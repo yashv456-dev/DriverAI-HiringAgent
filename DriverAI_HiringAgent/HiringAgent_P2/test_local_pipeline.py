@@ -9,6 +9,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from openpyxl import load_workbook
+
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_isolation  # noqa: F401 - must precede every hiring_agent import
+
 from hiring_agent.store import SQLiteCandidateStore, RowVanished
 from hiring_agent.sqlite_store import database_path
 from hiring_agent.local_pipeline import (run_local_pipeline, LocalClient, _child, worker_lock,

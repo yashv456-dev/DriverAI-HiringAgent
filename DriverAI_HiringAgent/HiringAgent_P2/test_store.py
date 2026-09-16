@@ -10,8 +10,12 @@ results onto the NEXT candidate's row. That is the bug this module exists to mak
 unrepresentable, so it gets an explicit, named test rather than being implied by the others.
 """
 import os
+import sys
+from pathlib import Path
 # Legacy orchestration checks use Excel stubs; local SQLite integration has its own suite.
 os.environ['HIRING_STORAGE_BACKEND'] = 'excel'
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_isolation  # noqa: F401 - must precede every hiring_agent import
 from hiring_agent.store import (
     ExcelCandidateStore, CandidateRow, RowVanished, APP_ID_COL,
 )

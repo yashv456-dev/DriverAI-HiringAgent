@@ -9,6 +9,8 @@ os.environ['HIRING_STORAGE_BACKEND'] = 'excel'  # local pipeline covered in test
 from pathlib import Path
 os.environ.setdefault("HIRING_OLLAMA_ENABLED", "false")
 os.environ.setdefault("HIRING_OLLAMA_SCORING", "false")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_isolation  # noqa: F401 - must precede every hiring_agent import; see its docstring
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent))
 sys.stdout.reconfigure(encoding="utf-8")
 from openpyxl import load_workbook

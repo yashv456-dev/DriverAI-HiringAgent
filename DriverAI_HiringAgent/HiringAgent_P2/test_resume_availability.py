@@ -2,10 +2,15 @@
 from contextlib import ExitStack
 from copy import deepcopy
 import os
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import requests
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_isolation  # noqa: F401 - must precede every hiring_agent import
 
 from hiring_agent import sharepoint_scoring as scoring
 from sharepoint_client import SharePointClient, SharePointError
