@@ -7333,6 +7333,59 @@ ok(extract_portfolios("Jane Doe\njane@acme.io | 480-555-0100\nSUMMARY") == ("N/A
 ok(extract_portfolios("Jane Doe\n480-555-0100 | janedoe.dev\nSUMMARY") == ("N/A", "N/A", "N/A"),
    "without an email or profile link the block is not trusted as a contact header")
 
+# Re-scoring the CandidateList surfaced three more defects (2026-09-16).
+# (a) Skill groups printed inline fused neighbouring skills: 'Bash PyTorch', 'NumPy RAG'.
+from hiring_agent.extraction import _split_fused_skills as _c13_split
+_c13_cv = ("Languages: Python, SQL, Bash \n\nML & Deep Learning: PyTorch, NumPy LLMs & Agents: RAG\n"
+           "Java Spring Boot services; Google Workspace admin")
+ok(_c13_split("Python, Bash PyTorch, NumPy RAG, Bash", _c13_cv) == "Python, Bash, PyTorch, NumPy, RAG",
+   "two vocabulary skills run together are split back apart, without duplicates")
+ok(_c13_split("Spring Boot, Google Workspace, Machine Learning", _c13_cv)
+   == "Spring Boot, Google Workspace, Machine Learning",
+   "real multi-word skills (in the vocabulary or written in the CV) are left alone")
+# (b) A month glued to its year lost the education start date.
+from hiring_agent.extraction import _extract_education_dates as _c13_dates
+ok(_c13_dates("EDUCATION\n\nExample State University August2024- August 2026 Master's, Data Science "
+              "GPA: 3.78 Example University June2019- May2023 Bachelor's degree\nSKILLS")
+   == ("Aug 2024", "Aug 2026"), "'August2024' is read as Aug 2024")
+# (c) Education carried grades, coursework, honours and campus addresses from the parser hint.
+from hiring_agent.extraction import normalize_education as _c13_edu, complete_education as _c13_complete
+for _c13_in, _c13_want in (
+    ("Master of Science in Business Analytics | GPA: 3.9/4.0 | Honor Society, 2x Hackathon Winner",
+     "Master of Science in Business Analytics"),
+    ("Example University, Syracuse, New York Master of Science in Information Systems | GPA: 3.8/4.0 "
+     "University of Mumbai, Mumbai, Maharashtra Bachelor of Engineering in Computer Science | GPA: 3.5/4.0",
+     "Master of Science in Information Systems, Example University | "
+     "Bachelor of Engineering in Computer Science, University of Mumbai"),
+    ("The Example State University B.S. in Computer Engineering | Coursework: Distributed Systems, ML",
+     "B.S. in Computer Engineering, The Example State University"),
+    ("Master of Science, Software Engineering, Arizona State University, Tempe, AZ (Full-time) GPA - 4.0/4.0",
+     "Master of Science, Software Engineering, Arizona State University"),
+    ("M.S. in Computer Science, Arizona State University : Tempe, AZ, USA",
+     "M.S. in Computer Science, Arizona State University"),
+    ("Master of Science in Computer Engineering (Electrical Engineering)|GPA - 3.70/4.0, Example College of Engineering",
+     "Master of Science in Computer Engineering (Electrical Engineering), Example College of Engineering"),
+):
+    ok(_c13_edu(_c13_in) == _c13_want, f"education cleaned: {_c13_in[:50]!r} -> {_c13_edu(_c13_in)!r}")
+for _c13_keep in ("MBA Degree, Finance and Controlling, USP (Universidade de São Paulo) | ESALQ",
+                  "Masters, Computer Science, Texas A&M University, College Station",
+                  "B.S. Computer Science, University of Texas",
+                  "The University of Texas at Dallas, MS in Information Technology and Management, "
+                  "Pune Institute of Computer Technology, BE in Computer Engineering"):
+    ok(_c13_edu(_c13_keep) == _c13_keep, f"education left alone: {_c13_keep[:50]!r}")
+# (d) A school-first section pairs a degree with the school ABOVE it, not the next entry's school.
+_c13_school_first = ("Education\nArizona State University\nAugust 2024 - December 2025\n"
+                     "Master of Science in Business Analytics | GPA: 4.0/4.0\nArizona, USA\n"
+                     "SRM University\nJuly 2021 - May 2024\nBachelor of Business Administration\nExperience")
+ok(_c13_complete("Master of Science in Business Analytics", _c13_school_first)
+   == "Master of Science in Business Analytics, Arizona State University",
+   "school-first layout: the degree takes the school above it")
+_c13_degree_first = ("Education\nMaster of Science in Data Science\nArizona State University\n"
+                     "Aug 2024 - May 2026\nBachelor of Technology\nSRM University\nExperience")
+ok(_c13_complete("Master of Science in Data Science", _c13_degree_first)
+   == "Master of Science in Data Science, Arizona State University",
+   "degree-first layout: the degree still takes the school below it")
+
 print(f"\n{'='*64}")
 print(f"  P2 RESULT: {P} passed, {F} failed")
 print(f"{'='*64}")

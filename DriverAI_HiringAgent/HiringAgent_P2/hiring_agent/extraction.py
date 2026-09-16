@@ -1203,6 +1203,106 @@ def education_needs_repair(value: str) -> bool:
     )
 
 
+#: A grade as CVs print it: 'GPA: 3.8/4.0', 'GPA - 4.0/4.0', 'CGPA: 8.68/10.00', '(GPA: 3.78)',
+#: or a bare '(3.52/4)' after the school.
+_EDU_GRADE_RE = re.compile(
+    r"(?i)\(?\b(?:c?gpa|grade)\b\s*[:\-–]?\s*\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s*\)?"
+    r"|\(\s*\d+(?:\.\d+)?\s*/\s*\d+(?:\.\d+)?\s*\)")
+_EDU_COURSEWORK_RE = re.compile(r"(?i)(?:relevant\s+)?coursework\s*:[^|;]*")
+_EDU_STUDY_MODE_RE = re.compile(r"(?i)\(\s*(?:full|part)[\s-]*time\s*\)|\(\s*online\s*\)")
+#: A '|' piece that is an honour rather than an education entry.
+_EDU_HONOUR_RE = re.compile(
+    r"(?i)\b(?:honou?rs?|awards?|winner|scholar(?:ship)?|summa|magna|cum\s+laude|dean'?s\s+list|"
+    r"sigma|society|medal|valedictorian|hackathon|fellowship)\b")
+#: One campus-city item of an address ('Tempe', 'College Park', 'São Paulo').
+_EDU_CITY_RE = re.compile(r"[A-Z][\w.'\-]*(?:\s+[A-Z][\w.'\-]*){0,2}")
+
+
+def _is_edu_region(token: str) -> bool:
+    """A state, province or country name - the end of a campus address."""
+    low = token.strip(" .").lower()
+    return bool(low) and (low in US_STATE_ABBREVS or low in US_STATE_NAMES
+                          or low in FOREIGN_COUNTRIES or low in US_COUNTRY_TERMS
+                          or low in _PROVINCE_TO_COUNTRY)
+
+
+def _strip_education_campus(entry: str) -> str:
+    """Drop the campus address after a school name, and put the degree before the school.
+
+    'Example University, Springfield, Illinois Master of Science in X' -> 'Master of Science
+    in X, Example University'. Only a run of place names that ENDS in a state, province or
+    country is removed, so a school whose name has a comma in it is left alone.
+    """
+    degrees = list(_DEGREE_RE.finditer(entry))
+    # 'School Degree ...' glued with no separator (a layout that prints the school first).
+    # 'School, Degree' is an accepted order and stays as written.
+    glued = (len(degrees) == 1 and degrees[0].start() > 0
+             and re.search(r"[\w)]\s+$", entry[:degrees[0].start()]) is not None)
+    entry = re.sub(r"\s+:\s+", ", ", entry)          # 'Arizona State University : Tempe, AZ'
+    parts = [p.strip() for p in entry.split(",")]
+    i = 0
+    while i < len(parts):
+        if _INSTITUTION_RE.search(parts[i]) and not _DEGREE_RE.match(parts[i]):
+            end = rest = None
+            for j in range(i + 1, min(i + 5, len(parts))):
+                head = parts[j]
+                degree = _DEGREE_RE.search(head)
+                region = head[:degree.start()].strip() if degree else head
+                if _is_edu_region(region):
+                    end, rest = j, (head[degree.start():] if degree else None)
+                    if degree:
+                        break
+                    continue                          # 'AZ, USA' - keep reading regions
+                # A city may come before the region; anything after it, or any other text,
+                # ends the address.
+                if end is not None or degree or not _EDU_CITY_RE.fullmatch(head):
+                    break
+            if end is not None:
+                parts = parts[:i + 1] + ([rest] if rest else []) + parts[end + 1:]
+        i += 1
+    entry = ", ".join(p for p in parts if p)
+    # Lead a glued value with the degree, so the address removal above cannot leave it
+    # reading 'School, Degree' by accident. Only for a single degree - with two, which school
+    # belongs to which is not decidable here.
+    degrees = list(_DEGREE_RE.finditer(entry))
+    if glued and len(degrees) == 1 and degrees[0].start() > 0:
+        school = entry[:degrees[0].start()].strip(" ,;-|")
+        if _INSTITUTION_RE.search(school):
+            entry = f"{entry[degrees[0].start():].strip(' ,;-|')}, {school}"
+    return entry
+
+
+def _strip_education_noise(text: str) -> str:
+    """Keep the degree and school; drop grades, coursework, honours and campus addresses.
+
+    The deterministic parser hands the model whole Education lines as a hint, and the model
+    is told to keep a hint that is already right, so everything on those lines came back:
+    'Master of Science in X | GPA: 3.9/4.0 | <honour society>, Hackathon Winner', 'The Example
+    State University B.S. in Y | Coursework: Distributed Systems, ...', '... <City>, <ST>
+    (Full-time) GPA - 3.9/4.0' (CandidateList audit
+    2026-09-16, eight rows). Grades, coursework and study mode are removed wherever they
+    appear; a '|' piece that is an honour, not a degree or school, is dropped.
+    """
+    for pattern in (_EDU_STUDY_MODE_RE, _EDU_GRADE_RE, _EDU_COURSEWORK_RE):
+        # A fragment that was its own '|' piece leaves the separator behind, so the two
+        # degrees around it stay two entries instead of running together.
+        # One between a degree and its own school ('... Engineering)|GPA - 3.7/4.0, Example
+        # College') takes its separator with it.
+        # When a whole next degree follows the comma, the separator still divides two entries.
+        text = pattern.sub("\x00", text)
+        text = re.sub(r"\s*\|\s*\x00\s*,(?=([^|;]*))",
+                      lambda m: " | " if _DEGREE_RE.search(m.group(1)) else ",", text)
+        text = re.sub(r"\s*\|\s*\x00\s*", " | ", text).replace("\x00", " ")
+    pieces = [p.strip(" ,;-") for p in re.split(r"\s*\|\s*", text)]
+    pieces = [p for p in pieces if p and not (
+        _EDU_HONOUR_RE.search(p) and not _DEGREE_RE.search(p) and not _INSTITUTION_RE.search(p))]
+    out = []
+    for piece in pieces:
+        entries = [_strip_education_campus(e.strip()) for e in piece.split(";") if e.strip()]
+        out.append("; ".join(entries))
+    return " | ".join(out)
+
+
 def normalize_education(value: str) -> str:
     """Conservatively format a degree/school string without inventing information."""
     text = str(value or "").strip()
@@ -1243,6 +1343,7 @@ def normalize_education(value: str) -> str:
     )
     for pattern, replacement in replacements:
         text = re.sub(pattern, replacement, text)
+    text = _strip_education_noise(text)
     text = re.sub(r"\s+([,;])", r"\1", text)
     text = re.sub(r"([,;])(?=\S)", r"\1 ", text)
     text = re.sub(r"\s{2,}", " ", text).strip(" ,;-|")
@@ -1540,12 +1641,25 @@ def complete_education(value, resume_text: str) -> str:
         # school->degree are both common. Do not skip over a coursework line to steal the
         # following degree's school (live: Nimish Goel, whose MS was paired with R.V. College
         # instead of the W. P. Carey / ASU line immediately above it).
+        #
+        # When both sides are equally near, the section's own layout decides. A section
+        # that opens with a school lists each entry school-first, so the school belongs
+        # above: APP-20260813-1733-MC1A reads "<School A> / <dates> / Master of Science in X /
+        # <State>, USA / <School B> / ...", and the MS was published with School B, the NEXT degree's school,
+        # which sits two lines below just as ASU sits two lines above (audit 2026-09-16).
+        school_first = False
+        for k in range(i - 1, max(-1, i - 40), -1):
+            if re.match(r"(?i)^\W*education\b", lines[k]):
+                opener = lines[k + 1] if k + 1 < i else ""
+                school_first = bool(_institution_on_line(opener)) and not _DEGREE_RE.search(opener)
+                break
+        first, second = (backward, forward) if school_first else (forward, backward)
         neighbors = [line]
         for offset in range(max(len(forward), len(backward))):
-            if offset < len(forward):
-                neighbors.append(forward[offset])
-            if offset < len(backward):
-                neighbors.append(backward[offset])
+            if offset < len(first):
+                neighbors.append(first[offset])
+            if offset < len(second):
+                neighbors.append(second[offset])
         for candidate in neighbors:
             school = _institution_on_line(candidate)
             if school and school.lower() not in val.lower():
@@ -1631,6 +1745,10 @@ def _extract_education_dates(text: str) -> tuple[str, str]:
         # is a regex word character, so the boundary before the month disappears and the
         # parser falls through to a less precise bare year.
         window = window.replace("_", " ")
+        # A month glued to its year ('August2024- August 2026', 'June2019- May2023') is not
+        # a date to the range pattern, so the start was lost and only the end survived
+        # (CandidateList audit 2026-09-16, APP-20260804-2019-MDJA).
+        window = re.sub(rf"(?i)\b({_EDU_MONTH_RE})\.?(?=(?:19|20)\d{{2}}\b)", r"\1 ", window)
         explicit = [(_normalize_edu_date_token(m.group(1)),
                      _normalize_edu_date_token(m.group(2)))
                     for m in _EDU_DATE_RANGE_RE.finditer(window)]
@@ -3738,7 +3856,7 @@ def _merge_keyword_skills(result: dict, text: str) -> dict:
     # entries used up slots and genuine skills at the end of the list were cut: live row
     # APP-20260908-1304-MCLA lost Microservices, SQLite and n8n when three new vocabulary
     # terms were added (2026-09-14). normalize_skills keeps a bracketed group as one entry.
-    raw_skills = normalize_skills(result.get("skills", ""))
+    raw_skills = normalize_skills(_split_fused_skills(result.get("skills", ""), text))
     base = [s.strip() for s in raw_skills.split(", ")
             if s.strip() and s.strip().lower() != "not extracted"]
     # 'AWS (EC2/S3/IAM)' already covers the keyword 'aws'; do not append a plain 'AWS' again.
@@ -4022,6 +4140,38 @@ _RECHECK_PROMPT = (
 )
 
 
+def _split_fused_skills(skills_str: str, text: str) -> str:
+    """Split an AI skill that is really two vocabulary skills run together.
+
+    A CV that prints its skill groups inline - "Languages: ... SQL, Bash  ML & Deep Learning:
+    PyTorch, ... NumPy  LLMs & Agents: RAG" - loses the break between the last skill of one
+    group and the first of the next once its labels are read past, and the model returned
+    'Bash PyTorch' and 'NumPy RAG' as skills (CandidateList audit 2026-09-16,
+    APP-20260817-0617-MCVA). Such a token is not written anywhere in the text, and each half
+    is a known skill; a real multi-word skill ('Spring Boot', 'Google Workspace') is either
+    in the vocabulary or written in the CV, and is left alone.
+    """
+    flat = re.sub(r"\s+", " ", str(text or "")).lower()
+    out, seen = [], set()
+    for skill in (s.strip() for s in str(skills_str or "").split(",")):
+        if not skill:
+            continue
+        pieces = [skill]
+        words = skill.split()
+        if (len(words) >= 2 and skill.lower() not in _SKILL_KEYWORD_SET
+                and skill.lower() not in flat):
+            for cut in range(1, len(words)):
+                left, right = " ".join(words[:cut]), " ".join(words[cut:])
+                if left.lower() in _SKILL_KEYWORD_SET and right.lower() in _SKILL_KEYWORD_SET:
+                    pieces = [left, right]
+                    break
+        for piece in pieces:
+            if piece.lower() not in seen:
+                seen.add(piece.lower())
+                out.append(piece)
+    return ", ".join(out)
+
+
 def _merge_recheck_skills(old_val: str, new_val: str, evidence_text: str) -> str:
     """Let the recheck add skills, but never silently drop one the CV actually states.
 
@@ -4116,8 +4266,11 @@ def ai_recheck_fields(fields: dict, resume_text: str, mail_body: str) -> dict:
         if key == "phone" and new_val and sum(ch.isdigit() for ch in new_val) < 7:
             new_val = ""
         _both_texts = f"{resume_text or ''}\n{mail_body or ''}"
+        if key == "skills" and new_val:
+            new_val = _split_fused_skills(new_val, _both_texts)
         if key == "skills" and new_val and old_val:
-            new_val = _merge_recheck_skills(old_val, new_val, _both_texts)
+            new_val = _merge_recheck_skills(_split_fused_skills(old_val, _both_texts),
+                                            new_val, _both_texts)
         if key == "looking_for_role" and new_val:
             new_val = clean_role_text(new_val) or new_val
         # Geography is NOT decided here. Location and Country are one claim and they are
