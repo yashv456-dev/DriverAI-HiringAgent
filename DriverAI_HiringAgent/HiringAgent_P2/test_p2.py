@@ -3805,6 +3805,22 @@ ok(_restore_cv_identity(dict(_same), _same, "APP-TEST") == _same,
 ok(_CV_IDENTITY_FIELDS == ("full_name", "location", "country"),
    "the identity set is exactly full_name/location/country")
 
+# 'Remote' says how somebody works, not where they live, so it must not outrank a real city
+# the covering email supplies - the CV-wins rule is there to protect a REAL answer. Live:
+# Saad Ullah (APP-20260804-2021-MDIA) emailed "I'm in Lahore, Pakistan" and Virendra Saini
+# (APP-20260804-1910-MDLA) "Gotan, Rajasthan, India"; both were stored as Location 'Remote'.
+_z29_remote = _restore_cv_identity(
+    {"full_name": "Saad Ullah", "location": "Lahore, Pakistan", "country": "Pakistan"},
+    {"full_name": "Saad Ullah", "location": "Remote", "country": "Pakistan"}, "APP-TEST")
+ok(_z29_remote["location"] == "Lahore, Pakistan",
+   f"a 'Remote' CV header yields to a real city from the email (got {_z29_remote['location']!r})")
+# The agency-submission protection must survive: a REAL CV city still wins.
+_z29_agency = _restore_cv_identity(
+    {"full_name": "Vandana Asawa", "location": "Plano, Texas", "country": "United States"},
+    {"full_name": "Shivam", "location": "Austin, Texas", "country": "United States"}, "APP-TEST")
+ok(_z29_agency["location"] == "Austin, Texas" and _z29_agency["full_name"] == "Shivam",
+   "a real CV city still overrides the covering email (agency submissions stay protected)")
+
 
 print("\n=== G1c. PRE-REJECT COMPLETENESS GATE ===")
 # Live regression (2026-08-01): Syyed Nazir Ali (APP-20260727-1431-6F75) and Divy Parmar

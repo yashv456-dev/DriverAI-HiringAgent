@@ -2571,6 +2571,15 @@ def _download_resume_text(client, app_id: str, resume_filename_cell: str, subpat
 # these when the CV is silent, but it must never contradict a value the CV actually stated.
 _CV_IDENTITY_FIELDS = ("full_name", "location", "country")
 
+#: Work arrangements a CV header often carries where a city belongs. They say how somebody
+#: works, not where they live, so they must not outrank a real city the covering email
+#: supplies - the CV-wins rule exists to protect a REAL answer from being overwritten, and
+#: 'Remote' is not one. Live: Saad Ullah (APP-20260804-2021-MDIA) whose email says "I'm in
+#: Lahore, Pakistan", and Virendra Saini (APP-20260804-1910-MDLA), "Gotan, Rajasthan,
+#: India" - both stored with Location 'Remote'.
+_NON_PLACE_LOCATIONS = {"remote", "hybrid", "onsite", "on-site", "on site", "anywhere",
+                        "worldwide", "global", "flexible", "wfh", "work from home"}
+
 
 def _restore_cv_identity(details: dict, cv_identity: dict, app_id: str = "") -> dict:
     """Re-assert CV-derived identity after the mail-body merge and the AI recheck.
@@ -2592,6 +2601,8 @@ def _restore_cv_identity(details: dict, cv_identity: dict, app_id: str = "") -> 
         cv_val = str(cv_identity.get(field, "") or "").strip()
         if not cv_val or cv_val.lower() in _GAP_LITERALS:
             continue                      # CV never stated it - let the email's value stand
+        if field == "location" and cv_val.lower() in _NON_PLACE_LOCATIONS:
+            continue                      # 'Remote' is how they work, not where they are
         cur = str(out.get(field, "") or "").strip()
         if cur.lower() != cv_val.lower():
             out[field] = cv_val
