@@ -1242,7 +1242,7 @@ def _strip_education_campus(entry: str) -> str:
     parts = [p.strip() for p in entry.split(",")]
     i = 0
     while i < len(parts):
-        if _INSTITUTION_RE.search(parts[i]) and not _DEGREE_RE.match(parts[i]):
+        if _INSTITUTION_RE.search(parts[i]):
             end = rest = None
             for j in range(i + 1, min(i + 5, len(parts))):
                 head = parts[j]
@@ -1292,7 +1292,11 @@ def _strip_education_noise(text: str) -> str:
         text = pattern.sub("\x00", text)
         text = re.sub(r"\s*\|\s*\x00\s*,(?=([^|;]*))",
                       lambda m: " | " if _DEGREE_RE.search(m.group(1)) else ",", text)
-        text = re.sub(r"\s*\|\s*\x00\s*", " | ", text).replace("\x00", " ")
+        text = re.sub(r"\s*\|\s*\x00\s*", " | ", text)
+        # Anywhere else a grade or study mode ends the school name: the address a CV prints
+        # after it ('Arizona State University (3.52/4) Arizona, USA') must read as a separate
+        # item, or it stays glued to the school (APP-20260816-1338-MCWA, audit 2026-09-16).
+        text = text.replace("\x00", ", " if pattern is not _EDU_COURSEWORK_RE else " ")
     pieces = [p.strip(" ,;-") for p in re.split(r"\s*\|\s*", text)]
     pieces = [p for p in pieces if p and not (
         _EDU_HONOUR_RE.search(p) and not _DEGREE_RE.search(p) and not _INSTITUTION_RE.search(p))]

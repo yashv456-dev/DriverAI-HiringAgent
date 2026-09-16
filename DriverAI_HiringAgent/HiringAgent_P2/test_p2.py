@@ -7367,6 +7367,15 @@ for _c13_in, _c13_want in (
      "Master of Science in Computer Engineering (Electrical Engineering), Example College of Engineering"),
 ):
     ok(_c13_edu(_c13_in) == _c13_want, f"education cleaned: {_c13_in[:50]!r} -> {_c13_edu(_c13_in)!r}")
+ok(_c13_edu("Master of Science in Electrical Engineering, Example State University (3.52/4) Arizona, USA "
+            "Bachelor of Technology in EEE, Example Institute of Technology (8.27/10) Odisha, India")
+   == "Master of Science in Electrical Engineering, Example State University, "
+      "Bachelor of Technology in EEE, Example Institute of Technology",
+   "an address printed after a bare grade is not left glued to the school")
+ok(_c13_edu("Bachelor of Computer Applications (BCA) - Example Institute of Management & Engineering, "
+            "Pune, Maharashtra")
+   == "Bachelor of Computer Applications (BCA) - Example Institute of Management & Engineering",
+   "a campus address is removed when the degree and school share one item")
 for _c13_keep in ("MBA Degree, Finance and Controlling, USP (Universidade de São Paulo) | ESALQ",
                   "Masters, Computer Science, Texas A&M University, College Station",
                   "B.S. Computer Science, University of Texas",
