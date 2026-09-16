@@ -54,6 +54,11 @@ MISSING_VALUE = "Missing"
 _GAP_LITERALS = {"not extracted", "n/a", "na", "none", "-", "not found", "unknown", "",
                  "missing", "not confirmed"}
 
+#: The skills vocabulary as a lowercased set, for the "is this word a technology?" test the
+#: location parser needs. No entry in it is also a place name, so membership is a safe reason
+#: to refuse a location match.
+_SKILL_KEYWORD_SET = {str(s).strip().lower() for s in SKILL_KEYWORDS if str(s).strip()}
+
 
 def _ai_fields(data: dict, text: str) -> dict:
     """Normalize an LLM's parsed dict into the candidate-detail shape."""
@@ -761,6 +766,9 @@ def _extract_location(text: str) -> str | None:
             # Country, losing the one explicit non-US signal on the row. Falling through
             # instead lets the foreign scan (step 6) return the whole segment, so
             # split_location_country can pull "Canada" back out of it.
+            # A technology is never a city - same reason as the full-text pass below.
+            if m and m.group(1).strip().lower() in _SKILL_KEYWORD_SET:
+                continue
             if m and m.group(2).lower() in US_STATE_ABBREVS:
                 return f"{m.group(1)}, {m.group(2)}"
 
@@ -778,6 +786,9 @@ def _extract_location(text: str) -> str | None:
     for ln in header:
         for seg in re.split(r"\s*[|•·]\s*", ln):
             m = _city_state_nocomma_re.match(seg.strip())
+            # A technology is never a city - same reason as the full-text pass below.
+            if m and m.group(1).strip().lower() in _SKILL_KEYWORD_SET:
+                continue
             if m and m.group(2).lower() in US_STATE_ABBREVS:
                 return f"{m.group(1)}, {m.group(2)}"
 
@@ -841,6 +852,17 @@ def _extract_location(text: str) -> str | None:
             # no other US city, so this guard cost him his location entirely).
             tail = ln[m.end():]
             if re.match(r"\s+[A-Z][a-z]", tail) and not _ADDRESS_TAIL_OK_RE.match(tail):
+                continue
+            # A technology is never a city. The guard above only catches a list whose next
+            # item is space-separated ('Bloomberg Terminal, MS Project'); a comma-separated
+            # one slips straight past it, because the tail starts with the comma rather
+            # than a capital. Live case Adil Anwer (APP-20260805-0035-MDEA): "emerging
+            # technologies including Firebase, AR, Blockchain" - AR is Augmented Reality -
+            # was read as a city in Arkansas, so a candidate whose CV header says
+            # 'Karachi, Pakistan | +92-333-2467664' was recorded in the United States and
+            # escaped the non-USA rejection entirely. No skill in the vocabulary is also a
+            # place name, so this cannot cost a genuine location.
+            if m.group(1).strip().lower() in _SKILL_KEYWORD_SET:
                 continue
             return f"{m.group(1)}, {m.group(2)}"
 

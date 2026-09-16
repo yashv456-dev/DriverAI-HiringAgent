@@ -4516,6 +4516,16 @@ for _text, _want, _why in [
     ("Jane Doe\nBoston, Massachusetts", "Boston, Massachusetts", "full state name"),
     ("Jane Doe\nNew York, NY 10001", "New York, NY", "City, ST + ZIP"),
     ("Jane Doe\nemail | 480-277-5159 | Tempe, AZ", "Tempe, AZ", "after pipe fields"),
+    # A technology list is not an address. 'AR' here is Augmented Reality, not Arkansas.
+    # Live case Adil Anwer (APP-20260805-0035-MDEA): "emerging technologies including
+    # Firebase, AR, Blockchain" was stored as his location, so a candidate whose header
+    # reads 'Karachi, Pakistan | +92-333-2467664' was recorded in the United States and
+    # never reached the non-USA rejection. The existing tools-list guard missed it because
+    # it only catches a space-separated continuation ('Bloomberg Terminal, MS Project'),
+    # and this list continues with a comma.
+    ("Adil Anwer\nKarachi, Pakistan | +92-333-2467664 | a@x.com\n\nSENIOR iOS ENGINEER\n"
+     "Experience\nConducted R&D on emerging technologies including Firebase, AR, Blockchain",
+     "Karachi, Pakistan", "a skill name is never read as a city"),
 ]:
     _got = str(_loc(_text) or "")
     ok(_got == _want, f"location {_why}: {_got!r} == {_want!r}")
