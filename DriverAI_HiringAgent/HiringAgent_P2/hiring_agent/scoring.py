@@ -138,6 +138,18 @@ def is_unmatched_hardware_profile(skills_str: str = "", role_pref: str = "") -> 
     return is_hw and not _catalog_has_hardware_opening()
 
 
+def is_unmatched_discipline_profile(skills_str: str = "", role_pref: str = "") -> bool:
+    """True when this candidate's whole field of work is absent from the catalogue.
+
+    Both guards above answer the same question for one discipline each. When either says
+    yes, the roles the scorer picked are artifacts of a catalogue that holds nothing for
+    this person - they share only generic tooling - so publishing them as this candidate's
+    best three matches states something untrue about them.
+    """
+    return (is_unmatched_qa_profile(skills_str, role_pref)
+            or is_unmatched_hardware_profile(skills_str, role_pref))
+
+
 def assign_category(role_str: str, skills_str: str = "", role_pref: str = "") -> str:
     """Map 'Role Title (NN%)' → business category using config-driven rules.
 

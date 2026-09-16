@@ -83,6 +83,13 @@ STATUS_NEEDS_REVIEW_SPAM = _yaml.get("status_values", {}).get(
 STATUS_NO_MATCHING_ROLE = _yaml.get("status_values", {}).get(
     "no_matching_role", "Needs Review - No Matching Role")
 
+# Written into Suggested Role 1/2/3 when the catalogue holds no opening for this candidate's
+# discipline. Deliberately a statement rather than a blank: an empty cell reads as "the bot
+# failed to fill this in", while this says we looked and there was nothing to match. It is
+# NOT one of extraction._GAP_LITERALS, so no later heal or recovery pass treats it as a hole
+# to go and fill.
+NO_ROLE_MATCH_LABEL = "Not Matching"
+
 # P2's secondary content-safety net (see config.yaml content_safety) - checked against a
 # row's resume text and mail body before normal extraction runs. P1 already screens
 # incoming mail for this (HiringAgent_P1/flow/flow_config.json spam_filters); this only

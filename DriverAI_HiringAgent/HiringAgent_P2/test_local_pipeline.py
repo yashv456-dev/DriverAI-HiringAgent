@@ -471,8 +471,10 @@ class ReliabilityTests(unittest.TestCase):
         self.assertNotEqual(row['Status'], cfg.STATUS_NEEDS_REVIEW,
                             'must not be reported as an unreadable resume - it read fine')
         self.assertEqual(row['Category'], 'General')
-        self.assertEqual(row['Suggested Role 1'], '',
-                         'no role cleared the bar, so no role may be published')
+        self.assertEqual(row['Suggested Role 1'], cfg.NO_ROLE_MATCH_LABEL,
+                         'no role cleared the bar, so the row must say so outright')
+        self.assertEqual(row['Suggested Role 2'], cfg.NO_ROLE_MATCH_LABEL)
+        self.assertEqual(row['Suggested Role 3'], cfg.NO_ROLE_MATCH_LABEL)
         # Her extracted profile has to survive - that is the point of recording her.
         self.assertEqual(row['Full Name'], 'Alex Morgan')
         self.assertIn('Verilog', row['Current Skills'])

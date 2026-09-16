@@ -36,7 +36,8 @@ from hiring_agent.extraction import (
     EXTRACTION_SOURCE,
 )
 from hiring_agent.config import SKILL_DISPLAY, SCORING_MAX_SKILLS
-from hiring_agent.scoring import suggested_roles, assign_category
+from hiring_agent.scoring import (suggested_roles, assign_category,
+                                  is_unmatched_discipline_profile)
 from hiring_agent.jd_sources import get_active_roles
 from hiring_agent.geo import (
     GeoDecision, check_location_usa, classify_location_usa,
@@ -3394,6 +3395,20 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
             r1, r2, r3 = res["role_1"], res["role_2"], res.get("role_3", "")
             category = assign_category(r1, skills, role_pref)   # never blank — falls back to "General"
 
+            # The category guards already concluded this candidate's discipline is absent
+            # from the catalogue - that is why Category came back 'General'. The roles the
+            # scorer picked are the same artifact seen from the other side: titles earned on
+            # generic tooling alone, for work this person does not do. Ruta Kothari, a
+            # VLSI/ASIC engineer, was published as a 35% "Software Developer - AI/ML,
+            # Computer Vision". Say plainly that nothing matched instead, and let the row
+            # land in review where a human decides where she belongs.
+            if is_unmatched_discipline_profile(skills, role_pref):
+                logger.info("       NO MATCH : %s - no opening in the catalogue fits this "
+                            "candidate's field; recording roles as '%s'.",
+                            app_id, _cfg.NO_ROLE_MATCH_LABEL)
+                r1 = r2 = r3 = _cfg.NO_ROLE_MATCH_LABEL
+                no_matching_opening = True
+
             if GEO_FILTER_USA_ONLY:
                 geo_decision, usa_reason = _classify_candidate_geo(
                     location, country, phone, education=education, resume_text=text)
@@ -3567,7 +3582,9 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
             _r1 = str(fields.get("Suggested Role 1", "") or "").strip()
             _cat = str(fields.get("Category", "") or "").strip()
 
-            if not _r1 or _is_gap(_r1):
+            # no_matching_opening is checked alongside the gap test because the roles may now
+            # read 'Not Matching', which is a real value rather than an empty cell.
+            if not _r1 or _is_gap(_r1) or no_matching_opening:
                 if no_matching_opening:
                     logger.info("       PRE-SCORING CHECK: no opening matched this CV; "
                                 "filing as '%s' for a human to place.",
