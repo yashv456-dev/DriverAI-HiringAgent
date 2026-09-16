@@ -2285,6 +2285,11 @@ def _strip_unconfirmed_ambiguous_skills(skills_str: str, text: str) -> str:
 _SKIP_DOMAINS = frozenset({
     "gmail", "yahoo", "hotmail", "outlook", "live", "icloud",
     "google", "docs.google", "drive.google", "play", "apps", "mail", "protonmail",
+    # itunes.apple.com is the older host for the same App Store listings that 'apps' already
+    # excludes - a listing is usually an employer's or client's product, not the candidate's
+    # own site. Only the newer host was blocked, so APP-20260804-2021-MDIA's itunes.apple.com link
+    # was stored as a portfolio while identical apps.apple.com links were not (2026-09-16).
+    "itunes",
     "microsoft", "office", "teams", "sharepoint",
     "linkedin", "github", "figma", "behance", "dribbble",
     "instagram", "facebook", "twitter", "x", "tiktok", "youtube",
@@ -2512,6 +2517,38 @@ def _github_profile_if_own(url: str, text: str) -> str:
     return f"{m.group(1)}{m.group(2)}" if is_own else url
 
 
+_COMPANY_MARKER_RE = re.compile(
+    r"(?i)\b(?:inc|llc|ltd|pvt|gmbh|corp|corporation|limited|technologies|solutions)\b\.?")
+
+
+def _is_employer_product_link(url: str, text: str) -> bool:
+    """True when a link sits in an EMPLOYMENT entry - directly under a company-and-role line.
+
+    Experience entries often list the products built there, with each product's own URL:
+    APP-20260804-2021-MDIA lists "<Company> Inc. (Senior iOS Developer) / <App> / In InHouse
+    Distribution / http://www.<app>.com" - a client's app, not the candidate's site (audit
+    2026-09-16). _is_employer_site misses it because the role is lines above the URL.
+
+    Deliberately narrow, because a student's own project link must survive: a capstone
+    project line carrying the candidate's own published paper (an ieeexplore link) is kept. A link counts as an employer's product only when one of the three lines
+    above it names a company form (Inc., LLC, Ltd, Pvt, Technologies, ...) AND a role. A
+    hyperlink-only link ('Links in document: ...') is never placed, so never excluded.
+    """
+    key = re.sub(r"^https?://(?:www\.)?", "", str(url or "").strip().lower()).rstrip("/")
+    if not key:
+        return False
+    key_re = re.compile(rf"(?<![a-z0-9]){re.escape(key)}(?![a-z0-9])")
+    lines = [ln for ln in (text or "").splitlines() if ln.strip()]
+    for i, line in enumerate(lines):
+        low = line.lower()
+        if low.lstrip().startswith("links in document") or not key_re.search(low):
+            continue
+        for above in lines[max(0, i - 3):i]:
+            if _COMPANY_MARKER_RE.search(above) and _EMPLOYMENT_ROLE_RE.search(above):
+                return True
+    return False
+
+
 def extract_portfolios(text: str) -> tuple[str, str, str]:
     """Return (portfolio_1, portfolio_2, portfolio_3).
 
@@ -2570,7 +2607,8 @@ def extract_portfolios(text: str) -> tuple[str, str, str]:
             # genuine bare "janesmith.io" mention (no scheme, no "portfolio" nearby) now
             # falls through to N/A instead - a safe default, not a fabricated wrong link.
             if ((token.lower().startswith(("http://", "https://")) or "portfolio" in low)
-                    and not _is_employer_site(url, raw)):
+                    and not _is_employer_site(url, raw)
+                    and not _is_employer_product_link(url, raw)):
                 personal = url
 
     p1 = linkedin or personal or "N/A"
@@ -3776,11 +3814,32 @@ def finalize_geography_shape(location, country, resume_text: str) -> tuple[str, 
         # USA eligibility question, so it is kept rather than blanked to N/A.
         return "United States", "United States"
     if final_low and (final_low in FOREIGN_COUNTRIES or final_low in US_COUNTRY_TERMS):
-        loc = ("Remote"
-               if re.search(r"\bremote\b|\bwork[\s-]*from[\s-]*home\b|\bwfh\b",
-                            resume_text or "", re.IGNORECASE)
-               else "N/A")
+        # 'Remote' only when the candidate's own contact header says so. This used to search
+        # the WHOLE resume, so any use of the word counted: APP-20260804-1910-MDLA got
+        # Location 'Remote' from a project line, "ESP-NOW remote control for RC devices",
+        # while the header gives a real town (audit 2026-09-16).
+        loc = "Remote" if _states_remote_in_contact_block(resume_text) else "N/A"
+
+    # The same rule for a location that ENDS with its country: 'Karachi, Pakistan' beside
+    # Country 'Pakistan' repeats the country, while US rows read 'Phoenix, Arizona' beside
+    # 'United States'. Dropping the repeat makes every row the same shape.
+    if loc and country and "," in loc:
+        head, _, tail = loc.rpartition(",")
+        tail_low, country_low = tail.strip().lower(), country.lower()
+        same_country = (tail_low == country_low
+                        or (tail_low in US_COUNTRY_TERMS and country_low in US_COUNTRY_TERMS))
+        if same_country and head.strip():
+            loc = head.strip()
     return loc, country
+
+
+def _states_remote_in_contact_block(text: str) -> bool:
+    """True when the contact header itself declares remote work, not merely uses the word."""
+    for line in _contact_header_lines(text):
+        if re.search(r"(?i)\bremote\b(?!\s+(?:control|sensing|access|server|desktop|monitoring|"
+                     r"device|devices|management))|\bwork[\s-]*from[\s-]*home\b|\bwfh\b", line):
+            return True
+    return False
 
 
 def extract_candidate_details_smart(text: str) -> dict:
@@ -4233,6 +4292,12 @@ def _location_grounded_in_contact_block(location: str, text: str) -> bool:
     Keep this intentionally small and deterministic—the leading contact block ends at the
     first common section heading or after twelve non-empty lines.
     """
+    lines = _contact_header_lines(text)
+    return bool(lines) and _location_grounded_in_text(location, "\n".join(lines))
+
+
+def _contact_header_lines(text: str) -> list[str]:
+    """The leading contact block: up to the first section heading, at most twelve lines."""
     lines = []
     for raw in str(text or "").splitlines():
         line = re.sub(r"\s+", " ", raw).strip()
@@ -4243,7 +4308,7 @@ def _location_grounded_in_contact_block(location: str, text: str) -> bool:
         lines.append(line)
         if len(lines) >= 12:
             break
-    return bool(lines) and _location_grounded_in_text(location, "\n".join(lines))
+    return lines
 
 
 _EMAIL_ADDRESS_RE = re.compile(r"[\w.+\-]+@[\w\-]+(?:\.[\w\-]+)+")
@@ -4346,7 +4411,7 @@ def infer_missing_portfolios(resume_text: str, current_p1: str, current_p2: str,
         v = _clean_url(v)
         if require_host is not None:
             return v if f"{require_host}/" in v.lower() else ""
-        if _is_employer_site(v, resume_text):
+        if _is_employer_site(v, resume_text) or _is_employer_product_link(v, resume_text):
             return ""
         return v if _domain_root(v) not in _SKIP_DOMAINS else ""
 

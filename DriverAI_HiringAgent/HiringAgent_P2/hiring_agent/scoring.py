@@ -220,9 +220,7 @@ def assign_category(role_str: str, skills_str: str = "", role_pref: str = "") ->
             return rule["category"]
 
     _AUTOMATION_SKILLS = {"uipath", "rpa", "blue prism", "power automate", "automation anywhere"}
-    # Precedence 2: Uncontested AI / Agentic tool stack (3+ specialized AI skills)
-    if len(skills & _AI_TOOL_SKILLS) >= 3 and not (skills & _AUTOMATION_SKILLS) and not any(k in title for k in ("automation", "rpa", "uipath", "process developer")):
-        return "AI/ML/CV (SIN2)"
+    _automation_title = any(k in title for k in ("automation", "rpa", "uipath", "process developer"))
 
     for rule in ROLE_CATEGORY_RULES:
         needle = rule.get("match", "").lower()
@@ -238,6 +236,18 @@ def assign_category(role_str: str, skills_str: str = "", role_pref: str = "") ->
                 return rule["category"]
         elif needle in title:
             return rule["category"]
+
+    # Precedence 2: an uncontested AI / agentic tool stack (3+ specialised AI skills) - but only
+    # once the role title has matched no category rule. It used to run BEFORE the rules, so the
+    # tool stack overrode the role the candidate actually matched: APP-20260815-0302-MCYA
+    # was filed 'AI/ML/CV (SIN2)' while all three suggested roles were
+    # web and cloud (Full Stack Web Developer, Website Developer, Software Cloud Developer).
+    # Category is read as "what this person was matched to", so a title that maps to a
+    # category decides it; the tool stack decides only when the title does not (audit
+    # 2026-09-16). Kept ahead of the fallbacks below so it still outranks 2 web skills.
+    if (len(skills & _AI_TOOL_SKILLS) >= 3 and not (skills & _AUTOMATION_SKILLS)
+            and not _automation_title):
+        return "AI/ML/CV (SIN2)"
 
     # Precedence 3: Unaligned technical skills fallback (if title doesn't match any category rule)
     _CYBERSEC_SKILLS = {"siem", "soc", "wireshark", "metasploit", "penetration testing",

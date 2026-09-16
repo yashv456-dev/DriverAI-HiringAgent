@@ -1255,6 +1255,27 @@ ok(not _z33_employer("https://janedoe.dev", "Jane Doe | Software Developer | htt
 ok(not _z33_employer("https://youplaya.com", "Founder at YouPlaya | youplaya.com | 2019 - Present"),
    "the candidate's own company site is never treated as an employer's")
 
+# App Store listings are not personal portfolios (see the store test above) - and the rule has
+# to cover the older itunes.apple.com host too, which let one candidate's listing through while
+# identical apps.apple.com links were refused (2026-09-16).
+ok(extract_portfolios("https://www.linkedin.com/in/janedoe\n"
+                      "https://itunes.apple.com/us/app/example-app/id100000001?mt=8")
+   == ("https://www.linkedin.com/in/janedoe", "N/A", "N/A"),
+   "an itunes.apple.com listing is excluded exactly like an apps.apple.com one")
+
+# A product URL inside an employment entry is the employer's or client's, not the candidate's
+# ("<Company> Inc. (Senior iOS Developer) / <App> / http://www.<app>.com") - but a student's own
+# project link stays (an IEEE paper on the candidate's capstone project).
+ok("parkapp" not in " ".join(extract_portfolios(
+        "Jane Doe\nhttps://www.linkedin.com/in/janedoe\n\nAcme Inc. (Senior iOS Developer)\n"
+        "ParkApp\nIn InHouse Distribution\nhttp://www.parkapp.example.com\nParkApp finds parking")).lower(),
+   "a product URL under a company-and-role line is not the candidate's portfolio")
+ok("https://ieeexplore.ieee.org/document/1000001" in extract_portfolios(
+        "Jane Doe\nhttps://linkedin.com/in/janedoe\n\nPROJECTS\n"
+        "Expert Routing https://github.com/janedoe/routing\n"
+        "Kiosk, Undergraduate Culminating Project https://ieeexplore.ieee.org/document/1000001"),
+   "a link on the candidate's own project is kept")
+
 # Figma â†’ Portfolio 3
 p1, p2, p3 = extract_portfolios("https://figma.com/file/abc123/my-design")
 ok("figma.com" in p3, "Figma URL â†’ Portfolio 3")
@@ -5788,6 +5809,20 @@ ok(not _cg("India", "Pune", "Worked in Bengaluru, Karnataka 2019. Lives in Pune"
 ok(not _cg("India", "Lahore", "Address: Township, Lahore, Punjab"),
    "a province that exists in two countries (Punjab) never settles the country")
 
+# Location holds city/state; Country holds the country. Foreign rows repeated the country
+# ('Karachi, Pakistan' + 'Pakistan') while US rows did not, and 'Remote' was inferred from any
+# use of the word - one candidate got it from "ESP-NOW remote control for RC devices".
+from hiring_agent.extraction import finalize_geography_shape as _z36_shape
+ok(_z36_shape("Karachi, Pakistan", "Pakistan", "") == ("Karachi", "Pakistan"),
+   "a location does not repeat the country already in the Country column")
+ok(_z36_shape("Phoenix, Arizona, USA", "United States", "") == ("Phoenix, Arizona", "United States"),
+   "a US synonym at the end of the location is dropped the same way")
+ok(_z36_shape("Pakistan", "Pakistan", "V S\n+92 300\n\nPROJECTS\nESP-NOW remote control for RC devices")
+   == ("N/A", "Pakistan"),
+   "'remote control' in a project line does not make the location 'Remote'")
+ok(_z36_shape("India", "India", "Jane\nOpen to Remote roles | +91 99\nSUMMARY") == ("Remote", "India"),
+   "'Remote' stated in the contact header still counts")
+
 # Both AI passes must apply the SAME rule - the recheck used to undo the merge's decision.
 _ex_src = Path(__file__).with_name("hiring_agent").joinpath("extraction.py").read_text(
     encoding="utf-8", errors="replace")
@@ -7213,6 +7248,16 @@ finally:
 # The live catalog must not already satisfy the guard, or it would never fire.
 ok(not _z25_scoring._catalog_has_hardware_opening(),
    "no current JD title reads as a hardware opening, so the guard is active")
+
+# Category follows the role the candidate matched. A strong AI tool stack used to override a
+# role title that maps to a category: APP-20260815-0302-MCYA was filed AI/ML with three web roles. It now
+# decides only when the title maps to no category.
+_z34_ai_stack = "Python, LangChain, RAG, Agentic AI, React, Node.js"
+ok(assign_category("Full Stack Web Developer (85%)", _z34_ai_stack, "Software Development Engineer")
+   == "Web Team (Full stack/Back end & UI/UX)",
+   "a role title that maps to a category outranks the candidate's AI tool stack")
+ok(assign_category("Unlisted Specialist Role (40%)", _z34_ai_stack, "") == "AI/ML/CV (SIN2)",
+   "the AI tool stack still decides when the title maps to no category")
 
 # Seed: identical input must give identical scores.
 ok(isinstance(_z25cfg.OLLAMA_SEED, int), "every Ollama call carries a fixed seed from config")
