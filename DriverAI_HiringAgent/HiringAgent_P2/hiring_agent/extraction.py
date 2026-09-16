@@ -2280,8 +2280,15 @@ _SKIP_DOMAINS = frozenset({
 # 'docs.github.com/en' can never be misread as 'github.com/...' profiles.
 _LINKEDIN_URL_RE = re.compile(
     r'(?<![A-Za-z0-9.])(?:https?://)?(?:www\.)?linkedin\.com/(?:in|pub)/[A-Za-z0-9\-_.%~]+/?', re.I)
+# The path is captured in FULL, repository and all. Stopping at the first segment turned
+# every project link into a profile link - and the owner of a project a candidate worked on
+# is often somebody else. Live: Shashank Singh (APP-20260817-1859-MCSA) cites
+# 'github.com/harishchaurasia/Benchmarking-Privacy-Aware-Autono...', a collaborator's repo,
+# and Portfolio 2 published 'github.com/harishchaurasia' - another person's GitHub account
+# recorded as this candidate's. Keeping the whole URL states what the CV states.
 _GITHUB_URL_RE = re.compile(
-    r'(?<![A-Za-z0-9.])(?:https?://)?(?:www\.)?github\.com/[A-Za-z0-9\-_.]{2,}/?', re.I)
+    r'(?<![A-Za-z0-9.])(?:https?://)?(?:www\.)?github\.com/[A-Za-z0-9\-_.]{2,}'
+    r'(?:/[A-Za-z0-9\-_.]+)*/?', re.I)
 
 # Scan any URL-like token: full https:// URL or bare domain.tld[/path]
 _RAW_URL_RE = re.compile(

@@ -1185,6 +1185,17 @@ ok("github.com/johndoe" in p2, "GitHub URL â†’ Portfolio 2")
 p1, p2, p3 = extract_portfolios("github.com/j")
 ok(p2 == "N/A", "github.com/single-char â†’ not captured (too short)")
 
+# A repository link keeps its repository. Truncating to the first path segment turned a
+# project link into a profile link, and the owner of a project a candidate worked on is
+# often somebody else: Shashank Singh (APP-20260817-1859-MCSA) cites a collaborator's repo
+# and Portfolio 2 published 'github.com/harishchaurasia' as if it were his account.
+_z28_repo = extract_portfolios(
+    "Project: https://github.com/harishchaurasia/Benchmarking-Privacy-Aware-Autonomy")[1]
+ok(_z28_repo == "https://github.com/harishchaurasia/Benchmarking-Privacy-Aware-Autonomy",
+   f"a GitHub repo URL keeps its full path, never collapsing to someone's profile (got {_z28_repo})")
+ok(extract_portfolios("https://github.com/janedoe")[1] == "https://github.com/janedoe",
+   "a bare GitHub profile URL is still stored unchanged")
+
 # Figma â†’ Portfolio 3
 p1, p2, p3 = extract_portfolios("https://figma.com/file/abc123/my-design")
 ok("figma.com" in p3, "Figma URL â†’ Portfolio 3")
