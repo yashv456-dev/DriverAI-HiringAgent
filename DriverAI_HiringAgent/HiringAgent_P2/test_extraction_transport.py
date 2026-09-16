@@ -4,10 +4,15 @@ Run separately to preserve the existing acceptance suites and their counts:
     .venv/Scripts/python test_extraction_transport.py
 """
 import json
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import requests
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_isolation  # noqa: F401 - must precede every hiring_agent import
 
 from hiring_agent import extraction as ex
 
@@ -72,13 +77,21 @@ class ExtractionTransportTests(unittest.TestCase):
                 body = request["json"]
                 self.assertIs(body["think"], False)
                 self.assertIs(body["stream"], False)
-                self.assertEqual(body["options"], {"temperature": 0, "num_predict": 512, "seed": 42})
+                self.assertEqual(body["options"], {"temperature": 0,
+                                                   "num_predict": ex._EXTRACTION_NUM_PREDICT,
+                                                   "seed": 42})
                 schema = body["format"]
                 self.assertEqual(schema["type"], "object")
                 self.assertFalse(schema["additionalProperties"])
                 self.assertEqual(set(schema["required"]), set(payload))
-                self.assertEqual(schema["properties"],
-                                 {key: {"type": "string"} for key in payload})
+                self.assertEqual(set(schema["properties"]), set(payload))
+                self.assertTrue(all(schema["properties"][key]["type"] == "string"
+                                    for key in payload))
+                if kind in ("extract", "recheck"):
+                    # Grammar-enforced bounds, so a runaway enumeration cannot run the reply
+                    # past the token cap and leave invalid JSON (Saad Ullah, 2026-09-16).
+                    self.assertTrue(all(schema["properties"][key].get("maxLength", 0) > 0
+                                        for key in payload))
 
     def test_timeout_then_success_retries_exactly_once(self):
         for kind in PAYLOADS:
@@ -159,7 +172,12 @@ class ExtractionTransportTests(unittest.TestCase):
                 response("extract", content="{"), response("extract")]) as post:
             self.assertEqual(self.invoke("extract"), expected)
             self.assertEqual(post.call_count, 2)
-            self.assertEqual(post.call_args_list[0], post.call_args_list[1])
+            # The JSON retry is the same request with double the output room: an identical
+            # request at temperature 0 reproduces an identical truncation.
+            first, retry = (c.kwargs["json"] for c in post.call_args_list)
+            self.assertEqual(retry["options"]["num_predict"],
+                             2 * first["options"]["num_predict"])
+            self.assertEqual(dict(retry, options=None), dict(first, options=None))
         self.assertEqual(ex.EXTRACTION_SOURCE["value"], "ollama")
 
     def test_combined_timeout_and_json_retries_are_bounded_at_four_requests(self):
@@ -176,8 +194,13 @@ class ExtractionTransportTests(unittest.TestCase):
                 self.assertEqual(self.invoke("extract"),
                                  successful if ending == "success" else None)
                 self.assertEqual(post.call_count, 4)
-                self.assertTrue(all(call == post.call_args_list[0]
-                                    for call in post.call_args_list))
+                # Calls 1-2 are the first attempt and its transport retry (identical); calls
+                # 3-4 are the JSON retry and ITS transport retry, both with double the room.
+                calls = post.call_args_list
+                self.assertEqual(calls[0], calls[1])
+                self.assertEqual(calls[2], calls[3])
+                self.assertEqual(calls[2].kwargs["json"]["options"]["num_predict"],
+                                 2 * calls[0].kwargs["json"]["options"]["num_predict"])
                 if ending == "success":
                     self.assertEqual(ex.EXTRACTION_SOURCE["value"], "ollama")
                 elif ending == "bad_json":

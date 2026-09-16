@@ -389,6 +389,13 @@ def clean_role_text(s: str) -> str:
     t = re.split(r"(?i)\b(?:e-?mail|phone|mobile|tel|contact|linkedin|github)\b\s*[:\-|]",
                  t)[0]
     t = re.split(r"\S+@\S+|https?://\S+", t)[0]
+    # A work arrangement, and the place after it, is how a past job was done, not part of the
+    # title. A CV line 'Software Development Engineer Remote, USA' gave Yash Shah
+    # (APP-20260815-0302-MCYA) the Looking For Role 'Software Development Engineer Remote'
+    # on a re-score (2026-09-16). Only a TRAILING arrangement is removed, so a role that
+    # begins with one ('Remote Sensing Engineer') is left alone.
+    t = re.sub(r"(?i)\s*[(\[\-–—|,]?\s*\b(?:remote|hybrid|on-?site|wfh)\b"
+               r"(?:\s*[,\-–—]\s*[a-z][a-z .]*)?\s*[)\]]?\s*$", "", t)
     return t.strip(" ,;|-–—:").strip()
 
 
@@ -3464,22 +3471,51 @@ EXTRACTION_SOURCE = {"value": "offline (Ollama disabled)"}
 
 # Live qwen3-1.7b-p2 measurement, 2026-09-06: the largest non-thinking reply
 # across these four calls was 121 tokens (421 characters), rising to 124 with
-# schemas. 512 gives >4x headroom. Measurements: docs/benchmarks/stage2a/.
-_EXTRACTION_NUM_PREDICT = 512
+# schemas. 512 gave >4x headroom over that benchmark set. Measurements:
+# docs/benchmarks/stage2a/.
+#
+# Raised to 1024 on 2026-09-16. A resume outside that set - Saad Ullah
+# (APP-20260804-2021-MDIA), a 15-year iOS CV listing dozens of tools - hit the cap
+# (done_reason 'length', eval_count 512) and the JSON was cut off mid skills list, so
+# every re-score deferred with JSONDecodeError. The "retry once" below cannot rescue that:
+# it repeats the identical capped request. This is a ceiling, not a target - a normal
+# reply still stops by itself far below it (the same CV finishes at 348 tokens once it
+# is allowed to), so ordinary candidates pay nothing for the extra room.
+_EXTRACTION_NUM_PREDICT = 1024
 
 
-def _string_fields_schema(*fields: str) -> dict:
+def _string_fields_schema(*fields: str, max_lengths: dict | None = None) -> dict:
     """Require the existing string fields, including empty strings for gaps."""
+    properties = {}
+    for field in fields:
+        prop = {"type": "string"}
+        if max_lengths and field in max_lengths:
+            prop["maxLength"] = max_lengths[field]
+        properties[field] = prop
     return {
         "type": "object",
-        "properties": {field: {"type": "string"} for field in fields},
+        "properties": properties,
         "required": list(fields),
         "additionalProperties": False,
     }
 
 
+# Hard length bounds, enforced by Ollama's grammar rather than requested in the prompt. A
+# senior CV listing dozens of tools can send the model into an endless skills enumeration;
+# the reply then hits the token cap mid-string and is not valid JSON, so the candidate is
+# deferred on every run. Saad Ullah (APP-20260804-2021-MDIA) did exactly that - and not even
+# reproducibly: the identical request stopped cleanly on one call and ran away on the next.
+# A bound makes the runaway impossible, since the grammar forces the string to close. Each
+# is 2-4x the longest value stored across all 33 live candidates (2026-09-16: skills 705
+# after processing and 1,080 raw, education 245, every other field under 60), and stored
+# skills are cut to max_skills_display afterwards regardless, so no real data is lost.
+_CANDIDATE_FIELD_MAX_LENGTHS = {
+    "full_name": 120, "phone": 40, "location": 120, "country": 60,
+    "skills": 1500, "looking_for_role": 200, "education": 800,
+}
 _CANDIDATE_FORMAT = _string_fields_schema(
-    "full_name", "phone", "location", "country", "skills", "looking_for_role", "education")
+    "full_name", "phone", "location", "country", "skills", "looking_for_role", "education",
+    max_lengths=_CANDIDATE_FIELD_MAX_LENGTHS)
 _ROLE_SUMMARY_FORMAT = _string_fields_schema("summary")
 _PORTFOLIO_FORMAT = _string_fields_schema("linkedin", "github", "other")
 
@@ -3547,8 +3583,9 @@ def extract_with_ollama(text: str, hints: dict | None = None) -> dict | None:
         ],
     }
 
-    def _ask():
-        r = _post_ollama_extraction(f"{OLLAMA_HOST}/api/chat", json=payload,
+    def _ask(num_predict=_EXTRACTION_NUM_PREDICT):
+        body = dict(payload, options=dict(payload["options"], num_predict=num_predict))
+        r = _post_ollama_extraction(f"{OLLAMA_HOST}/api/chat", json=body,
                                     timeout=OLLAMA_TIMEOUT)
         r.raise_for_status()
         return json.loads(r.json()["message"]["content"])
@@ -3563,8 +3600,17 @@ def extract_with_ollama(text: str, hints: dict | None = None) -> dict | None:
             # single bad response deferred the candidate outright. Seen live 2026-09-11,
             # "Unterminated string starting at line 8 column 13", on a resume that scored
             # fine on the retry. One more attempt, then fall through as before.
-            logger.warning("       Ollama returned malformed JSON; retrying once.")
-            data = _ask()
+            #
+            # The retry gets DOUBLE the output room rather than repeating the identical
+            # request. At temperature 0 an identical request reproduces an identical
+            # truncation, so it could never rescue a reply cut off at the cap - and the
+            # cap also changes which path the model takes: Saad Ullah
+            # (APP-20260804-2021-MDIA) ran out of room enumerating skills at 1024 tokens,
+            # yet finished cleanly at 393 once allowed 2048. Deferred on every re-score
+            # until this (2026-09-16).
+            logger.warning("       Ollama returned malformed JSON; retrying once with more "
+                           "output room.")
+            data = _ask(_EXTRACTION_NUM_PREDICT * 2)
     except Exception as e:
         # requests is imported lazily inside the helper. Keep provenance classification
         # independent of that import, so a missing dependency also falls back cleanly.

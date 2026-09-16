@@ -6038,6 +6038,12 @@ ok(clean_role_text("Mobile Application Developer Email: ashfaq.fullstackdev@gmai
    "trailing 'Email: ...' is cut off the role title")
 ok(clean_role_text("Senior React Native or Full-Stack Engineer")
    == "Senior React Native or Full-Stack Engineer", "a clean role title is untouched")
+# A trailing work arrangement is how a past job was done, not the title (Yash Shah,
+# APP-20260815-0302-MCYA: 'Software Development Engineer Remote, USA').
+ok(clean_role_text("Software Development Engineer Remote, USA") == "Software Development Engineer",
+   "a trailing 'Remote, USA' is cut off the role title")
+ok(clean_role_text("Remote Sensing Engineer") == "Remote Sensing Engineer",
+   "a role that BEGINS with 'Remote' is left alone")
 
 # -- AI scorer: a confident pick with ZERO evidence must be dropped --
 from hiring_agent.scoring import _skill_overlap_count, _ai_pick_has_evidence
