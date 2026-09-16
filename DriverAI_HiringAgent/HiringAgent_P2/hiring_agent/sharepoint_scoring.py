@@ -37,7 +37,8 @@ from hiring_agent.extraction import (
 )
 from hiring_agent.config import SKILL_DISPLAY, SCORING_MAX_SKILLS
 from hiring_agent.scoring import (suggested_roles, assign_category,
-                                  is_unmatched_discipline_profile)
+                                  is_unmatched_discipline_profile, is_below_placement_bar,
+                                  role_match_percent, ROLE_CATEGORY_DEFAULT)
 from hiring_agent.jd_sources import get_active_roles
 from hiring_agent.geo import (
     GeoDecision, check_location_usa, classify_location_usa,
@@ -3402,11 +3403,22 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
             # VLSI/ASIC engineer, was published as a 35% "Software Developer - AI/ML,
             # Computer Vision". Say plainly that nothing matched instead, and let the row
             # land in review where a human decides where she belongs.
-            if is_unmatched_discipline_profile(skills, role_pref):
-                logger.info("       NO MATCH : %s - no opening in the catalogue fits this "
-                            "candidate's field; recording roles as '%s'.",
-                            app_id, _cfg.NO_ROLE_MATCH_LABEL)
+            # A match too thin to act on is treated the same way, for the same reason: scores
+            # drift run to run near the bottom of the range, so a weak percentage is not a
+            # stable verdict, and publishing one puts a candidate in a category they do not
+            # belong to. The bar is scoring.publish_min_percent.
+            _weak_match = is_below_placement_bar(r1)
+            if is_unmatched_discipline_profile(skills, role_pref) or _weak_match:
+                logger.info("       NO MATCH : %s - %s; recording roles as '%s'.", app_id,
+                            (f"best match {role_match_percent(r1)}% is under the "
+                             f"{_cfg.SCORING_PUBLISH_MIN}% placement bar") if _weak_match
+                            else "no opening in the catalogue fits this candidate's field",
+                            _cfg.NO_ROLE_MATCH_LABEL)
                 r1 = r2 = r3 = _cfg.NO_ROLE_MATCH_LABEL
+                # Category is derived from Suggested Role 1, so it has to be reset with it -
+                # otherwise a 55% 'Data Analyst' would file the row under Data Analytics
+                # while its own role columns read 'Not Matching'.
+                category = ROLE_CATEGORY_DEFAULT
                 no_matching_opening = True
 
             if GEO_FILTER_USA_ONLY:

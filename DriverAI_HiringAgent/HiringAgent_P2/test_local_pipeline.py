@@ -538,6 +538,89 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(row['Full Name'], 'Alex Morgan')
         self.assertIn('Verilog', row['Current Skills'])
 
+    def test_match_under_the_placement_bar_is_not_published_as_a_match(self):
+        """A thin percentage is not a placement.
+
+        Scores drift run to run near the bottom of the range - the same CV produced 0% and
+        35% on consecutive runs - so a weak match is not a stable verdict, and publishing
+        one files a candidate under a category they do not belong to. Below
+        scoring.publish_min_percent the row reads 'Not Matching' under General, exactly like
+        a candidate whose field has no opening at all.
+        """
+        from hiring_agent import sharepoint_scoring as scoring
+        from hiring_agent import config as cfg
+        values = candidate()
+        path = self.root/'cv.docx'; path.write_bytes(b'synthetic')
+        docs = {'APP-A.docx': {'path': str(path), 'sha256': hashlib.sha256(b'synthetic').hexdigest(),
+                              'url': 'https://example.test/cv.docx'}}
+        values['_Local Resume Names'] = list(docs)
+        values['Resume URL'] = docs['APP-A.docx']['url']
+        details = {'full_name': 'Alex Morgan', 'phone': '5125550123', 'location': 'Austin, TX',
+                   'country': 'United States', 'skills': 'Python, SQL',
+                   'looking_for_role': 'Data Analyst',
+                   'education': 'BS Computer Science', 'experience': '3 years'}
+        weak = {'role_1': 'Data Analyst (55%)', 'role_2': 'Business Data Analyst (40%)',
+                'role_3': '', 'source': 'ollama'}
+        capture = []
+        class Pipe:
+            def send(self, value): capture.append(value)
+            def close(self): pass
+        with patch.object(scoring, 'ollama_health', return_value=(True,'OK')), \
+             patch.object(scoring, 'extract_text_from_bytes', return_value='Alex Morgan Austin TX Python SQL'), \
+             patch.object(scoring, 'extract_candidate_details_smart', return_value=details), \
+             patch.object(scoring, 'ai_recheck_fields', side_effect=lambda fields,*a: fields), \
+             patch.object(scoring, 'infer_missing_portfolios', return_value=('N/A','N/A','N/A')), \
+             patch.object(scoring, 'suggested_roles', return_value=weak), \
+             patch.dict(scoring.EXTRACTION_SOURCE, {'value':'ollama'}), \
+             patch.dict(os.environ, {'HIRING_P2_DISABLED':'false'}):
+            _child(Pipe(), values, docs, [{'title':'Engineer','skills':['Python']}])
+
+        self.assertNotIn('error', capture[0], capture[0])
+        sheet, row = capture[0]['rows'][0]
+        self.assertEqual(sheet, 'main')
+        self.assertEqual(row['Status'], cfg.STATUS_NO_MATCHING_ROLE)
+        self.assertEqual(row['Suggested Role 1'], cfg.NO_ROLE_MATCH_LABEL)
+        self.assertEqual(row['Category'], 'General',
+                         'Category derives from Role 1, so it must not keep Data Analytics')
+
+    def test_non_usa_is_rejected_even_when_nothing_matched(self):
+        """Outside the USA goes to Rejected, match or no match.
+
+        Geography is settled before the placement bar, so a candidate who is both non-USA
+        and unmatched is a rejection - not an Unfamiliar Role List entry. That sheet is for
+        people we could hire but have no opening for.
+        """
+        from hiring_agent import sharepoint_scoring as scoring
+        values = candidate()
+        path = self.root/'cv.docx'; path.write_bytes(b'synthetic')
+        docs = {'APP-A.docx': {'path': str(path), 'sha256': hashlib.sha256(b'synthetic').hexdigest(),
+                              'url': 'https://example.test/cv.docx'}}
+        values['_Local Resume Names'] = list(docs)
+        values['Resume URL'] = docs['APP-A.docx']['url']
+        details = {'full_name': 'Alex Morgan', 'phone': '442012345678',
+                   'location': 'London, United Kingdom', 'country': 'United Kingdom',
+                   'skills': 'Python, SQL', 'looking_for_role': 'Data Analyst',
+                   'education': 'BS Computer Science', 'experience': '3 years'}
+        weak = {'role_1': 'Data Analyst (55%)', 'role_2': '', 'role_3': '', 'source': 'ollama'}
+        capture = []
+        class Pipe:
+            def send(self, value): capture.append(value)
+            def close(self): pass
+        with patch.object(scoring, 'ollama_health', return_value=(True,'OK')), \
+             patch.object(scoring, 'extract_text_from_bytes', return_value='Alex Morgan London United Kingdom'), \
+             patch.object(scoring, 'extract_candidate_details_smart', return_value=details), \
+             patch.object(scoring, 'ai_recheck_fields', side_effect=lambda fields,*a: fields), \
+             patch.object(scoring, 'infer_missing_portfolios', return_value=('N/A','N/A','N/A')), \
+             patch.object(scoring, 'suggested_roles', return_value=weak), \
+             patch.dict(scoring.EXTRACTION_SOURCE, {'value':'ollama'}), \
+             patch.dict(os.environ, {'HIRING_P2_DISABLED':'false'}):
+            _child(Pipe(), values, docs, [{'title':'Engineer','skills':['Python']}])
+
+        self.assertNotIn('error', capture[0], capture[0])
+        sheet, row = capture[0]['rows'][0]
+        self.assertEqual(sheet, 'rejected',
+                         'non-USA outranks the placement bar; this is a rejection')
+
     def test_no_matching_role_row_is_not_picked_up_again(self):
         """Parked on a human, not on the bot: re-running must not re-score it.
 

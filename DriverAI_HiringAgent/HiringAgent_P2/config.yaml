@@ -4183,6 +4183,14 @@ geo_reject_email: true
 # Scoring parameters.
 scoring:
   min_match_percent: 20
+  # The bar for actually PLACING someone against a role, as opposed to min_match_percent
+  # above, which only decides what the scorer is willing to rank at all. A candidate whose
+  # best role lands under this is filed on the Unfamiliar Role List with 'Not Matching'
+  # rather than published as a match nobody would act on: a 35% "Software Developer - AI/ML"
+  # put a VLSI engineer in the AI/ML category, and scores drift run to run near the bottom
+  # of the range, so a thin match is not a stable verdict either. Kept separate from
+  # min_match_percent so raising the placement bar never changes how a score is calculated.
+  publish_min_percent: 60
   top_n: 3
   # Explicit candidate role-family preference must outweigh a small generic JD whose
   # short skills list otherwise inflates percentage overlap.

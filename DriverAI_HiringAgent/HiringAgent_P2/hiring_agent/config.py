@@ -330,6 +330,11 @@ SAVE_LOCAL_COPIES = _envflag("HIRING_SAVE_LOCAL_COPIES", False)
 # ── Scoring parameters ────────────────────────────────────────────────────────
 _scoring = _yaml.get("scoring", {})
 SCORING_MIN_MATCH = _scoring.get("min_match_percent", 20)
+# The bar for PLACING a candidate against a role. Below it the row is filed on the
+# Unfamiliar Role List as 'Not Matching' instead of published as a match. Separate from
+# SCORING_MIN_MATCH on purpose: that one governs what the scorer ranks, this one governs
+# what we are prepared to act on, and moving the second must never change the first.
+SCORING_PUBLISH_MIN = int(_scoring.get("publish_min_percent", 60))
 SCORING_TOP_N = _scoring.get("top_n", 3)
 SCORING_TITLE_BOOST = _scoring.get("title_boost", 10)
 SCORING_MIN_ROLE_SKILLS = int(_scoring.get("min_role_skills_denominator", 5))

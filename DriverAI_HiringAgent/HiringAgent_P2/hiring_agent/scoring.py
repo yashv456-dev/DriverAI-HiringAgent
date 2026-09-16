@@ -7,7 +7,7 @@ import re as _re
 
 from hiring_agent.config import (
     COLUMNS, DEFAULT_ROLES, GENERIC_TITLE_WORDS,
-    SCORING_MIN_MATCH, SCORING_TOP_N, SCORING_TITLE_BOOST,
+    SCORING_MIN_MATCH, SCORING_PUBLISH_MIN, SCORING_TOP_N, SCORING_TITLE_BOOST,
     SCORING_MIN_ROLE_SKILLS,
     OLLAMA_ENABLED, OLLAMA_SCORING,
     ROLE_CATEGORY_RULES, ROLE_CATEGORY_DEFAULT,
@@ -136,6 +136,26 @@ def is_unmatched_hardware_profile(skills_str: str = "", role_pref: str = "") -> 
     is_hw = (bool(_HW_PREF_RE.search(str(role_pref or "")))
              or len(skills & _HW_TOOL_SKILLS) >= 3)
     return is_hw and not _catalog_has_hardware_opening()
+
+
+_ROLE_PERCENT_RE = _re.compile(r"\((\d{1,3})%\)\s*$")
+
+
+def role_match_percent(role_str: str) -> int | None:
+    """The percentage out of a published 'Title (NN%)' value, or None if it carries none.
+
+    None means "no number to judge" - a blank slot, or the 'Not Matching' label - and is
+    deliberately not treated as a zero by callers, so an already-unmatched row is never
+    re-reported as a weak match.
+    """
+    m = _ROLE_PERCENT_RE.search(str(role_str or "").strip())
+    return int(m.group(1)) if m else None
+
+
+def is_below_placement_bar(role_str: str) -> bool:
+    """True when a role was matched, but too weakly to place the candidate against it."""
+    pct = role_match_percent(role_str)
+    return pct is not None and pct < SCORING_PUBLISH_MIN
 
 
 def is_unmatched_discipline_profile(skills_str: str = "", role_pref: str = "") -> bool:
