@@ -3587,7 +3587,7 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     if resume_url:
                         fields["Resume URL"] = resume_url
                         fields["Resume Folder Path"] = resume_path
-                    if _score_attempts_of(vals) != 0:
+                    if _score_attempts_of(vals) != 0 or _is_gap(vals.get("Retry Count")):
                         fields["Retry Count"] = 0
                     _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
                     logger.info("       Result   : LOCATION REVIEW - kept on Main; "
@@ -3620,6 +3620,8 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                 fields["Category"] = "General"
 
             if fields["Status"] in (_cfg.STATUS_NEEDS_REVIEW, _cfg.STATUS_NO_MATCHING_ROLE):
+                if _is_gap(vals.get("Retry Count")):
+                    fields["Retry Count"] = 0
                 if dry_run:
                     logger.info("       Result   : [DRY-RUN] Would mark '%s'.", fields["Status"])
                 else:
@@ -3641,8 +3643,11 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                     fields["Resume URL"] = resume_url
                     fields["Resume Folder Path"] = resume_path
                 # Clean slate on a genuine success - a row that failed once then scored fine
-                # on retry shouldn't carry a stale failure count forward.
-                if _score_attempts_of(vals) != 0:
+                # on retry shouldn't carry a stale failure count forward. A blank counter is
+                # written as 0 too, the way a row reaching Rejected already is
+                # (_complete_row_before_reject): CandidateList read blank on every row while
+                # Rejected read 0 (audit 2026-09-17).
+                if _score_attempts_of(vals) != 0 or _is_gap(vals.get("Retry Count")):
                     fields["Retry Count"] = 0
                 _store(client).save_by_id(_row_key(app_id, vals), fields, current_values=vals, hint=index)
                 has_doubt, doubt_reason = is_doubt_candidate(fields)

@@ -1300,6 +1300,18 @@ def _strip_education_noise(text: str) -> str:
     pieces = [p.strip(" ,;-") for p in re.split(r"\s*\|\s*", text)]
     pieces = [p for p in pieces if p and not (
         _EDU_HONOUR_RE.search(p) and not _DEGREE_RE.search(p) and not _INSTITUTION_RE.search(p))]
+    # A school on its own after a degree with none is that degree's school, not a second entry:
+    # 'Master of Science in Computer Applications | Indira Gandhi National Open University'
+    # read as two entries (APP-20260821-0812-MCQA, audit 2026-09-17). Every other row writes
+    # 'Degree, School'.
+    joined = []
+    for piece in pieces:
+        if (joined and _INSTITUTION_RE.search(piece) and not _DEGREE_RE.search(piece)
+                and _DEGREE_RE.search(joined[-1]) and not _INSTITUTION_RE.search(joined[-1])):
+            joined[-1] = f"{joined[-1]}, {piece}"
+        else:
+            joined.append(piece)
+    pieces = joined
     out = []
     for piece in pieces:
         entries = [_strip_education_campus(e.strip()) for e in piece.split(";") if e.strip()]

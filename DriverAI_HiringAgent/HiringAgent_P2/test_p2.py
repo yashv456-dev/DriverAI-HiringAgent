@@ -7376,6 +7376,15 @@ ok(_c13_edu("Bachelor of Computer Applications (BCA) - Example Institute of Mana
             "Pune, Maharashtra")
    == "Bachelor of Computer Applications (BCA) - Example Institute of Management & Engineering",
    "a campus address is removed when the degree and school share one item")
+ok(_c13_edu("Master of Science in Computer Applications | Example Open University")
+   == "Master of Science in Computer Applications, Example Open University",
+   "a school on its own after a degree with none joins that degree")
+ok(_c13_edu("B.Tech | Example Institute of Technology | M.S. in Data Science | Example State University")
+   == "B.Tech, Example Institute of Technology | M.S. in Data Science, Example State University",
+   "each degree takes the school that follows it; the two entries stay separate")
+ok(_c13_edu("Master of Science in X, Example University | Bachelor of Engineering in Y, Other University")
+   == "Master of Science in X, Example University | Bachelor of Engineering in Y, Other University",
+   "complete entries are never joined")
 for _c13_keep in ("MBA Degree, Finance and Controlling, USP (Universidade de São Paulo) | ESALQ",
                   "Masters, Computer Science, Texas A&M University, College Station",
                   "B.S. Computer Science, University of Texas",
