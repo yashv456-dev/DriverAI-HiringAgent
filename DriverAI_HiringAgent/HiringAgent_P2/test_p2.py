@@ -7385,6 +7385,42 @@ ok(_c13_edu("B.Tech | Example Institute of Technology | M.S. in Data Science | E
 ok(_c13_edu("Master of Science in X, Example University | Bachelor of Engineering in Y, Other University")
    == "Master of Science in X, Example University | Bachelor of Engineering in Y, Other University",
    "complete entries are never joined")
+# Education holds ONE degree, the most recent (client instruction 2026-09-17).
+from hiring_agent.extraction import keep_latest_degree as _kl
+_kl_cv = ("EDUCATION\nMaster of Science, Software Engineering\nAug 2024 - May 2026\nExample State University, "
+          "Tempe, AZ\nBachelor of Engineering, Computer Science\nAug 2019 - July 2023\nExample University, "
+          "Chennai, India\nEXPERIENCE\n")
+ok(_c13_complete("Master of Science, Software Engineering, Example State University, Bachelor of Engineering, "
+                 "Computer Science, Example University", _kl_cv)
+   == "Master of Science, Software Engineering, Example State University",
+   "a comma list of two degrees keeps the newer one with its own school")
+ok(_kl("Bachelor of Engineering in CS, Example University | Master of Science in X, Example State University",
+       "EDUCATION\nBachelor of Engineering in CS 2014 - 2018\nMaster of Science in X 2023 - 2025\nSKILLS")
+   == "Master of Science in X, Example State University",
+   "the newest degree wins even when it is listed second")
+ok(_kl("Example State University, MS in Information Technology, Example Institute of Technology, "
+       "BE in Computer Engineering", "")
+   == "Example State University, MS in Information Technology",
+   "a school-first list keeps each degree with the school before it")
+ok(_c13_complete("MCA - Example Regional Campus, Townville; BCA - Example College, Cityville",
+                 "EDUCATION\nMCA - Example Regional Campus, Townville (2009-2012) BCA - Example College, "
+                 "Cityville (2006-2009)\nCERTIFICATIONS")
+   == "MCA - Example Regional Campus, Townville",
+   "an undated-level degree (MCA/BCA) is dated from the resume, and no other school is borrowed")
+ok(_kl("Advanced Level Graduate - British Schooling System (equivalent to USA High School Diploma), "
+       "Full-Stack Web Development - Aptech Computer Education, React.js, Node.js - Udemy", "")
+   == "Advanced Level Graduate - British Schooling System (equivalent to USA High School Diploma)",
+   "courses and certificates listed under Education are dropped")
+ok(_kl("MBA Degree, Finance and Controlling, USP (Universidade de Sao Paulo) | ESALQ", "")
+   == "MBA Degree, Finance and Controlling, USP (Universidade de Sao Paulo) | ESALQ",
+   "one degree's own parts are left alone")
+ok(_c13_edu("Masters, Computer Science, Texas A&M University, College Station")
+   == "Masters, Computer Science, Texas A&M University",
+   "a campus town with no state after it is dropped")
+ok(_c13_edu("BSC Electrical, National University of Technology, Islamabad")
+   == "BSC Electrical, National University of Technology",
+   "a known city straight after the school is dropped")
+
 # Location by precedence (client instruction 2026-09-17): resume header, then the candidate's own
 # email, then the newest education entry, then the rest of the resume.
 from hiring_agent.extraction import (resolve_location_precedence as _lp,
@@ -7426,7 +7462,7 @@ ok(_lp_edu("Jane\njane@example.com\nEXPERIENCE\nAcme Corp, Phoenix, AZ\nJan 2025
            "Example University, Pune, India\nAug 2016 - May 2020\nB.E.\nSKILLS\n") is None,
    "a degree finished long before the latest job is not 'recent' education")
 for _c13_keep in ("MBA Degree, Finance and Controlling, USP (Universidade de São Paulo) | ESALQ",
-                  "Masters, Computer Science, Texas A&M University, College Station",
+                  "Masters, Computer Science, Texas A&M University",
                   "B.S. Computer Science, University of Texas",
                   "The University of Texas at Dallas, MS in Information Technology and Management, "
                   "Pune Institute of Computer Technology, BE in Computer Engineering"):

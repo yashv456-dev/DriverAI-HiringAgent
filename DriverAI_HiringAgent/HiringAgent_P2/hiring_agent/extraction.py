@@ -33,8 +33,9 @@ _AI_PROMPT = (
     "in the text below - never invent or add a skill that is not written in the resume, "
     "and never return section headings, categories, or descriptive phrases; "
     "'looking_for_role' is the job title/role they seek. "
-    "'education' is the candidate's highest degree and field of study, plus school if given "
-    "(e.g. 'B.S. Computer Science, Arizona State University') - empty string if the resume "
+    "'education' is ONE degree - the candidate's most recent - with its field of study, plus "
+    "school if given (e.g. 'B.S. Computer Science, Arizona State University'), never a second "
+    "degree, a course or a certificate - empty string if the resume "
     "doesn't mention any degree or schooling."
 )
 
@@ -1215,6 +1216,9 @@ _EDU_STUDY_MODE_RE = re.compile(r"(?i)\(\s*(?:full|part)[\s-]*time\s*\)|\(\s*onl
 _EDU_HONOUR_RE = re.compile(
     r"(?i)\b(?:honou?rs?|awards?|winner|scholar(?:ship)?|summa|magna|cum\s+laude|dean'?s\s+list|"
     r"sigma|society|medal|valedictorian|hackathon|fellowship)\b")
+#: Towns named after their university, which the institution pattern reads as a school.
+_CAMPUS_TOWNS = {"college station", "college park", "university park", "university city",
+                 "state college"}
 #: One campus-city item of an address ('Tempe', 'College Park', 'São Paulo').
 _EDU_CITY_RE = re.compile(r"[A-Z][\w.'\-]*(?:\s+[A-Z][\w.'\-]*){0,2}")
 
@@ -1261,7 +1265,15 @@ def _strip_education_campus(entry: str) -> str:
             if end is not None:
                 parts = parts[:i + 1] + ([rest] if rest else []) + parts[end + 1:]
         i += 1
-    entry = ", ".join(p for p in parts if p)
+    parts = [p for p in parts if p]
+    # A campus town written with no state after it ('Texas A&M University, College Station',
+    # 'National University of Technology, Islamabad') is the same address: a known city as
+    # the last item, straight after the school, goes too (audit 2026-09-17).
+    if (len(parts) >= 2 and _INSTITUTION_RE.search(parts[-2])
+            and (parts[-1].lower() in _CAMPUS_TOWNS or parts[-1].lower() in KNOWN_US_CITIES
+                 or parts[-1].lower() in FOREIGN_CITIES)):
+        parts = parts[:-1]
+    entry = ", ".join(parts)
     # Lead a glued value with the degree, so the address removal above cannot leave it
     # reading 'School, Degree' by accident. Only for a single degree - with two, which school
     # belongs to which is not decidable here.
@@ -1624,6 +1636,129 @@ def _institution_on_line(line: str) -> str:
     return ""
 
 
+#: Degree words _DEGREE_RE leaves out, for telling entries apart only (not for extraction).
+_ANY_DEGREE_RE = re.compile(
+    rf"{_DEGREE_RE.pattern}|\b(?:MCA|BCA|BBA|PGDM|B\.?\s?Com|M\.?\s?Com|M\.?\s?Sc|B\.?\s?Sc|Diploma|"
+    r"High\s+School|Doctor(?:ate)?)\b", re.IGNORECASE)
+_DEGREE_LEVEL_RES = (
+    (4, re.compile(r"(?i)\bph\.?\s?d\b|\bdoctor")),
+    (3, re.compile(r"(?i)\bmaster|\bm\.?\s?s\.?c?\b|\bmba\b|\bm\.?\s?tech|\bmca\b|\bm\.?\s?e\.?\b|"
+                   r"\bm\.?\s?a\.?\b|\bm\.?\s?com\b|\bpgdm\b|post\s*grad")),
+    (2, re.compile(r"(?i)\bbachelor|\bb\.?\s?s\.?c?\b|\bb\.?\s?tech|\bb\.?\s?e\.?\b|\bbca\b|\bbba\b|"
+                   r"\bb\.?\s?a\.?\b|\bb\.?\s?com\b")),
+    (1, re.compile(r"(?i)\bassociate")),
+)
+#: A course or certificate listed under Education - not a degree.
+_EDU_COURSE_RE = re.compile(
+    r"(?i)\b(?:udemy|coursera|edx|udacity|aptech|linkedin\s+learning|bootcamp|nanodegree|"
+    r"certificat(?:e|ion)|course)\b")
+
+
+def _degree_level(entry: str) -> int:
+    return next((level for level, pattern in _DEGREE_LEVEL_RES if pattern.search(entry)), 0)
+
+
+def _education_entries(value: str) -> list[str]:
+    """Split a multi-degree Education value into one string per degree.
+
+    '|' and ';' always separate entries. Inside a comma list the first item says the order:
+    a degree first ('MS, Data Science, <School>, BE, CS, <School>') starts a new entry at each
+    later degree; a school first ('<School>, MS in IT, <School>, BE in CE') at each later
+    school - which is how the second degree keeps its own school.
+    """
+    entries = []
+    for piece in re.split(r"\s*[|;]\s*", value):
+        parts = [p.strip() for p in piece.split(",") if p.strip()]
+        if not parts:
+            continue
+        kinds = []
+        for part in parts:
+            d = _ANY_DEGREE_RE.search(part)
+            s = _INSTITUTION_RE.search(part)
+            kinds.append("D" if d and (not s or d.start() <= s.start()) else "S" if s else "O")
+        leader = next((k for k in kinds if k in "DS"), None)
+        current, has_leader = [], False
+        for part, kind in zip(parts, kinds):
+            if kind == leader and has_leader:
+                entries.append(", ".join(current))
+                current, has_leader = [], False
+            current.append(part)
+            has_leader = has_leader or kind == leader
+        entries.append(", ".join(current))
+    return [e for e in entries if e]
+
+
+def _education_date_tokens(text: str) -> list[tuple[int, int]]:
+    """(position, sortable end key) for every date in `text`; a range counts once, by its end."""
+    text = re.sub(rf"(?i)\b({_EDU_MONTH_RE})\.?(?=(?:19|20)\d{{2}}\b)", r"\1 ", text)
+    tokens = []
+    for pattern in (_EDU_DATE_RANGE_RE, _EDU_DATE_RANGE_RE_LOOSE):
+        for m in pattern.finditer(text):
+            key = _entry_end_key(m.group(2))
+            if key is not None:
+                tokens.append((m.start(), key))
+                text = text[:m.start()] + " " * (m.end() - m.start()) + text[m.end():]
+    for m in re.finditer(rf"(?i)\b({_EDU_MONTH_RE})\.?\s*((?:19|20)\d{{2}})\b|\b((?:19|20)\d{{2}})\b",
+                         text):
+        key = _entry_end_key(f"{m.group(1)} {m.group(2)}" if m.group(1) else m.group(3))
+        if key is not None:
+            tokens.append((m.start(), key))
+    return tokens
+
+
+def keep_latest_degree(value: str, resume_text: str = "") -> str:
+    """Education holds ONE degree: the most recent (client instruction 2026-09-17).
+
+    Rows carried two degrees whenever the model returned both, and courses too ('Full-Stack
+    Web Development - Aptech', '... - Udemy'). Each degree is dated from the resume - the
+    nearest date on its own line or the line on either side - and the newest wins. When any
+    degree cannot be dated that way, the higher degree wins (a master's over a bachelor's),
+    and the first one listed breaks a tie, since resumes list the newest first.
+    """
+    val = str(value or "").strip()
+    # Courses follow the degree in a comma list: 'Advanced Level Graduate - ... Diploma),
+    # Full-Stack Web Development - Aptech ..., React.js, ... - Udemy'. From the first course
+    # item on, nothing is a degree.
+    pieces = []
+    for piece in re.split(r"(\s*[|;]\s*)", val):
+        parts = piece.split(",")
+        cut = next((i for i, p in enumerate(parts)
+                    if i and _EDU_COURSE_RE.search(p) and not _ANY_DEGREE_RE.search(p)
+                    and any(_ANY_DEGREE_RE.search(q) for q in parts[:i])), None)
+        pieces.append(",".join(parts[:cut]) if cut is not None else piece)
+    val = "".join(pieces).strip(" ,;|")
+    entries = _education_entries(val)
+    degrees = [e for e in entries if _ANY_DEGREE_RE.search(e) and not _EDU_COURSE_RE.search(e)]
+    if len(degrees) == 1 and len(entries) > 1:
+        courses = [e for e in entries if _EDU_COURSE_RE.search(e) and not _ANY_DEGREE_RE.search(e)]
+        others = [e for e in entries if e not in degrees and e not in courses]
+        if courses and not others:
+            return degrees[0]                        # a degree plus certificates: the degree
+        return val                                   # 'MBA ..., USP | ESALQ' - one degree's parts
+    if len(degrees) < 2:
+        return val
+    lines = [ln for ln in str(resume_text or "").splitlines() if ln.strip()]
+
+    def _dated(entry: str):
+        phrase = _ANY_DEGREE_RE.search(entry).group(0).lower()
+        for i, line in enumerate(lines):
+            at = line.lower().find(phrase)
+            if at < 0:
+                continue
+            window = "\n".join(lines[max(0, i - 1):i + 2])
+            offset = len("\n".join(lines[max(0, i - 1):i])) + (1 if i else 0)
+            tokens = _education_date_tokens(window)
+            if tokens:
+                return min(tokens, key=lambda t: abs(t[0] - (offset + at)))[1]
+        return None
+
+    keys = [_dated(e) for e in degrees]
+    if all(k is not None for k in keys) and len(set(keys)) == len(keys):
+        return degrees[keys.index(max(keys))]
+    best = max(_degree_level(e) for e in degrees)
+    return next(e for e in degrees if _degree_level(e) == best)
+
+
 def complete_education(value, resume_text: str) -> str:
     """Add the school to an Education value that names only the degree.
 
@@ -1636,6 +1771,13 @@ def complete_education(value, resume_text: str) -> str:
     which say where the candidate studied, not where they live.
     """
     val = normalize_education(value)
+    if val != "Not extracted":
+        latest = normalize_education(keep_latest_degree(val, resume_text))
+        if latest != val:
+            # Cut from a value that named every degree with its own school: the one kept
+            # already carries its school, and the lines beside it belong to the others
+            # ('MCA - GNDU Regional Campus' would take 'DAV College', the BCA's school).
+            return latest
     if val == "Not extracted" or _INSTITUTION_RE.search(val) or not resume_text:
         return val
     core = re.sub(r"[^a-z0-9]+", " ", val.lower()).strip()
@@ -4408,8 +4550,9 @@ _RECHECK_PROMPT = (
     "3. For 'location': city and state/region only (no country). "
     "For 'country': the country name.\n"
     "4. For 'skills': keep as comma-separated technical skills/tools only.\n"
-    "5. For 'education': the candidate's highest degree and field of study, plus school "
-    "if given (e.g. 'B.S. Computer Science, Arizona State University'); empty string if "
+    "5. For 'education': ONE degree - the candidate's most recent - with its field of study, "
+    "plus school if given (e.g. 'B.S. Computer Science, Arizona State University'), never a "
+    "second degree, a course or a certificate; empty string if "
     "the resume doesn't mention any degree or schooling.\n"
     "Return ONLY a JSON object with keys: full_name, phone, location, country, skills, "
     "looking_for_role, education. "
