@@ -681,6 +681,53 @@ class MasterWriteContract(unittest.TestCase):
         self.assertFalse(set(body) & set(INPUT_COLUMNS),
                          'an input column in a master write resets the row on the next poll')
 
+    def test_resume_is_filed_in_the_folder_of_its_sheet(self):
+        """A rejection puts the CV in the year's Rejected folder; a return puts it back.
+
+        The local pipeline recorded wherever it found the file, so a candidate rejected on a
+        re-score kept '/Candidate_Resumes/2026/August' on the Rejected sheet (2026-09-17).
+        """
+        from hiring_agent.local_pipeline import _file_by_sheet
+
+        class Mover:
+            resumes_folder = '/CVs'
+            def __init__(self, fail=False):
+                self.moves, self.fail = [], fail
+            def move_resume(self, name, from_folder, to_folder):
+                if self.fail:
+                    raise SharePointError('locked', status_code=423)
+                self.moves.append((name, from_folder, to_folder))
+                return True
+            def file_web_url(self, folder, name):
+                return 'https://example.test' + folder + '/' + name
+
+        received = '2026-08-05T00:35:50'
+        in_month = {'A_B_MDEA.pdf': {'folder': '/CVs/2026/August', 'url': 'old'}}
+        in_rejected = {'A_B_MDEA.pdf': {'folder': '/CVs/2026/Rejected', 'url': 'old'}}
+
+        remote = Mover()
+        filed = _file_by_sheet(remote, in_month, 'rejected', received, dry_run=False)
+        self.assertEqual(remote.moves, [('A_B_MDEA.pdf', '/CVs/2026/August', '/CVs/2026/Rejected')])
+        self.assertEqual(filed['A_B_MDEA.pdf']['folder'], '/CVs/2026/Rejected')
+        self.assertEqual(filed['A_B_MDEA.pdf']['url'], 'https://example.test/CVs/2026/Rejected/A_B_MDEA.pdf')
+
+        remote = Mover()
+        filed = _file_by_sheet(remote, in_rejected, 'main', received, dry_run=False)
+        self.assertEqual(filed['A_B_MDEA.pdf']['folder'], '/CVs/2026/August',
+                         'a candidate back on the main sheet has the CV returned to the month')
+
+        for docs, sheet in ((in_month, 'main'), (in_rejected, 'rejected')):
+            remote = Mover()
+            self.assertEqual(_file_by_sheet(remote, docs, sheet, received, dry_run=False), docs)
+            self.assertEqual(remote.moves, [], 'a CV already in the right folder is not touched')
+
+        remote = Mover()
+        self.assertEqual(_file_by_sheet(remote, in_month, 'rejected', received, dry_run=True), in_month)
+        self.assertEqual(remote.moves, [], 'a dry run moves nothing')
+
+        self.assertEqual(_file_by_sheet(Mover(fail=True), in_month, 'rejected', received, dry_run=False),
+                         in_month, 'a failed move keeps the row pointing at the file it found')
+
     def test_rejected_result_only_patches_the_existing_p1_row(self):
         from hiring_agent.local_pipeline import _sync_row_to_sharepoint
 

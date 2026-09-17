@@ -364,6 +364,51 @@ def _recovery_queue(store, limit):
     return out
 
 
+def _file_by_sheet(remote, documents, sheet, received, dry_run):
+    """Keep each stored CV in the folder its sheet belongs to.
+
+    A rejection files the CV in the year's Rejected folder, and a candidate who is back on the
+    main sheet has it returned to the month folder. The SharePoint pass always did this through
+    _move_resumes, but that helper returns early for a local_execution client, the isolated
+    worker never touches remote files, and this parent then recorded wherever the file was
+    found. Live APP-20260805-0035-MDEA, rejected on 2026-09-15, kept Resume Folder Path
+    '/Candidate_Resumes/2026/August' while every other Rejected row read '2026/Rejected'
+    (reported 2026-09-17).
+
+    move_resume copies and verifies; the original stays where it was, as every resume has
+    since 2026-09-06. Failure is non-fatal and leaves the row pointing at the file it found.
+    """
+    if dry_run or getattr(remote, 'local_execution', False):
+        return documents
+    move = getattr(remote, 'move_resume', None)
+    if not callable(move):
+        return documents
+    from . import sharepoint_scoring as scoring
+    root = str(getattr(remote, 'resumes_folder', '') or '').rstrip('/')
+    dated = f"{root}/{cfg.dated_subpath(scoring._parse_received(received))}"
+    rejected = f"{root}/{scoring._rejected_subpath(cfg.dated_subpath(scoring._parse_received(received)))}"
+    filed = {}
+    for name, doc in documents.items():
+        folder = str(doc.get('folder', '') or '')
+        in_rejected = folder.strip('/') == rejected.strip('/')
+        # Only the two mismatches are corrected; a file P1 stored somewhere else is left alone.
+        target = (rejected if sheet == 'rejected' and not in_rejected
+                  else dated if sheet != 'rejected' and in_rejected else None)
+        if target is None:
+            filed[name] = doc
+            continue
+        try:
+            moved = move(name, folder, target)
+        except Exception as error:
+            cfg.logger.warning('        File move : %s kept in %s (%s)', name, folder, error)
+            moved = False
+        if moved:
+            doc = dict(doc, folder=target, url=remote.file_web_url(target, name))
+            cfg.logger.info('        Filed     : %s -> %s', name, target)
+        filed[name] = doc
+    return filed
+
+
 def _rename_to_canonical(remote, documents, app_id, full_name, category, dry_run):
     """Give each stored CV the '<First>_<Last>_<AppTail>' name, once the real name is known.
 
@@ -546,6 +591,8 @@ def run_local_pipeline(remote, *, dry_run=False, process=True, app_ids=None, for
                     documents = _rename_to_canonical(
                         remote, documents, row.app_id, result_values.get('Full Name'),
                         result_values.get('Category'), dry_run)
+                    documents = _file_by_sheet(remote, documents, sheet,
+                                               result_values.get('Received Date'), dry_run)
                     # 'Original Filename' means what the APPLICANT sent. It used to be
                     # overwritten here with the post-rename canonical name, so the column
                     # reported 'Yash_Verma_AF6A.pdf' rather than the
