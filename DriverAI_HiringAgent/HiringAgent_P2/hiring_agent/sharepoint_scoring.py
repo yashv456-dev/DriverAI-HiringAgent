@@ -32,7 +32,7 @@ from hiring_agent.extraction import (
     education_needs_repair, normalize_skills, clean_role_text,
     _extract_education_dates, _extract_phone, _extract_location, location_is_plausible,
     _looks_like_company_name, _scan_skill_keywords, _extract_education, _extract_experience,
-    normalize_education,
+    normalize_education, resolve_location_precedence, finalize_geography_shape,
     EXTRACTION_SOURCE,
 )
 from hiring_agent.config import SKILL_DISPLAY, SCORING_MAX_SKILLS
@@ -3349,6 +3349,12 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
             experience = details.get("experience", "")
             location = details.get("location", "Not extracted")
             country = normalize_country(details.get("country", ""))   # USA/America → United States
+            # Where the candidate lives comes from the most direct statement: the resume
+            # header, then their own email, then their newest education entry, and only then
+            # the rest of the resume (client instruction 2026-09-17).
+            location, country, location_source = resolve_location_precedence(
+                location, country, text, mail_body)
+            location, country = finalize_geography_shape(location, normalize_country(country), text)
             phone = details.get("phone", "Not extracted")   # US-formatted below, once geo is known
 
             # Any slot still empty reads 'N/A', never a blank cell.
@@ -3516,7 +3522,7 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
             logger.info(f"       Portfolio3: {fields['Portfolio 3']}")
             logger.info(f"       Scored by : {res['source']}")
             logger.info(f"       Skills    : {fields['Current Skills'][:80]}")
-            logger.info(f"       Location  : {fields['Location']}")
+            logger.info(f"       Location  : {fields['Location']}  (from {location_source})")
             logger.info(f"       Country   : {fields['Country']}")
             logger.info(f"       Geo check : {geo_decision.value} ({usa_reason})")
 
@@ -3949,6 +3955,9 @@ def _derive_row_fields(client, vals: dict, roles, rejected: bool = False) -> dic
         details.get("portfolio_3", "N/A"))
     _loc = details.get("location", "Not extracted")
     _ctry = normalize_country(details.get("country", ""))
+    # Same order as the scoring path: header, own email, newest education, then the rest.
+    _loc, _ctry, _ = resolve_location_precedence(_loc, _ctry, text, mail_body)
+    _loc, _ctry = finalize_geography_shape(_loc, normalize_country(_ctry), text)
     # Same Country reconciliation as the scoring path (reconcile_us_country): a concrete US
     # location signal makes the Country cell 'United States'. Gated on main-sheet rows only
     # (is_usa=not rejected) so a Rejected (non-US) row's country is never overwritten.

@@ -4,6 +4,7 @@ import io
 import json
 import re
 import struct
+from datetime import date
 from html import unescape
 
 from hiring_agent.config import (
@@ -13,7 +14,7 @@ from hiring_agent.config import (
     REQUIRE_AI,
     SCORING_MAX_SKILLS, US_STATE_ABBREVS, US_STATE_NAMES,
     US_STATE_ABBREV_TO_NAME, US_STATE_NAME_TO_ABBREV, US_TERRITORY_NAMES,
-    US_COUNTRY_TERMS, FOREIGN_COUNTRIES, FOREIGN_CITIES, logger,
+    US_COUNTRY_TERMS, FOREIGN_COUNTRIES, FOREIGN_CITIES, KNOWN_US_CITIES, logger,
 )
 
 # Fields the Ollama extractor returns (the offline parser fills the same shape).
@@ -3893,6 +3894,266 @@ def _merge_keyword_skills(result: dict, text: str) -> dict:
             base = keyword_part + free_part[:SCORING_MAX_SKILLS - len(keyword_part)]
         result["skills"] = ", ".join(base)
     return result
+
+
+# ── Location by precedence ─────────────────────────────────────────────────
+# Where somebody lives is read from the most direct statement available, in this order
+# (client instruction 2026-09-17):
+#   1. the resume's contact header,
+#   2. what the candidate says in their own email ("my current location is ..."),
+#   3. the place written on their most recent education entry,
+#   4. anything else in the resume (the existing parser and model, unchanged).
+# A place found lower down never replaces one found higher up.
+
+#: Where the candidate's own words end and a quoted earlier message begins.
+_MAIL_QUOTE_START_RE = re.compile(
+    r"(?im)^\s*(?:on\s.{0,160}?wrote:|-{2,}\s*original message|from:\s)"
+    r"|\bOn\s(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,.{0,120}?wrote:")
+#: A covering email written ABOUT somebody else. Agencies submit candidates too, and their
+#: own city is not the candidate's (the 2026-08-01 agency case in _restore_cv_identity).
+_MAIL_THIRD_PARTY_RE = re.compile(
+    r"(?i)\b(?:our|the|this|my)\s+candidate\b|\bconsultant\b|\bon behalf of\b|\bprofile of\b"
+    r"|\bresume of\b|\bsubmitting\b")
+#: A first-person statement of where the sender is.
+_MAIL_LOCATION_RE = re.compile(
+    r"(?i)\b(?:my\s+(?:current\s+)?location\s+is"
+    r"|i\s*(?:'|’)?\s*m\s+(?:currently\s+)?(?:based|located|living|residing)\s+in"
+    r"|i\s+am\s+(?:currently\s+)?(?:based|located|living|residing)\s+in"
+    r"|i\s*(?:'|’)?\s*m\s+(?:currently\s+)?in|i\s+am\s+(?:currently\s+)?in"
+    r"|i\s+(?:currently\s+)?(?:live|reside)\s+in)\s+(?:the\s+)?")
+_MAIL_COUNTRY_RE = re.compile(r"(?i)\bcountry\s+is\s+([A-Za-z][A-Za-z .]{1,40}?)(?:[.,;\n]|$)")
+_LOCATION_LABEL_RE = re.compile(
+    r"(?i)^(?:current\s+)?(?:location|address|based\s+in|residence)\s*[:\-–]\s*|^\W+")
+
+
+def _region_name(value: str) -> str | None:
+    """'New Jersey', 'India', 'Punjab' - a state, country or province on its own."""
+    low = str(value or "").strip(" .").lower()
+    if low in US_STATE_NAMES:
+        return low.title()
+    if low in FOREIGN_COUNTRIES or low in US_COUNTRY_TERMS or low in _PROVINCE_TO_COUNTRY:
+        return value.strip(" .")
+    return None
+
+
+def _header_stated_location(resume_text: str) -> str | None:
+    """A place the contact header states on its own, e.g. 'New Jersey (open to relocation)'."""
+    lines = [ln.strip() for ln in (resume_text or "").splitlines() if ln.strip()]
+    lines = [_normalize_spacing(ln)
+             for ln in _rejoin_word_fragmented_lines(_split_collapsed_sections(lines))]
+    for line in _contact_block(lines)[1:]:           # the first line is the name
+        for seg in re.split(r"\s*[|•·]\s*|\s{2,}", line):
+            seg = _LOCATION_LABEL_RE.sub("", re.sub(r"\([^)]*\)", " ", seg)).strip(" ,;:-")
+            if not seg or len(seg) > 60 or "@" in seg or re.search(r"(?i)https?:|www\.|\.com\b", seg):
+                continue
+            place = _place_in_entry(seg) or _region_name(seg)
+            if place and location_is_plausible(place):
+                return place
+    return None
+
+
+def _mail_stated_location(mail_body: str) -> tuple[str, str] | None:
+    """(location, country) the sender states about themselves in their own words, or None."""
+    body = str(mail_body or "")
+    quote = _MAIL_QUOTE_START_RE.search(body)
+    own = body[:quote.start()] if quote else body
+    if not own.strip() or _MAIL_THIRD_PARTY_RE.search(own):
+        return None
+    m = _MAIL_LOCATION_RE.search(own)
+    if not m:
+        return None
+    rest = own[m.end():m.end() + 160]
+    # The statement ends at the sentence: a period after a word, but not inside an
+    # abbreviation like 'U.S.' or 'D.C.'.
+    end = len(rest)
+    for stop in re.finditer(r"[\n;!?]|\.(?=\s|$)", rest):
+        if stop.group(0) == ".":
+            token = re.findall(r"[\w.]+$", rest[:stop.start()])
+            if token and "." in token[0]:
+                continue
+        end = stop.start()
+        break
+    raw = rest[:end]
+    raw = re.split(r"(?i)\s+(?:and|but|with|where|which|so|open\s+to|looking|for|since|as)\b", raw)[0]
+    paren = re.match(r"\s*([^()]+?)\s*\(([^()]+)\)\s*$", raw)
+    if paren:                                        # 'U.S. (New Jersey)' -> 'New Jersey, U.S.'
+        raw = f"{paren.group(2)}, {paren.group(1)}"
+    kept = []
+    for part in (p.strip() for p in raw.split(",")):
+        if not part or not part[0].isupper():       # ', in the greater New York City area'
+            break
+        kept.append(part)
+    raw = ", ".join(kept)
+    words = raw.split()
+    if raw and "," not in raw and len(words) >= 2 and _region_name(words[-1]):
+        raw = " ".join(words[:-1]) + ", " + words[-1]   # 'Lahore Pakistan'
+    if not raw or raw.lower() in _SKILL_KEYWORD_SET or not location_is_plausible(raw):
+        return None
+    loc, country = split_location_country(raw)
+    stated = _MAIL_COUNTRY_RE.search(own)
+    return loc, (stated.group(1).strip() if stated else country)
+
+
+#: 'City, Region' at every starting word (a lookahead, so matches may overlap): in 'Arizona
+#: State University, Tempe, AZ, USA' a consuming scan spends 'Tempe' on the school's own match
+#: and only 'AZ, USA' is left. A city is at most two words, as in the header parser.
+_EDU_PLACE_RE = re.compile(
+    r"(?=\b([A-Z][\wÀ-ÿ.'\-]+(?:\s+[A-Z][\wÀ-ÿ.'\-]+)?),\s*"
+    r"([A-Z][A-Za-zÀ-ÿ.]+(?:\s+[A-Z][A-Za-zÀ-ÿ.]+){0,2}))")
+_EDU_DATE_TOKEN_RE = None
+
+
+def _recent_education_place(resume_text: str) -> str | None:
+    """The place written on the most recent entry of the Education section.
+
+    Education sections are laid out every way, and PDF text often runs a whole section onto
+    one line ('University of Maryland College Park, MD Master of Engineering ... May 2026 ...
+    PES University Bengaluru, India ... May 2024'), so entries cannot be told apart by line.
+    Each place is paired with the date written nearest to it, and the place paired with the
+    newest date is the answer. An older degree's city is never used: when the newest entry
+    names no place, there is no education answer.
+    """
+    global _EDU_DATE_TOKEN_RE
+    if _EDU_DATE_TOKEN_RE is None:
+        _EDU_DATE_TOKEN_RE = re.compile(
+            rf"(?i)\b({_EDU_MONTH_RE})\.?\s*((?:19|20)\d{{2}})\b|\b((?:19|20)\d{{2}})\b|\bpresent\b")
+    lines = [ln.strip() for ln in (resume_text or "").splitlines() if ln.strip()]
+    start = next((i for i, ln in enumerate(lines)
+                  if re.match(r"(?i)^\W*education\b", _collapse_letter_spacing(ln))), None)
+    if start is None:
+        return None
+    section = []
+    for ln in lines[start + 1:]:
+        if _is_section_heading(ln) or _CONTACT_SECTION_BREAK_RE.match(_collapse_letter_spacing(ln)):
+            break
+        section.append(ln)
+    flat = " | ".join(section)
+    flat = re.sub(rf"(?i)\b({_EDU_MONTH_RE})\.?(?=(?:19|20)\d{{2}}\b)", r"\1 ", flat)
+    dates = []
+    # A range is ONE date, keyed by its end: 'Aug 2024 - May 2026' must not pair a place with
+    # its own start year and file the entry as two years older than it is.
+    for pattern in (_EDU_DATE_RANGE_RE, _EDU_DATE_RANGE_RE_LOOSE):
+        for m in pattern.finditer(flat):
+            key = _entry_end_key(m.group(2))
+            if key is not None:
+                dates.append((m.start(), key))
+                flat = flat[:m.start()] + " " * (m.end() - m.start()) + flat[m.end():]
+    for m in _EDU_DATE_TOKEN_RE.finditer(flat):
+        token = (f"{m.group(1)} {m.group(2)}" if m.group(1) else m.group(3) or "Present")
+        key = _entry_end_key(token)
+        if key is not None:
+            dates.append((m.start(), key))
+    if not dates:
+        return None
+    newest = max(k for _, k in dates)
+    found = {}                                       # region end -> [(start, head, region)]
+    for m in _EDU_PLACE_RE.finditer(flat):
+        head, tail = m.group(1), m.group(2)
+        if _INSTITUTION_RE.search(head.split()[-1]):
+            continue                                 # 'Syracuse University, New York' is a name
+        if _INSTITUTION_RE.search(tail):
+            continue                                 # 'School of Business, Arizona State University'
+        tail_words = tail.split()
+        region = None
+        for n in range(len(tail_words), 0, -1):      # longest region prefix: 'New York Master'
+            cand = " ".join(tail_words[:n])
+            if cand.lower() in US_STATE_ABBREVS or _region_name(cand):
+                region = cand
+                break
+        if not region:
+            continue
+        after_head = m.start() + len(head)
+        end = after_head + len(flat[after_head:].split(region, 1)[0]) + len(region)
+        found.setdefault(end, []).append((m.start(), head, region))
+
+    def _known_city(head: str) -> bool:
+        low = head.lower()
+        return low in FOREIGN_CITIES or low in KNOWN_US_CITIES
+
+    # One address, several readings: 'University of Maryland College Park, MD' also reads as
+    # 'Park, MD', and 'PES University Bengaluru, India' as 'University Bengaluru, India'. A
+    # reading that is a known city wins; otherwise the longest one that is not part of a
+    # school's name.
+    places = []                                      # (start, end, 'City, Region')
+    for end, readings in sorted(found.items()):
+        known = [r for r in readings if _known_city(r[1])]
+        plain = [r for r in readings if not _INSTITUTION_RE.search(r[1])]
+        start, head, region = (known or plain or readings)[0]
+        if places and start < places[-1][1]:
+            continue                                 # 'AZ, USA' inside 'Tempe, AZ, USA'
+        places.append((start, end, f"{head}, {region}"))
+    # Each place owns the text up to the next place; the entry dated newest is the recent one.
+    # Entries run 'School / dates / degree / city' as often as 'city ... date', so a date
+    # between two places may sit nearer the next one - which is why ownership, not distance,
+    # pairs them.
+    best = None
+    for i, (start, end, place) in enumerate(places):
+        span_start = places[i - 1][1] if i else 0
+        span_end = places[i + 1][0] if i + 1 < len(places) else len(flat)
+        keys = [k for pos, k in dates if span_start <= pos < span_end]
+        if keys and max(keys) == newest:
+            best = place
+            break
+    if not best:
+        return None
+    # 'Recent' education only. A degree finished long before the candidate's latest job says
+    # where they studied, not where they live now: an Indian degree from 2020 must not outrank
+    # a 2025-Present US job and reject a US resident. The same one-year window as
+    # _recency_location decides whether the education is current.
+    today = date.today()
+    now_key = today.year * 12 + today.month
+    newest_anywhere = newest if newest != _ENTRY_PRESENT_KEY else now_key
+    for ln in lines:
+        m = _EDU_DATE_RANGE_RE.search(ln) or _EDU_DATE_RANGE_RE_LOOSE.search(ln)
+        key = _entry_end_key(m.group(2)) if m else None
+        if key is not None:
+            newest_anywhere = max(newest_anywhere, now_key if key == _ENTRY_PRESENT_KEY else key)
+    education_key = now_key if newest == _ENTRY_PRESENT_KEY else newest
+    if newest_anywhere - education_key > _ENTRY_CONCURRENT_MONTHS:
+        return None
+    return best
+
+
+def resolve_location_precedence(settled_location: str, settled_country: str,
+                                resume_text: str, mail_body: str = "",
+                                log_tag: str = "location") -> tuple[str, str, str]:
+    """(location, country, source): the settled pair, or a more direct statement above it.
+
+    `settled_*` is what the parser, the model and their guards agreed on. It already stands
+    when it is written in the contact header. Otherwise, in order, a place the header states
+    on its own, the candidate's own email, then the newest education entry replace it; with
+    none of those, it stands as the 'sections' answer.
+    """
+    loc = str(settled_location or "").strip()
+    country = str(settled_country or "").strip()
+    has_loc = bool(loc) and loc.lower() not in _GAP_LITERALS
+    lines = [ln.strip() for ln in (resume_text or "").splitlines() if ln.strip()]
+    lines = [_normalize_spacing(ln)
+             for ln in _rejoin_word_fragmented_lines(_split_collapsed_sections(lines))]
+    header = "\n".join(_contact_block(lines))
+    if has_loc and header and _location_grounded_in_text(loc, header):
+        return loc, country, "header"
+
+    def _take(value: str, value_country: str, source: str) -> tuple[str, str, str]:
+        new_loc, new_country = split_location_country(value)
+        new_country = value_country or new_country
+        if has_loc and new_loc.split(",")[0].strip().lower() == loc.split(",")[0].strip().lower():
+            # Same city: keep whichever the candidate wrote more fully ('Mumbai, Maharashtra').
+            fuller = new_loc if new_loc.count(",") > loc.count(",") else loc
+            return fuller, country or new_country, source
+        logger.info(f"   {log_tag}: {source} states {new_loc!r} - replacing {loc or 'nothing'!r}")
+        return new_loc, new_country, source
+
+    stated = _header_stated_location(resume_text)
+    if stated:
+        return _take(stated, "", "header")
+    mailed = _mail_stated_location(mail_body)
+    if mailed:
+        return _take(mailed[0], mailed[1], "mail")
+    studied = _recent_education_place(resume_text)
+    if studied:
+        return _take(studied, "", "education")
+    return loc, country, "sections"
 
 
 def settle_geography(current_location, current_country,

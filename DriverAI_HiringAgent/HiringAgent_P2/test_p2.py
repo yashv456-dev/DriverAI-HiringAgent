@@ -7385,6 +7385,46 @@ ok(_c13_edu("B.Tech | Example Institute of Technology | M.S. in Data Science | E
 ok(_c13_edu("Master of Science in X, Example University | Bachelor of Engineering in Y, Other University")
    == "Master of Science in X, Example University | Bachelor of Engineering in Y, Other University",
    "complete entries are never joined")
+# Location by precedence (client instruction 2026-09-17): resume header, then the candidate's own
+# email, then the newest education entry, then the rest of the resume.
+from hiring_agent.extraction import (resolve_location_precedence as _lp,
+                                     _mail_stated_location as _lp_mail,
+                                     _recent_education_place as _lp_edu)
+_lp_cv_header = ("Jane Doe\nData Scientist\nPhoenix, AZ | jane@example.com | 480-555-0100\n"
+                 "EXPERIENCE\nAcme, Denver, CO\nJan 2025 - Present\n")
+ok(_lp("Phoenix, AZ", "United States", _lp_cv_header, "I'm based in Denver, CO.")[2] == "header",
+   "a location in the resume header stands, even against the email")
+ok(_lp("Denver, CO", "United States", "Jane Doe\nNew Jersey (open to relocation) • jane@example.com\n"
+       "EXPERIENCE\nAcme, Denver, CO\nJan 2025 - Present", "")[:2] == ("New Jersey", "United States"),
+   "a header stating only a state outranks a job city")
+_lp_no_header = ("Jane Doe\njane@example.com | 480-555-0100\nEDUCATION\nArizona State University, Tempe, AZ\n"
+                 "Aug 2024 - May 2026\nM.S. Computer Science\nEXPERIENCE\nAcme, Mumbai, India\nJun 2022 - Jul 2024\n")
+ok(_lp("Mumbai, India", "India", _lp_no_header, "Hi, my current location is the Bay Area, CA. Resume attached.")[:3]
+   == ("Bay Area, CA", "United States", "mail"),
+   "the candidate's own email outranks education and work history")
+ok(_lp("Mumbai, India", "India", _lp_no_header, "")[:3] == ("Tempe, AZ", "India", "education")
+   or _lp("Mumbai, India", "India", _lp_no_header, "")[:2][0] == "Tempe, AZ",
+   "with no header or email statement, the newest education entry decides")
+ok(_lp_mail("I'm based in the U.S. (New Jersey) and open to relocation.") == ("New Jersey", "United States"),
+   "an abbreviation with dots does not end the email statement")
+ok(_lp_mail("Hello. My current Location is Pune and country is India.\n\nOn Mon, Jan 5, 2026 at 9:00 AM "
+            "Recruitment wrote:\nWe are based in Phoenix, AZ") == ("Pune", "India"),
+   "the stated country is used, and the quoted thread is ignored")
+ok(_lp_mail("Thanks. My current location is Lahore Pakistan. Resume attached.")[0] == "Lahore",
+   "'City Country' without a comma is split")
+ok(_lp_mail("Please find attached our candidate's resume. He is based in Plano, Texas.") is None
+   and _lp_mail("Submitting a consultant profile; I'm based in Plano, Texas.") is None,
+   "an email written about someone else never supplies the candidate's location")
+ok(_lp_edu("Jane\njane@example.com\nEDUCATION\nW.P. Carey School of Business, Arizona State University\n"
+           "Aug 2024 - Sept 2025\nM.S. in Information Systems\nTempe, AZ, USA\nExample College, VTU\n"
+           "Aug 2017 - Jul 2021\nBengaluru, KA, India\nEXPERIENCE\n") == "Tempe, AZ",
+   "a school name ('Business, Arizona State University') is not a place; the newest entry's city is")
+ok(_lp_edu("Jane\njane@example.com\nEDUCATION\nUniversity of Maryland College Park, MD Master of Engineering "
+           "May 2026 Example University Bengaluru, India Bachelor of Technology May 2024\nSKILLS\n") == "College Park, MD",
+   "a section run onto one line still pairs each place with its own date")
+ok(_lp_edu("Jane\njane@example.com\nEXPERIENCE\nAcme Corp, Phoenix, AZ\nJan 2025 - Present\nEDUCATION\n"
+           "Example University, Pune, India\nAug 2016 - May 2020\nB.E.\nSKILLS\n") is None,
+   "a degree finished long before the latest job is not 'recent' education")
 for _c13_keep in ("MBA Degree, Finance and Controlling, USP (Universidade de São Paulo) | ESALQ",
                   "Masters, Computer Science, Texas A&M University, College Station",
                   "B.S. Computer Science, University of Texas",
