@@ -288,97 +288,30 @@ DriverAI Hiring Agent detects `http://localhost:11434` automatically and execute
 
 ---
 
----
+## 🧠 Google Gemini Cloud AI Setup
 
-## 🧠 Google Gemini Cloud AI Setup (Recommended AI Engine)
+The DriverAI evaluation engine uses **Google Gemini** for instant candidate entity extraction, 105-role matching, 6-axis skill radar scoring, and the interactive Recruiter Copilot.
 
-The DriverAI Hiring Agent leverages Google Gemini API for:
-* **4-Step Real-Time Resume Parsing**: Extracts structured candidate entities (Full Name, Email, Phone, US Geo validation, Skills list, Education degrees, Target role).
-* **105-Role Semantic Matching**: Contextual qualification rating (0–100 scale) against all DriverAI technical job descriptions.
-* **6-Axis Skill Radar Scoring**: Multi-dimensional scoring across Core Engineering, Systems, ML/AI, Production, Leadership, and Communication.
-* **Interactive Recruiter Copilot**: Contextual candidate QA and resume inspection directly within the web dashboard.
-
-### Step 1: Obtain a Gemini API Key
-1. Go to [Google AI Studio](https://aistudio.google.com/).
-2. Sign in with your Google account.
-3. Click **Get API key** ➔ **Create API key** (in a new or existing Google Cloud project).
-4. Copy your API key (`AIzaSy...`).
-
-### Step 2: Add Gemini Key to `.env`
-Create or edit `.env` in the repository root or in `DriverAI_HiringAgent/HiringAgent_P2/.env`:
+Quick setup in `.env`:
 ```ini
 GEMINI_API_KEY=AIzaSyYourGeminiApiKeyHere
 HIRING_GEMINI_MODEL=gemini-2.5-flash
 HIRING_GEMINI_ENABLED=true
 ```
-*(Supports `gemini-2.5-flash`, `gemini-2.0-flash`, or `gemini-1.5-flash`).*
 
-### Step 3: Verify Gemini Connectivity
-Run diagnostics:
-```bash
-python bot.py --doctor
-```
-Or check the `/health` endpoint while the web server is running:
-```bash
-curl http://localhost:8000/health
-```
-You will see:
-```json
-{
-  "status": "healthy",
-  "gemini": {
-    "configured": true,
-    "model": "gemini-2.5-flash"
-  }
-}
-```
-
-### Fallback Hierarchy (Zero Downtime)
-If Gemini is not configured or an API quota limit is reached, the system automatically falls back gracefully:
-1. **Gemini Cloud AI** (Primary — fast, intelligent semantic matching)
-2. **Local Ollama** (Fallback — private local weights: `qwen3:1.7b`)
-3. **Deterministic Scorer** (Offline Fallback — built-in regex & keyword matching, zero API keys required)
+> 📖 **Full Guide**: See **[docs/GEMINI_SETUP.md](docs/GEMINI_SETUP.md)** for step-by-step instructions on obtaining an API key from Google AI Studio, model options (`gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-1.5-flash`), health checks, and the zero-downtime Ollama/offline fallback hierarchy.
 
 ---
 
-## 🏢 Microsoft 365 & SharePoint Setup Guide (Azure Entra ID & P1 Flow)
+## 🏢 Microsoft 365 & SharePoint Setup
 
-The DriverAI Hiring Agent operates across two synchronized Microsoft tiers:
-1. **Phase 1 (P1 Cloud Ingestion)**: An automated Microsoft Power Automate flow running 24/7 in the Microsoft Cloud watching `apply@driverai.io`, screening anti-spam, depositing resumes into `/Candidate_Resumes/YYYY/MM/`, and creating candidate rows in `Sharepoint_Master_File.xlsx`.
-2. **Phase 2 (P2 Scoring & Evaluation)**: Connects headlessly to SharePoint via **Microsoft Entra ID (Azure AD)** using client credentials (app-only authentication) without requiring interactive browser login.
+The hiring pipeline synchronizes with **Microsoft 365** across two automated tiers:
+* **Phase 1 (P1 Cloud Flow)**: Automated Power Automate email intake on `apply@driverai.io`.
+* **Phase 2 (P2 Scoring & Sync)**: Headless **Microsoft Entra ID (Azure AD)** client credentials reading/writing candidate rows and uploading results to SharePoint.
 
-### Step 1: Register Microsoft Entra ID (Azure AD) Application
-1. Sign in to the [Microsoft Entra Admin Center](https://entra.microsoft.com/) or [Azure Portal](https://portal.azure.com/).
-2. Navigate to **Identity** ➔ **Applications** ➔ **App registrations** ➔ Click **New registration**.
-3. Set Name: `DriverAI-HiringAgent-P2`.
-4. Set Supported account types: *Accounts in this organizational directory only (Single tenant)*.
-5. Click **Register**.
-6. Copy the following identifiers from the Overview page:
-   * **Application (client) ID** ➔ `CLIENT_ID`
-   * **Directory (tenant) ID** ➔ `TENANT_ID`
-
-### Step 2: Generate Client Secret
-1. In your App Registration sidebar, click **Certificates & secrets** ➔ **Client secrets** tab.
-2. Click **New client secret**.
-3. Enter Description (e.g., `HiringAgent Production Secret`) and set an expiration period (e.g., 180 days).
-4. Click **Add**.
-5. **CRITICAL**: Immediately copy the **Value** column (NOT the Secret ID). The secret value is never displayed again once you leave the page. ➔ `CLIENT_SECRET`.
-
-### Step 3: Configure Microsoft Graph Application Permissions
-1. In the sidebar, click **API permissions** ➔ **Add a permission**.
-2. Select **Microsoft Graph**.
-3. Select **Application permissions** *(important: do NOT choose Delegated permissions; headless backend workers run without a signed-in user)*.
-4. Search for and check the following permissions:
-   * **`Sites.ReadWrite.All`**: Allows reading and updating the candidate Excel master table and saving resumes.
-   * **`Files.ReadWrite.All`**: Allows uploading candidate scorecards and generated Excel results.
-   * **`Mail.Send`** *(Optional)*: Needed only if P2 candidate rejection or notification emails are enabled.
-5. Click **Add permissions**.
-6. **CRITICAL**: Click **"Grant admin consent for <Your Organization>"** and confirm. Ensure all permissions display a green status icon (*"Granted for..."*).
-
-### Step 4: Add Microsoft Credentials to `.env`
-Update your `.env` file:
+Quick setup in `.env`:
 ```ini
-# Microsoft Entra ID (Azure AD) Credentials
+# Microsoft Entra ID (Azure AD) App Credentials
 TENANT_ID=00000000-0000-0000-0000-000000000000
 CLIENT_ID=00000000-0000-0000-0000-000000000000
 CLIENT_SECRET=your_client_secret_value_here
@@ -391,38 +324,18 @@ SHAREPOINT_WORKBOOK=/Master_Files/Sharepoint_Master_File.xlsx
 SHAREPOINT_RESUMES_FOLDER=/Candidate_Resumes
 SENDER_MAILBOX=apply@driverai.io
 
-# ⚠️ Safety Master Switch: Keep TRUE for staging/testing to prevent sending live emails
+# Safety Master Switch: Keep TRUE for staging/testing to suppress live candidate emails
 HIRING_SUPPRESS_EMAILS=true
-
-# Filter candidates to US geographical eligibility
-HIRING_GEO_USA_ONLY=true
 ```
 
-### Step 5: Test Microsoft & SharePoint Connection
-Verify credentials, site resolution, Excel table access, and resume folders with a single test command:
+Test connection:
 ```bash
-# Test connection (read-only):
 python bot.py --test-sharepoint
-
-# Or run via Docker:
+# or via Docker:
 docker compose run --rm cli --test-sharepoint
 ```
 
-If credentials and permissions are correct, you will see:
-```text
-✓ Microsoft Graph token acquired successfully
-✓ SharePoint Site resolved: /sites/CandidateList_HiringAgent
-✓ Candidate Excel table found: HiringAgent_P1_Candidates
-✓ Resumes folder verified: /Candidate_Resumes
-```
-
-### Phase 1 Power Automate Flow Deployment
-If setting up P1 intake in a new Microsoft 365 tenant:
-1. Open **Power Automate** (`make.powerautomate.com`).
-2. Go to **My flows** ➔ **Import** ➔ **Import Package (Legacy)**.
-3. Upload `DriverAI_HiringAgent/HiringAgent_P1/flow/DriverAI-Hiring-AutoReply-apply.zip`.
-4. Authorize connections for **Office 365 Outlook**, **SharePoint**, and **Excel Online (Business)**.
-5. Refer to [`P1_RUNBOOK.md`](DriverAI_HiringAgent/HiringAgent_P1/docs/P1_RUNBOOK.md) for full mailbox and table routing verification.
+> 📖 **Full Guide**: See **[docs/MICROSOFT_SETUP.md](docs/MICROSOFT_SETUP.md)** for complete instructions on registering an Azure Entra ID app, granting `Sites.ReadWrite.All` admin consent, configuring SharePoint document libraries, and deploying the Phase 1 Power Automate flow.
 
 ---
 
@@ -518,7 +431,9 @@ DriverAI-HiringAgent/
 
 | Document | Description |
 |---|---|
-| [Client Handoff Guide](file:///Users/akhilb/.gemini/antigravity-ide/scratch/DriverAI-HiringAgent/DriverAI_HiringAgent/HiringAgent_P2/CLIENT_COMPUTER_START_HERE.md) | Full computer setup, model setup, and local run guide |
-| [P2 Manual Run Guide](file:///Users/akhilb/.gemini/antigravity-ide/scratch/DriverAI-HiringAgent/DriverAI_HiringAgent/HiringAgent_P2/docs/P2_MANUAL_RUN_STEPS.md) | Web app, desktop app, and CLI step-by-step operating guide |
-| [P1 Runbook](file:///Users/akhilb/.gemini/antigravity-ide/scratch/DriverAI-HiringAgent/DriverAI_HiringAgent/HiringAgent_P1/docs/P1_RUNBOOK.md) | Power Automate flow deployment, testing, and mailbox management |
-| [Version Stack](file:///Users/akhilb/.gemini/antigravity-ide/scratch/DriverAI-HiringAgent/DriverAI_HiringAgent/VERSION_STACK.md) | Verified runtime versions (Python, Gemini, PyMuPDF, RapidOCR, Tesseract) |
+| [Google Gemini AI Guide](docs/GEMINI_SETUP.md) | Gemini API key creation, supported models, testing, and zero-downtime fallback |
+| [Microsoft 365 & SharePoint Guide](docs/MICROSOFT_SETUP.md) | Azure Entra ID App registration, Graph API permissions, and P1 flow |
+| [Client Handoff Guide](DriverAI_HiringAgent/HiringAgent_P2/CLIENT_COMPUTER_START_HERE.md) | Full computer setup, model setup, and local run guide |
+| [P2 Manual Run Guide](DriverAI_HiringAgent/HiringAgent_P2/docs/P2_MANUAL_RUN_STEPS.md) | Web app, desktop app, and CLI step-by-step operating guide |
+| [P1 Runbook](DriverAI_HiringAgent/HiringAgent_P1/docs/P1_RUNBOOK.md) | Power Automate flow deployment, testing, and mailbox management |
+| [Version Stack](DriverAI_HiringAgent/VERSION_STACK.md) | Verified runtime versions (Python, Gemini, PyMuPDF, RapidOCR, Tesseract) |
