@@ -229,9 +229,9 @@ def _name_is_sentence_fragment(s: str) -> bool:
 def _looks_like_name(s: str) -> bool:
     """True if s looks like a real person's name: 2-4 alpha tokens, none a section word.
 
-    Four tokens since 2026-09-18: 'CHARU SNEHA LAGUDUVA RAVI' (APP-20260817-0617-MCVA)
-    and 'Samarth Agasthya Mandya Subramanya' were never read offline, so the model alone
-    supplied the name - and on one re-score invented 'Charusneha Laguduva Ravitha'.
+    Four tokens since 2026-09-18: four-word names (APP-20260817-0617-MCVA,
+    APP-20260804-2114-MDHA) were never read offline, so the model alone supplied the
+    name - and on one re-score invented a word of it.
 
     A single-character token is allowed as a MIDDLE INITIAL ('Christopher L. Feld',
     'Jane Q Public') - fixed 2026-08-01, found by the offline dry-run harness: the old
@@ -264,10 +264,11 @@ def _looks_like_name(s: str) -> bool:
 def name_grounded_in_text(name: str, text: str) -> bool:
     """True when every word of ``name`` occurs somewhere in ``text`` (case/accent-blind).
 
-    The model may reshape a name but must not invent part of it: 'Charusneha Laguduva
-    Ravitha' for a CV headed 'CHARU SNEHA LAGUDUVA RAVI' (APP-20260817-0617-MCVA, 2026-09-18)
-    fails on 'Ravitha', while 'Charusneha' passes because the email carries it. Substring
-    matching keeps a joined or split spelling acceptable, which is what the CV evidences.
+    The model may reshape a name but must not invent part of it (APP-20260817-0617-MCVA,
+    2026-09-18). For a CV headed 'PRIYA ANJALI RAMAN IYER' with priyaanjali@..., the model's
+    'Priyaanjali Raman Iyengar' fails on 'Iyengar', while 'Priyaanjali' passes because the
+    email carries it. Substring matching keeps a joined or split spelling acceptable, which
+    is what the CV evidences.
     """
     import unicodedata
 
@@ -1988,8 +1989,8 @@ def _extract_education_dates(text: str) -> tuple[str, str]:
             continue
         found = _best_effort(_EDU_GLUED_MONTH_RE.sub(" ", line))
         # A long degree row wraps, and its dates land on the second visual line: 'M.S.,
-        # Information Systems Management - Arizona State' / 'University (W. P. Carey),
-        # Tempe, AZ | Aug 2024 - Jul 2025'. Skipping it let the older B.Sc. row, whose range
+        # Computer Science - Arizona State' / 'University, Tempe, AZ | Aug 2022 - May
+        # 2024'. Skipping it let the older B.Sc. row, whose range
         # fit on one line, publish its dates beside the M.S. (APP-20260918-0712-JVDA).
         # Not in a school-above-degree layout ('University of Texas Arlington  Aug 23-May
         # 25' / 'Master of Science'): there the line below is the NEXT entry's school line,
@@ -2684,7 +2685,7 @@ _RAW_URL_RE = re.compile(
     r'(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)'      # domain labels
     r'+(?:com|io|dev|me|co|net|org|info|tech|design|art|'
     r'work|site|app|portfolio|edu|uk|in|au|ca|de|fr|jp|'
-    # Newer personal-site endings. Without these a header site like 'milon.live' was never
+    # Newer personal-site endings. Without these a header site like 'janedoe.live' was never
     # even seen, so its slot was left open for a skills-line token to fill (2026-09-18,
     # APP-20260918-0712-JVDA). A bare match still has to pass the contact-line test.
     r'live|ai|xyz|online|blog|page|studio|website)'

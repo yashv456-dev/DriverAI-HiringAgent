@@ -7481,18 +7481,18 @@ ok(_c13_complete("Master of Science in Data Science", _c13_degree_first)
    "degree-first layout: the degree still takes the school below it")
 
 # Test application APP-20260918-0712-JVDA (2026-09-18) published Portfolio 3 'https://VB.NET'
-# from a skills line, missed the header site 'milon.live', and paired the M.S. with the
-# B.Sc.'s dates because the M.S. row wrapped its range onto a second line.
+# from a skills line, missed a '.live' header site, and paired the M.S. with the
+# B.Sc.'s dates because the M.S. row wrapped its range onto a second line. Made-up values.
 from hiring_agent.extraction import (_extract_education_dates as _d18_dates,
                                      extract_portfolios as _d18_ports,
                                      _looks_like_url as _d18_url)
-_d18_header = ("Yash Verma\nSENIOR UIPATH RPA DEVELOPER | AUTOMATION ENGINEERING LEAD\n"
-               "San Francisco Bay Area, CA | (480) 809-1749 | jane@example.com | "
-               "linkedin.com/in/jane | github.com/janedoe | milon.live\nPROFESSIONAL SUMMARY\n"
+_d18_header = ("Jane Doe\nSENIOR UIPATH RPA DEVELOPER | AUTOMATION ENGINEERING LEAD\n"
+               "San Francisco Bay Area, CA | (480) 555-0100 | jane@example.com | "
+               "linkedin.com/in/jane | github.com/janedoe | janedoe.live\nPROFESSIONAL SUMMARY\n"
                "Senior RPA developer.\nCORE TECHNICAL SKILLS\n"
                "Programming / Data: Python, SQL, C#/.NET, VB.NET, VBA, FastAPI\n")
 ok(_d18_ports(_d18_header) == ("https://linkedin.com/in/jane", "https://github.com/janedoe",
-                               "https://milon.live"),
+                               "https://janedoe.live"),
    "a '.live' header site is found and a skills-line 'VB.NET' is never a portfolio")
 ok(_d18_ports("Jane Doe\njane@example.com | linkedin.com/in/jane\nSummary\nmore\n"
               "Stack: C#, VB.NET, ASP.NET, Node.js\n")[2] == "N/A",
@@ -7506,12 +7506,12 @@ ok(_d18_ports("Jane Doe\njane@example.com | linkedin.com/in/jane\nSummary\nmore\
    "a bare domain away from the contact line is not the candidate's site")
 for _d18_tech in ("VB.NET", "https://VB.NET", "asp.net", "node.js", "vue.js", "socket.io"):
     ok(not _d18_url(_d18_tech), f"'{_d18_tech}' is a technology name, not a URL")
-ok(_d18_url("https://milon.live") and _d18_url("https://janedoe.ai"),
+ok(_d18_url("https://janedoe.live") and _d18_url("https://janedoe.ai"),
    "'.live' and '.ai' personal sites are URLs")
-ok(_d18_dates("EDUCATION\nM.S., Information Systems Management - Arizona State\n"
-              "University (W. P. Carey), Tempe, AZ | Aug 2024 - Jul 2025 | GPA: 3.97\n"
-              "B.Sc., Computer Science - Guru Gobind Singh Indraprastha University, Delhi, "
-              "India | Jul 2012 - Jun 2015\n") == ("Aug 2024", "Jul 2025"),
+ok(_d18_dates("EDUCATION\nM.S., Computer Science - Arizona State\n"
+              "University, Tempe, AZ | Aug 2022 - May 2024 | GPA: 3.9\n"
+              "B.Sc., Physics - Example University, Delhi, "
+              "India | Jul 2016 - Jun 2019\n") == ("Aug 2022", "May 2024"),
    "a degree row wrapped onto a second line keeps its own dates, not the next degree's")
 ok(_d18_dates("EDUCATION\nM.S. Data Science, Stanford | Sep 2023 - Jun 2025\nB.E., Mechanical "
               "Engineering - Visvesvaraya Technological\nUniversity, India | Aug 2012 - Jul 2016\n")
@@ -7526,22 +7526,22 @@ ok(_d18_dates("Software Engineer, Intel | Jan 2020 - Present\nB.S. Computer Scie
 ok(_d18_dates("M.S. Physics\nResearch Assistant, University of Utah | 2019 - 2021\n")
    == ("2019", "2021"), "a line naming a school still counts as the degree's own entry")
 
-# A re-score of APP-20260817-0617-MCVA replaced 'Charu Sneha Laguduva Ravi' with the model's
-# 'Charusneha Laguduva Ravitha': four-word names were never read offline, and the model's
-# name was accepted without checking it against the CV.
+# A re-score of APP-20260817-0617-MCVA replaced a four-word name with a model spelling that
+# invented one word: four-word names were never read offline, and the model's name was
+# accepted without checking it against the CV. Made-up values.
 from hiring_agent.extraction import (name_grounded_in_text as _d18_grounded,
                                      _looks_like_name as _d18_is_name,
                                      extract_candidate_details as _d18_details)
-_d18_cv = ("CHARU SNEHA LAGUDUVA RAVI\n\nTempe, AZ | +1 (623) 271-5755 | charusneha266@gmail.com | "
-           "linkedin.com/in/charusnehalr26\nSUMMARY\nSoftware engineer.\n")
-ok(_d18_details(_d18_cv)["full_name"] == "Charu Sneha Laguduva Ravi",
+_d18_cv = ("PRIYA ANJALI RAMAN IYER\n\nTempe, AZ | +1 (480) 555-0100 | priyaanjali@example.com | "
+           "linkedin.com/in/priyaiyer\nSUMMARY\nSoftware engineer.\n")
+ok(_d18_details(_d18_cv)["full_name"] == "Priya Anjali Raman Iyer",
    "a four-word all-caps name on the first line is read offline")
-ok(_d18_is_name("Samarth Agasthya Mandya Subramanya"), "four-word names are names")
+ok(_d18_is_name("Maria Elena Garcia Lopez"), "four-word names are names")
 ok(not _d18_is_name("Senior UiPath RPA Developer"), "a four-word job title is still not a name")
 ok(not _d18_is_name("One Two Three Four Five"), "five words is still not a name")
-ok(not _d18_grounded("Charusneha Laguduva Ravitha", _d18_cv),
+ok(not _d18_grounded("Priyaanjali Raman Iyengar", _d18_cv),
    "a model name with a word the CV never contains is rejected")
-ok(_d18_grounded("Charu Sneha Laguduva Ravi", _d18_cv) and _d18_grounded("Charusneha Ravi", _d18_cv),
+ok(_d18_grounded("Priya Anjali Raman Iyer", _d18_cv) and _d18_grounded("Priyaanjali Iyer", _d18_cv),
    "a model name whose words all occur in the CV (or its email) is accepted")
 ok(_d18_grounded("José Núñez", "JOSE NUNEZ\njose@x.com"), "accents are ignored when grounding a name")
 
