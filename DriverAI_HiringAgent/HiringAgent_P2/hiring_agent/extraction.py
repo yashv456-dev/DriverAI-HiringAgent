@@ -2576,9 +2576,9 @@ def _strip_unconfirmed_ambiguous_skills(skills_str: str, text: str) -> str:
 
 # ── Portfolio URL extraction ─────────────────────────────────────────────
 # Priority:
-#   Portfolio 1 → LinkedIn > personal website / portfolio domain
+#   Portfolio 1 → LinkedIn
 #   Portfolio 2 → GitHub
-#   Portfolio 3 → Figma > Behance > Dribbble
+#   Portfolio 3 → Figma > Behance > Dribbble > personal website / portfolio domain
 
 # Domains we never want as "portfolio" links
 _SKIP_DOMAINS = frozenset({
@@ -2875,9 +2875,9 @@ def _is_employer_product_link(url: str, text: str) -> bool:
 def extract_portfolios(text: str) -> tuple[str, str, str]:
     """Return (portfolio_1, portfolio_2, portfolio_3).
 
-    P1 = LinkedIn URL  OR  personal website / portfolio domain
+    P1 = LinkedIn URL
     P2 = GitHub URL
-    P3 = Figma / Behance / Dribbble / other creative tool URL
+    P3 = Figma / Behance / Dribbble, else a personal website / portfolio domain
     Missing slots → 'N/A'.
     """
     raw = text or ""
@@ -2936,10 +2936,10 @@ def extract_portfolios(text: str) -> tuple[str, str, str]:
                     and not _is_employer_product_link(url, raw)):
                 personal = url
 
-    p1 = linkedin or personal or "N/A"
+    # Fixed columns (client instruction 2026-09-17): LinkedIn, GitHub, everything else.
+    p1 = linkedin or "N/A"
     p2 = github or "N/A"
-    # When LinkedIn occupies P1, retain a separate personal portfolio in P3.
-    p3 = figma or behance or dribbble or (personal if linkedin else None) or "N/A"
+    p3 = figma or behance or dribbble or personal or "N/A"
     return p1, p2, p3
 
 

@@ -1290,7 +1290,7 @@ both_p1, both_p2, both_p3 = extract_portfolios(
     "linkedin.com/in/janedoe https://janesmith.io/portfolio")
 ok("linkedin.com/in/janedoe" in both_p1 and "janesmith.io/portfolio" in both_p3,
    "LinkedIn in P1 does not discard a separate personal portfolio (stored in P3)")
-ok("janesmith.io" in p1, "Personal .io site â†’ Portfolio 1")
+ok("janesmith.io" in p3 and p1 == "N/A", "Personal .io site -> Portfolio 3 (Portfolio 1 is LinkedIn only)")
 
 # Live regression (2026-08-01, Muhammad Ahsan Hussain / APP-20260721-2030-3AA7): "Socket.io"
 # (a real-time messaging library he uses, mentioned repeatedly as plain text - never written
@@ -1302,7 +1302,7 @@ p1, p2, p3 = extract_portfolios(
 ok((p1, p2, p3) == ("N/A", "N/A", "N/A"),
    f"'Socket.io' (a library mention, not a link) is not stored as a portfolio "
    f"(got p1={p1!r}, p2={p2!r}, p3={p3!r})")
-ok("janesmith.io" in extract_portfolios("janesmith.io/portfolio")[0],
+ok("janesmith.io" in extract_portfolios("janesmith.io/portfolio")[2],
    "a genuine personal .io site is still detected after the Socket.io exclusion")
 
 # Live regression (2026-08-01, Mindy Anderson / APP-20260723-2034-12DF): a SECOND
@@ -6061,8 +6061,8 @@ ok(not _is_meaningful_portfolio("https://drive.google.com/file/d/1ZL/view?usp=sh
 ok(_is_meaningful_portfolio("https://github.com/petervishal55"), "a real GitHub profile is kept")
 ok(_is_meaningful_portfolio("https://rutuja.fyi/"), "a personal site is kept")
 ok(_compact_portfolios("N/A", "https://github.com/x", "https://vercel.com/x")
-   == ("https://github.com/x", "https://vercel.com/x", "N/A"),
-   "slots are compacted - N/A never sits above a real link")
+   == ("N/A", "https://github.com/x", "https://vercel.com/x"),
+   "each link keeps its own column: LinkedIn, GitHub, then any other site")
 ok(_compact_portfolios("https://linkedin.com/in/s", "https://github.com/s", "http://b.sc")
    == ("https://linkedin.com/in/s", "https://github.com/s", "N/A"),
    "junk is dropped and the remaining slot reads N/A")
@@ -7322,7 +7322,7 @@ ok(extract_portfolios("Jane Doe\n480-555-0100 • jane@example.com• linkedin.c
                       "github.com/janedoe\n•janedoe.dev\nSUMMARY\nKiosk project "
                       "https://ieeexplore.ieee.org/document/1000001")[2] == "https://janedoe.dev",
    "a header-listed personal site wins over a later paper link")
-ok(extract_portfolios("Jane Doe\n(480) 555-0100 | jane@example.com | janedoe.dev\nSUMMARY")[0]
+ok(extract_portfolios("Jane Doe\n(480) 555-0100 | jane@example.com | janedoe.dev\nSUMMARY")[2]
    == "https://janedoe.dev", "a header site is kept even without LinkedIn")
 ok(extract_portfolios("Jane Doe\njane@example.com | Socket.io | linkedin.com/in/jane\nSUMMARY")[2]
    == "N/A", "a library name in the header is still not a site")

@@ -122,20 +122,22 @@ def _na_if_gap(v) -> str:
 
 
 def _compact_portfolios(p1, p2, p3) -> tuple:
-    """Pack real links into slots 1..n, dropping any that aren't a candidate's own work.
+    """Put each real link in its own column: LinkedIn, GitHub, then any other site.
 
-    Two problems this fixes, both seen live on 2026-08-04:
-      * ORDER - APP-20260716-1037-6CE3 had Portfolio 1 = 'N/A' with real GitHub and Vercel
-        links sitting in slots 2 and 3. Reading down the column, the candidate looks like he
-        has no portfolio until you scroll right.
-      * JUNK - APP-20260715-2257-7693 stored 'http://b.sc' (his B.Sc degree text parsed as a
-        domain), APP-20260715-2231-25F9 stored 'https://www.asu.edu/' (his university's home
-        page) and APP-20260707-1727-0DF7 a Google Drive file link (almost certainly the
-        resume we already hold). See _is_meaningful_portfolio.
+    Client instruction 2026-09-17: Portfolio 1 is LinkedIn, Portfolio 2 is GitHub and
+    Portfolio 3 is everything else (a personal site, a paper, a Drive folder). Links used to
+    be packed left - added 2026-08-04 because APP-20260716-1037-6CE3 read 'N/A' in Portfolio
+    1 beside real links - which put a DOI, a Framer site or a Drive folder in the GitHub
+    column. A second LinkedIn or GitHub link goes to Portfolio 3 when it is free.
 
-    Empty trailing slots read 'N/A', which is the settled "there genuinely is none" label.
+    Junk is still dropped first: APP-20260715-2257-7693 stored 'http://b.sc' (his B.Sc degree
+    text parsed as a domain), APP-20260715-2231-25F9 'https://www.asu.edu/' (his university's
+    home page) and APP-20260707-1727-0DF7 a Google Drive file link (almost certainly the
+    resume we already hold). See _is_meaningful_portfolio. An empty slot reads 'N/A', the
+    settled "there genuinely is none" label.
     """
-    kept, seen = [], set()
+    linkedin = github = other = None
+    seen = set()
     for v in (p1, p2, p3):
         s = str(v or "").strip()
         if _is_gap(s) or not _is_meaningful_portfolio(s):
@@ -144,9 +146,13 @@ def _compact_portfolios(p1, p2, p3) -> tuple:
         if key in seen:
             continue
         seen.add(key)
-        kept.append(s)
-    kept += ["N/A"] * (3 - len(kept))
-    return tuple(kept[:3])
+        if "linkedin.com/" in key and linkedin is None:
+            linkedin = s
+        elif "github.com/" in key and github is None:
+            github = s
+        elif other is None:
+            other = s
+    return (linkedin or "N/A", github or "N/A", other or "N/A")
 
 
 #: Candidate-supplied columns that read MISSING_VALUE rather than sitting blank, so a reader
@@ -3482,7 +3488,7 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
                 "Suggested Role 2": r2,
                 "Suggested Role 3": r3,
                 "Category": category,
-                # Same compaction/junk filter as the derive path, so the two never disagree.
+                # Same slotting/junk filter as the derive path, so the two never disagree.
                 **dict(zip(("Portfolio 1", "Portfolio 2", "Portfolio 3"),
                            _compact_portfolios(portfolio_1, portfolio_2, portfolio_3))),
                 "Status": (
