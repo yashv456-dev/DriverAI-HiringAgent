@@ -1,0 +1,26 @@
+# ── Docker Build Ignore ───────────────────────────────────────────────────
+.git/
+.gitignore
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.DS_Store
+Thumbs.db
+
+# Runtime data and caches
+*.xlsx
+P2_Logs/
+P2_Input/
+P2_Output/
+P2_Final_Results/
+P2_Preview/
+resume_cache/
+processing_artifacts/
+benchmark_resumes/
+archive/
+sandbox/
+.agents/
+.agent.lock

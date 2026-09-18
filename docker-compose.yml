@@ -1,0 +1,65 @@
+# ── DriverAI Hiring Agent Docker Compose ──────────────────────────────────
+# Run the complete hiring intelligence stack locally with a single command:
+#
+#   docker compose up --build
+#
+# Access the web dashboard at: http://localhost:8000
+# Run CLI diagnostics:         docker compose run --rm cli --doctor
+# Run SharePoint scorer:       docker compose run --rm cli --score-sharepoint --dry-run
+# ───────────────────────────────────────────────────────────────────────────
+
+version: '3.8'
+
+services:
+  # ── Web Application & Recruiter Dashboard (Default Service) ───────────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: driverai-hiring-agent:latest
+    container_name: driverai-hiring-web
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - path: DriverAI_HiringAgent/HiringAgent_P2/.env
+        required: false
+      - path: .env
+        required: false
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+      - HIRING_OLLAMA_HOST=http://host.docker.internal:11434
+    volumes:
+      # Candidate output, logs, and local resumes persist across container restarts
+      - ./DriverAI_HiringAgent/HiringAgent_P2/P2_Logs:/app/DriverAI_HiringAgent/HiringAgent_P2/P2_Logs
+      - ./DriverAI_HiringAgent/HiringAgent_P2/P2_Final_Results:/app/DriverAI_HiringAgent/HiringAgent_P2/P2_Final_Results
+      - ./DriverAI_HiringAgent/HiringAgent_P2/P2_Output:/app/DriverAI_HiringAgent/HiringAgent_P2/P2_Output
+      - ./DriverAI_HiringAgent/HiringAgent_P2/resumes:/app/DriverAI_HiringAgent/HiringAgent_P2/resumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ── Headless CLI Worker (SharePoint Sync & Batch Runs) ─────────────────────
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: driverai-hiring-agent:latest
+    container_name: driverai-hiring-cli
+    entrypoint: ["python", "bot.py"]
+    command: ["--help"]
+    env_file:
+      - path: DriverAI_HiringAgent/HiringAgent_P2/.env
+        required: false
+      - path: .env
+        required: false
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HIRING_OLLAMA_HOST=http://host.docker.internal:11434
+    volumes:
+      - ./DriverAI_HiringAgent/HiringAgent_P2/P2_Logs:/app/DriverAI_HiringAgent/HiringAgent_P2/P2_Logs
+      - ./DriverAI_HiringAgent/HiringAgent_P2/P2_Final_Results:/app/DriverAI_HiringAgent/HiringAgent_P2/P2_Final_Results
+      - ./DriverAI_HiringAgent/HiringAgent_P2/P2_Output:/app/DriverAI_HiringAgent/HiringAgent_P2/P2_Output
+      - ./DriverAI_HiringAgent/HiringAgent_P2/resumes:/app/DriverAI_HiringAgent/HiringAgent_P2/resumes
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

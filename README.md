@@ -13,12 +13,12 @@ graph TD
     A[Candidate Email / Local Ingestion] --> B[P1 Intake & Anti-Spam Screening]
     B --> C[SharePoint / Local ./resumes Folder]
     C --> D[P2 Extraction Engine: PDF / DOCX / OCR]
-    D --> E[Gemini 3.1 Flash-Lite AI Brain]
+    D --> E[Gemini AI Brain / Ollama / Keyword Fallback]
     E --> F[US Geographic Eligibility Gate]
     E --> G[105-Role JD Semantic Matching]
     E --> H[6-Axis Skill Radar Scoring]
     F & G & H --> I[SQLite Store & SharePoint Master]
-    I --> J[GitHub Primer Dark Web Dashboard: http://localhost:8000]
+    I --> J[Recruiter Web Dashboard: http://localhost:8000]
     I --> K[1-Click Candidate Outreach & Dossier Drawer]
 ```
 
@@ -29,25 +29,77 @@ graph TD
 - **Rich Candidate Dossier Drawer & 1-Click Outreach**: Slide-out candidate dossier with 4 tabs (*Overview*, *Resume Extract*, *1-Click Outreach*, *Markdown Export*), pre-composed email templates (*Interview Invite*, *Non-USA Decline*, *5 Deep Probing Questions*), and one-click `mailto:` / copy triggers.
 - **Comparison Matrix & Markdown Scorecard Export**: Compare candidates head-to-head across 6-axis competencies and export clean GitHub Markdown scorecards (`POST /api/candidates/export-markdown`).
 
-### 2. Dual-Engine Intelligence (Gemini 3.1 & Ollama)
-- **Gemini 3.1 Flash-Lite AI Brain**: High-throughput extraction, deep semantic reasoning, and 6-axis evaluation.
-- **Local Ollama Fallback**: Local inference (`qwen3:1.7b` / `qwen3-1.7b-p2`) for zero-external-network or offline scoring.
+### 2. Multi-Engine AI Brain & Resilient Fallbacks
+- **Gemini Cloud AI Brain**: Fast, contextual extraction, role matching, and 6-axis radar evaluation via Gemini API.
+- **Local Ollama Fallback**: Local inference (`qwen3:1.7b` / `qwen3-1.7b-p2`) for private, offline candidate evaluation.
+- **Deterministic Keyword Matcher**: Always available offline fallback requiring zero API keys or external dependencies.
 
 ### 3. Local Directory & OneDrive Ingestion Resiliency
-- Ingest local batches of resumes directly from `./resumes` or local synced OneDrive folders (`POST /api/ingest/local-dir`) with zero Microsoft Entra / cloud credential configuration needed.
+- Ingest local batches of resumes directly from `./resumes` or local synced OneDrive folders (`POST /api/ingest/local-dir`) with zero cloud credential configuration needed.
 
 ---
 
 ## 🚀 Quickstart
 
-### Option 1: Modern Web Application (Recommended)
+### Option 1: 🐳 Docker (Recommended — Run in 1 Command)
 
-Start the local web server and open the GitHub Primer Dark dashboard in your browser:
+Run the entire stack (FastAPI web server, Glassmorphic recruiter UI, OCR, and scoring engine) anywhere without configuring a local Python environment:
+
+```bash
+# 1. From the repository root, start the web server & dashboard:
+docker compose up --build
+```
+
+Open **[http://localhost:8000](http://localhost:8000)** in your browser!
+
+#### Optional Environment Configuration:
+To enable Gemini Cloud AI scoring or live SharePoint synchronization, create a `.env` file at repository root or inside `DriverAI_HiringAgent/HiringAgent_P2/.env`:
+```bash
+cp DriverAI_HiringAgent/HiringAgent_P2/.env.example .env
+# Add your GEMINI_API_KEY or Azure SharePoint credentials if available
+```
+*(If no `.env` or keys are provided, the system runs completely in local offline mode using the deterministic scorer and sample benchmark candidate data).*
+
+#### Running CLI Operations in Docker:
+```bash
+# Run system & environment diagnostics:
+docker compose run --rm cli --doctor
+
+# Score a folder of resumes:
+docker compose run --rm cli --score-folder ./resumes
+
+# Run read-only SharePoint test:
+docker compose run --rm cli --test-sharepoint
+docker compose run --rm cli --score-sharepoint --dry-run
+```
+
+#### Stopping Docker Containers:
+```bash
+docker compose down
+```
+
+---
+
+### Option 2: 💻 Local Native Web Application
+
+If you prefer running natively with Python on macOS, Linux, or Windows:
 
 ```bash
 cd DriverAI_HiringAgent/HiringAgent_P2
-python bot.py --web --port 8000
+
+# 1. Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate       # macOS / Linux
+# or: .venv\Scripts\activate   # Windows
+
+# 2. Install dependencies
+pip install -r requirements-docker.txt
+
+# 3. Launch the web server
+python web_server.py
+# or: python bot.py --web --port 8000
 ```
+
 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
 #### Web Interface Power-User Shortcuts:
@@ -61,37 +113,17 @@ Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
 ---
 
-### Option 2: Docker (macOS & Windows)
+### Option 3: 🖥️ Native CLI & Desktop GUI
 
 ```bash
 cd DriverAI_HiringAgent/HiringAgent_P2
-cp .env.example .env
-cp app_settings.example.json app_settings.json
-
-docker compose build
-docker compose run --rm p2 --doctor            # Check environment & dependencies
-docker compose run --rm p2 --score-sharepoint --dry-run
-docker compose run --rm p2 --score-sharepoint --batch-size 50
-docker compose run --rm p2 --export-results
-```
-
----
-
-### Option 3: Native CLI & Desktop GUI
-
-```bash
-cd DriverAI_HiringAgent/HiringAgent_P2
-python -m venv .venv
-source .venv/bin/activate       # macOS / Linux
-# or: .venv\Scripts\activate   # Windows
-
-pip install -r requirements-desktop.txt
+source .venv/bin/activate
 
 # Run CLI diagnostic
 python bot.py --doctor
 
-# Ingest local folder of resumes
-python bot.py --ingest-dir ./resumes
+# Ingest a local folder of resumes
+python bot.py --score-folder ./resumes
 
 # Launch Windows Desktop GUI (Windows only)
 Launch.bat
@@ -103,54 +135,65 @@ Launch.bat
 
 ```text
 DriverAI-HiringAgent/
-├── DriverAI_HiringAgent/
-│   ├── HiringAgent_P1/                  # P1 Power Automate flow intake & email filters
-│   │   ├── flow/                        # Flow definition & build scripts
-│   │   └── docs/P1_RUNBOOK.md           # P1 operation & installation guide
-│   ├── HiringAgent_P2/                  # P2 Extraction, Scoring & Web Application
-│   │   ├── bot.py                       # Unified CLI, server & pipeline controller
-│   │   ├── web_server.py                # REST API backend (FastAPI / stdlib server)
-│   │   ├── static/                      # Web UI (GitHub Primer Dark theme, JS, CSS, Logo)
-│   │   │   ├── index.html               # Main dashboard & single-page application
-│   │   │   ├── style.css                # GitHub Primer Dark design tokens & animations
-│   │   │   ├── app.js                   # Client controller, Command Palette, Stepper
-│   │   │   └── driverai_logo.png        # Official DriverAI brand emblem
-│   │   ├── hiring_agent/                # Core pipeline modules
-│   │   │   ├── extractor.py             # Multi-tier text & OCR extraction engine
-│   │   │   ├── ai_brain.py              # Gemini 3.1 & Ollama evaluation engines
-│   │   │   ├── store.py                 # SQLite local-first storage layer
-│   │   │   └── sharepoint_client.py     # Microsoft Graph & SharePoint client
-│   │   ├── jd_roles_cache.json          # 105 DriverAI Job Descriptions cache
-│   │   ├── resumes/                     # Local resume drop folder for zero-cloud ingestion
-│   │   └── docs/                        # Complete P2 architecture, runbooks & benchmarks
-│   ├── CLIENT_COMPUTER_START_HERE.md    # Client handoff quick reference
-│   └── VERSION_STACK.md                 # Verified runtime, OCR, LLM, SQL stack
-└── README.md                            # Root project overview & documentation
+├── Dockerfile                           # Production Docker image (FastAPI Web UI + OCR + CLI)
+├── docker-compose.yml                   # 1-command Docker Compose stack (Web & CLI services)
+├── requirements-docker.txt              # Containerized runtime dependencies
+├── .dockerignore                        # Docker build optimization rules
+├── README.md                            # Main project overview & documentation
+└── DriverAI_HiringAgent/
+    ├── HiringAgent_P1/                  # P1 Power Automate flow intake & email filters
+    │   ├── flow/                        # Flow definition & build scripts
+    │   └── docs/P1_RUNBOOK.md           # P1 operation & installation guide
+    └── HiringAgent_P2/                  # P2 Extraction, Scoring & Web Application
+        ├── web_server.py                # REST API backend (FastAPI, Web UI endpoints)
+        ├── bot.py                       # Unified CLI, server & pipeline controller
+        ├── static/                      # Modern Web UI (GitHub Primer Dark theme)
+        │   ├── index.html               # Main single-page application & recruiter dashboard
+        │   ├── style.css                # Dark theme design tokens, glassmorphism & layout
+        │   ├── app.js                   # Client controller, Command Palette, Stepper
+        │   └── driverai_logo.png        # Official DriverAI brand emblem
+        ├── hiring_agent/                # Core pipeline modules
+        │   ├── extraction.py            # Multi-tier text & OCR extraction engine
+        │   ├── gemini_scorer.py         # Gemini Cloud AI extraction & 105-role matching
+        │   ├── ollama_scorer.py         # Local Ollama AI evaluation
+        │   ├── local_scorer.py          # Deterministic keyword scoring
+        │   ├── sharepoint_scoring.py    # SharePoint workbook synchronization
+        │   ├── sqlite_store.py          # Local SQLite storage layer
+        │   └── config.py                # Business rules and environment configuration
+        ├── jd_roles_cache.json          # 105 DriverAI Job Descriptions cache
+        ├── resumes/                     # Local resume drop folder for zero-cloud ingestion
+        └── docs/                        # Complete P2 architecture, runbooks & benchmarks
 ```
 
 ---
 
 ## ⚙️ Configuration & Environment
 
-Copy `.env.example` to `.env` in `HiringAgent_P2/`:
+Copy `.env.example` to `.env` (either at the repository root or inside `DriverAI_HiringAgent/HiringAgent_P2/`):
 
 | Variable | Description | Required For |
 |---|---|---|
-| `GEMINI_API_KEY` | Google Gemini 3.1 Flash-Lite API key | Gemini AI Brain scoring |
-| `OLLAMA_HOST` | Local Ollama endpoint (e.g., `http://localhost:11434`) | Local offline scoring |
-| `TENANT_ID` | Microsoft Azure Entra Tenant ID | SharePoint sync |
-| `CLIENT_ID` | Microsoft Azure App Registration Client ID | SharePoint sync |
-| `CLIENT_SECRET` | Microsoft Azure App Registration Client Secret | SharePoint sync |
-| `SHAREPOINT_HOSTNAME` | SharePoint tenant URL (e.g., `driverai.sharepoint.com`) | SharePoint sync |
-| `SHAREPOINT_SITE_PATH` | Path to SharePoint site | SharePoint sync |
-| `HIRING_SUPPRESS_EMAILS` | `true` to suppress automated candidate emails | Safe staging/testing |
+| `GEMINI_API_KEY` | Google Gemini API key (e.g. `gemini-2.5-flash`) | Cloud AI Brain extraction & scoring |
+| `HIRING_OLLAMA_HOST` | Local Ollama endpoint (e.g. `http://localhost:11434`) | Local offline AI scoring |
+| `PORT` | Web server port (default: `8000`) | Web server deployment |
+| `TENANT_ID` | Microsoft Azure Entra Tenant ID | Live SharePoint sync |
+| `CLIENT_ID` | Microsoft Azure App Registration Client ID | Live SharePoint sync |
+| `CLIENT_SECRET` | Microsoft Azure App Registration Client Secret | Live SharePoint sync |
+| `SHAREPOINT_HOSTNAME` | SharePoint tenant URL (e.g. `driverai.sharepoint.com`) | Live SharePoint sync |
+| `SHAREPOINT_SITE_PATH` | Path to SharePoint site | Live SharePoint sync |
+| `HIRING_SUPPRESS_EMAILS` | `true` to suppress automated candidate emails | Safe staging & testing |
 
 ---
 
-## 🧪 Testing & Validation
+## 🧪 Testing & Verification
 
 ```bash
 cd DriverAI_HiringAgent/HiringAgent_P2
+
+# Structural validation & P1 flow simulation (~55 scenarios):
+python ../HiringAgent_P1/test_p1.py
+
+# P2 Pipeline and store tests:
 python test_p2.py                    # Main test suite
 python test_store.py                 # SQLite storage layer tests
 python test_local_pipeline.py        # Local-first end-to-end pipeline test
@@ -163,9 +206,7 @@ python test_resume_availability.py   # Resume availability & retry tests
 
 | Document | Description |
 |---|---|
-| [Client Handoff Guide](DriverAI_HiringAgent/HiringAgent_P2/CLIENT_COMPUTER_START_HERE.md) | Full computer setup, model setup, and local run guide |
-| [P2 Manual Run Guide](DriverAI_HiringAgent/HiringAgent_P2/docs/P2_MANUAL_RUN_STEPS.md) | Web app, desktop app, and CLI step-by-step operating guide |
-| [Current Architecture](DriverAI_HiringAgent/CURRENT_ARCHITECTURE.md) | Technical architecture, pipeline flow, and data contracts |
-| [Version Stack](DriverAI_HiringAgent/VERSION_STACK.md) | Verified runtime versions (Python 3.12, Gemini 3.1, PyMuPDF, Tesseract) |
-| [P1 Runbook](DriverAI_HiringAgent/HiringAgent_P1/docs/P1_RUNBOOK.md) | Power Automate flow deployment, testing, and mailbox management |
-
+| [Client Handoff Guide](file:///Users/akhilb/.gemini/antigravity-ide/scratch/DriverAI-HiringAgent/DriverAI_HiringAgent/HiringAgent_P2/CLIENT_COMPUTER_START_HERE.md) | Full computer setup, model setup, and local run guide |
+| [P2 Manual Run Guide](file:///Users/akhilb/.gemini/antigravity-ide/scratch/DriverAI-HiringAgent/DriverAI_HiringAgent/HiringAgent_P2/docs/P2_MANUAL_RUN_STEPS.md) | Web app, desktop app, and CLI step-by-step operating guide |
+| [P1 Runbook](file:///Users/akhilb/.gemini/antigravity-ide/scratch/DriverAI-HiringAgent/DriverAI_HiringAgent/HiringAgent_P1/docs/P1_RUNBOOK.md) | Power Automate flow deployment, testing, and mailbox management |
+| [Version Stack](file:///Users/akhilb/.gemini/antigravity-ide/scratch/DriverAI-HiringAgent/DriverAI_HiringAgent/VERSION_STACK.md) | Verified runtime versions (Python, Gemini, PyMuPDF, RapidOCR, Tesseract) |
