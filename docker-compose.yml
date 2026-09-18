@@ -8,8 +8,6 @@
 # Run SharePoint scorer:       docker compose run --rm cli --score-sharepoint --dry-run
 # ───────────────────────────────────────────────────────────────────────────
 
-version: '3.8'
-
 services:
   # ── Web Application & Recruiter Dashboard (Default Service) ───────────────
   web:
