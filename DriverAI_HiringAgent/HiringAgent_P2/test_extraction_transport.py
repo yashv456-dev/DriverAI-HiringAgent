@@ -37,9 +37,14 @@ def response(kind, *, content=None, status=200):
 
 class ExtractionTransportTests(unittest.TestCase):
     def setUp(self):
-        enabled = patch.object(ex, "OLLAMA_ENABLED", True)
-        enabled.start()
-        self.addCleanup(enabled.stop)
+        # Pin the Ollama transport: Gemini off (a .env key would take precedence),
+        # and the require_ai gate off so a failed recheck falls back instead of raising.
+        import hiring_agent.config as cfg
+        for target, name, value in ((ex, "OLLAMA_ENABLED", True), (cfg, "GEMINI_ENABLED", False),
+                                    (ex, "REQUIRE_AI", False), (ex, "STRICT_AI_STAGES", False)):
+            p = patch.object(target, name, value, create=True)
+            p.start()
+            self.addCleanup(p.stop)
 
     def invoke(self, kind):
         if kind == "extract":
@@ -129,16 +134,24 @@ class ExtractionTransportTests(unittest.TestCase):
             with self.subTest(kind=kind), patch.object(
                     requests, "post", return_value=response(kind, content='{ "broken":')) as post:
                 self.assertEqual(self.invoke(kind), expected)
-                post.assert_called_once()
+                # Since 2026-09-11 the extract call alone re-asks once on a malformed
+                # body (a truncated reply is transient like a timeout); the others do not.
+                self.assertEqual(post.call_count, 2 if kind == "extract" else 1)
 
     def test_timeout_then_bad_json_does_not_get_a_third_attempt(self):
         for kind in PAYLOADS:
             expected = self.fallback(kind)
             with self.subTest(kind=kind), patch.object(requests, "post", side_effect=[
                     requests.Timeout("slow"), response(kind, content="{"),
-                    response(kind)]) as post:
-                self.assertEqual(self.invoke(kind), expected)
-                self.assertEqual(post.call_count, 2)
+                    response(kind), response(kind)]) as post:
+                result = self.invoke(kind)
+                if kind == "extract":
+                    # timeout -> retry -> bad JSON -> one re-ask -> good: 3 posts, model result.
+                    self.assertIsNotNone(result)
+                    self.assertEqual(post.call_count, 3)
+                else:
+                    self.assertEqual(result, expected)
+                    self.assertEqual(post.call_count, 2)
 
     def test_recovered_timeout_records_model_provenance(self):
         ex.EXTRACTION_SOURCE["value"] = "offline (ConnectionError)"

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
+  <defs>
+    <linearGradient id="driverai-grad-primary" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#58a6ff" />
+      <stop offset="100%" stop-color="#1f6feb" />
+    </linearGradient>
+    <linearGradient id="driverai-grad-accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3fb950" />
+      <stop offset="100%" stop-color="#238636" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background container (GitHub Primer subtle) -->
+  <rect x="4" y="4" width="112" height="112" rx="24" fill="#161b22" stroke="#30363d" stroke-width="3" />
+
+  <!-- Stylized Geometric 'D' Neural Backbone -->
+  <!-- Vertical Spine -->
+  <path d="M 32 26 L 32 94" stroke="url(#driverai-grad-primary)" stroke-width="8" stroke-linecap="round" />
+
+  <!-- D Outer Curve -->
+  <path d="M 32 26 C 68 26 94 42 94 60 C 94 78 68 94 32 94" 
+        fill="none" 
+        stroke="url(#driverai-grad-primary)" 
+        stroke-width="8" 
+        stroke-linecap="round" />
+
+  <!-- Inner Circuit Neural Network Traces -->
+  <!-- Trace 1 (Top Spoke) -->
+  <path d="M 32 40 L 56 40 L 74 32" fill="none" stroke="#58a6ff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="74" cy="32" r="4.5" fill="#38bdf8" />
+
+  <!-- Trace 2 (Middle AI Nexus) -->
+  <path d="M 32 60 L 52 60 L 68 50 L 86 50" fill="none" stroke="url(#driverai-grad-accent)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="52" cy="60" r="4" fill="#3fb950" />
+  <circle cx="86" cy="50" r="4.5" fill="#3fb950" />
+
+  <!-- Trace 3 (Lower Branch) -->
+  <path d="M 32 80 L 54 80 L 72 88" fill="none" stroke="#58a6ff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="72" cy="88" r="4.5" fill="#38bdf8" />
+
+  <!-- Vertical Backbone Nodes -->
+  <circle cx="32" cy="32" r="5" fill="#f0f6fc" stroke="#1f6feb" stroke-width="2" />
+  <circle cx="32" cy="48" r="4" fill="#58a6ff" />
+  <circle cx="32" cy="64" r="5" fill="#3fb950" stroke="#238636" stroke-width="2" />
+  <circle cx="32" cy="80" r="4" fill="#58a6ff" />
+  <circle cx="32" cy="90" r="4" fill="#f0f6fc" />
+</svg>

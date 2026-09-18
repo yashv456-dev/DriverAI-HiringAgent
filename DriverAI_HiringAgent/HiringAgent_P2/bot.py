@@ -204,7 +204,7 @@ def _run_doctor() -> None:
 
     from hiring_agent.ollama_scorer import ollama_health
     ok_ai, ai_msg = ollama_health()
-    _line("Ollama (local AI)", ai_msg)
+    _line("AI Brain", ai_msg)
 
     from hiring_agent.config import JD_CACHE_FILE, SHAREPOINT_CONFIGURED, DEFAULT_ROLES
     env_issue = _local_env_issue()
@@ -307,6 +307,11 @@ def main() -> None:
                           "to SharePoint. Scores nothing, sends no mail, changes no row. "
                           "Use when the client needs a refreshed workbook without waiting "
                           "for the next scoring run.")
+    src.add_argument("--web", "--serve", action="store_true",
+                     help="Launch the interactive Recruiter Web Application & Dashboard.")
+
+    parser.add_argument("--port", type=int, default=8000,
+                        help="Port for the web server (default: 8000).")
 
     parser.add_argument("--watch", action="store_true",
                         help="With --score-sharepoint: poll the queue every --interval seconds.")
@@ -351,16 +356,25 @@ def main() -> None:
         _run_doctor()
         return
 
+    if args.web:
+        from web_server import run_web
+        run_web(port=args.port)
+        return
+
     # Imported AFTER env is set so config picks up the toggles.
     from hiring_agent.config import (
-        logger, OLLAMA_ENABLED, OLLAMA_SCORING, OLLAMA_MODEL, GEO_FILTER_USA_ONLY,
+        logger, OLLAMA_ENABLED, OLLAMA_SCORING, OLLAMA_MODEL, GEMINI_ENABLED, GEMINI_MODEL, GEO_FILTER_USA_ONLY,
     )
     from hiring_agent.intake import run_intake, score_existing_excel
     from hiring_agent.scoring import rematch_sheet
     from hiring_agent.jd_sources import get_active_roles, load_jd_sources
 
-    brain = (f"Ollama '{OLLAMA_MODEL}'" if (OLLAMA_ENABLED and OLLAMA_SCORING)
-             else "Keyword Scorer (no AI)")
+    if GEMINI_ENABLED:
+        brain = f"Gemini Cloud AI '{GEMINI_MODEL}'"
+    elif OLLAMA_ENABLED and OLLAMA_SCORING:
+        brain = f"Ollama '{OLLAMA_MODEL}'"
+    else:
+        brain = "Keyword Scorer (no AI)"
     geo = "USA-only (non-USA rejected)" if GEO_FILTER_USA_ONLY else "OFF (all locations accepted)"
     logger.info("")
     logger.info("=" * 64)

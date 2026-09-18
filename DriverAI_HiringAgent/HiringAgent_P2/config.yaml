@@ -3,7 +3,7 @@
 # This file holds all tunable business logic: skills, roles, templates, filters.
 
 company_name: "DriverAI"
-admin_email: "yashv@driverai.io"
+admin_email: "akhilb@driverai.io"
 
 login:
   port: 8400

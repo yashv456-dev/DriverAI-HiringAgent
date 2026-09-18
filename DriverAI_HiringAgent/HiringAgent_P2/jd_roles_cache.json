@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-09-11T09:53:38",
+  "built_at": "2026-09-17T19:55:01",
   "signature": "de52962fa0e71284",
   "folder_fingerprint": "4f75930dd45e2ba3",
   "roles": [
@@ -2464,6 +2464,29 @@
       ],
       "opening": "Website Developer Lead Developer Full Stack",
       "opening_id": "website-developer-lead-developer-full-stack",
+      "doc_type": "Position Description"
+    },
+    {
+      "title": "DEMO - Senior AI/ML Engineer, Agentic Systems",
+      "skills": [
+        "python",
+        "machine learning",
+        "pytorch",
+        "llm",
+        "rag",
+        "langchain",
+        "mcp",
+        "fastapi",
+        "docker",
+        "kubernetes",
+        "aws",
+        "ci/cd",
+        "vector database",
+        "prompt engineering",
+        "mlops"
+      ],
+      "opening": "DEMO - Senior AI/ML Engineer, Agentic Systems",
+      "opening_id": "demo-senior-aiml-agentic",
       "doc_type": "Position Description"
     }
   ]

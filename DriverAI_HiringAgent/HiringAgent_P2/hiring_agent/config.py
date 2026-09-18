@@ -277,6 +277,11 @@ def _envflag(name: str, default: bool) -> bool:
     return raw.strip().lower() in _truthy
 
 
+# ── Gemini Cloud AI Brain (Google Gemini) ──────────────────────────────────
+GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+GEMINI_MODEL = (os.getenv("HIRING_GEMINI_MODEL") or "gemini-2.5-flash").strip()
+GEMINI_ENABLED = _envflag("HIRING_GEMINI_ENABLED", bool(GEMINI_API_KEY))
+
 # Ollama defaults ON locally but OFF in serverless (no local model in the cloud — trying
 # would just burn the timeout before falling back). Set HIRING_OLLAMA_ENABLED to override.
 _ollama_default = bool(_ollama.get("enabled", True)) and not IS_SERVERLESS

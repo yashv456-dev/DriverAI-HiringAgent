@@ -208,16 +208,39 @@ If the results export is stale after rows are checked, `bot.py --export-results`
 
 If the client later wants P2 applicant emails enabled, make that a deliberate client-side switch (`HIRING_SUPPRESS_EMAILS=false`) and restart/check effective settings. First inspect pending suppressed markers: they can become eligible for real sends on the next live pass, including historical rows. This handoff does not enable those emails or clear any markers.
 
-## 11. Enable one scheduler and monitor the first cycles
+## 11. Modern Web Application & Local Directory Ingestion (Recommended)
 
-Use either the GUI (`Start.bat`, Home schedule controls; app must remain open) OR Windows Task Scheduler calling the full client path to `RunDaily.bat`. Do not enable both, and do not retain an old-machine watcher. Configure a Windows task to avoid overlapping instances, use the P2 folder as its working directory, and run under the configured account with access to Ollama and `.env`. Ensure the machine stays on/awake for the scheduled interval.
+In addition to the legacy Windows desktop GUI, P2 includes a modern browser-based **GitHub Primer Dark Web Dashboard** with real-time candidate management, live parsing stepper, command palette (`Cmd+K`), 6-axis radar visualizations, and 1-click candidate outreach.
+
+### Launch the Web Dashboard:
+```powershell
+Set-Location -LiteralPath $p2Path
+.\.venv\Scripts\python.exe bot.py --web --port 8000
+```
+Open **[http://localhost:8000](http://localhost:8000)** in Google Chrome or Edge.
+
+### Zero-Cloud-Config Local Ingestion:
+If SharePoint / Entra credentials are unavailable or if you want to score a local folder of resumes:
+1. Drop PDF, DOCX, or TXT resumes into `DriverAI_HiringAgent/HiringAgent_P2/resumes/` or any local/synced OneDrive folder.
+2. Ingest via CLI:
+   ```powershell
+   .\.venv\Scripts\python.exe bot.py --ingest-dir ./resumes
+   ```
+3. Or ingest directly via the Web Dashboard (**Settings ➔ Ingest Local Directory**).
+
+---
+
+## 12. Enable one scheduler and monitor the first cycles
+
+Use either the GUI (`Start.bat`, Home schedule controls; app must remain open), the Web Server background worker, OR Windows Task Scheduler calling the full client path to `RunDaily.bat`. Do not enable both, and do not retain an old-machine watcher. Configure a Windows task to avoid overlapping instances, use the P2 folder as its working directory, and run under the configured account with access to Ollama and `.env`. Ensure the machine stays on/awake for the scheduled interval.
 
 `RunDaily.bat` uses the CLI default batch (currently 500), not the GUI's 25. Set a deliberate client-side batch limit if required before scheduling. Review `P2_Logs`, including `task_console.log`, the queue/review states, remote export membership, and admin messages after the first scheduled cycles. The script's comment promising no duplicates is stronger than the current implementation guarantees.
 
 If extraction or scoring times out, inspect whether source is offline/keyword before changing hardware/model/timeouts. More time alone does not fix field provenance. If a run fails, stop repeated automatic runs while checking the affected IDs and remote state; do not delete/requeue entire sheets or replay the archive as a generic recovery step.
 
-## 12. Handoff completion record
+## 13. Handoff completion record
 
 Record client install path, Windows account/specs, Python/Ollama versions, model/base IDs, workbook/site, P1 flow identity, effective mail switches, queue count, test outputs, five checked IDs, remote export verification, and chosen schedule. Record which defects remain or were fixed, with evidence. Never record secret values.
 
 `docs/client_handoff/SOURCE_SHA256_BEFORE_HANDOFF.json` records the existing runtime/config/import files before these notes were added. It can distinguish subsequent client-side fixes from the delivered source. No deployment, live run, mail send, existing-file edit, or compression was performed while preparing this note.
+

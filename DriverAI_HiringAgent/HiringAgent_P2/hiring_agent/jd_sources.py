@@ -22,6 +22,12 @@ from hiring_agent.scoring import get_open_roles
 
 _GRAPH = "https://graph.microsoft.com/v1.0"
 
+# ponytail: process-local backoff after a failed automatic (24h TTL) refresh, so a
+# long-running web server does not hit Graph and log the same ERROR block on every
+# request. Persist to the cache file if multiple processes ever share one cache.
+JD_REFRESH_RETRY_MINUTES = int(os.getenv("JD_REFRESH_RETRY_MINUTES", "30"))
+_last_failed_refresh = None
+
 
 class JDFolderScanError(RuntimeError):
     """A SharePoint JD folder IS configured but yielded nothing.
@@ -592,6 +598,7 @@ def get_active_roles(refresh: bool = False) -> list:
     refresh=True. On a cache miss it fetches live and writes the cache so the next run is
     instant (in the cloud, commit jd_roles_cache.json so fresh checkouts start warm).
     """
+    global _last_failed_refresh
     cfg = load_jd_sources()
     if not cfg["enabled"]:
         return get_open_roles()
@@ -606,8 +613,13 @@ def get_active_roles(refresh: bool = False) -> list:
                     built_at = datetime.datetime.fromisoformat(built_at_str)
                     age = datetime.datetime.now() - built_at
                     if age > datetime.timedelta(hours=24):
-                        logger.info(f"JD cache is older than 24 hours ({age.total_seconds() / 3600:.1f} hours old) — triggering automatic background refresh.")
-                        refresh = True
+                        since_fail = (datetime.datetime.now() - _last_failed_refresh
+                                      if _last_failed_refresh else None)
+                        if since_fail is not None and since_fail < datetime.timedelta(minutes=JD_REFRESH_RETRY_MINUTES):
+                            pass  # serve the stale cache quietly; retry after the backoff
+                        else:
+                            logger.info(f"JD cache is older than 24 hours ({age.total_seconds() / 3600:.1f} hours old) — triggering automatic background refresh.")
+                            refresh = True
             except Exception as ex:
                 logger.warning(f"Error checking JD cache age: {ex}")
 
@@ -636,6 +648,7 @@ def get_active_roles(refresh: bool = False) -> list:
         # Same rule as build_jd_cache: a scoring run must never silently downgrade the
         # cache. Serve the existing roles if there are any, and say loudly that they are
         # stale, rather than scoring this candidate against a folder-less rebuild.
+        _last_failed_refresh = __import__("datetime").datetime.now()
         logger.error(f"JD FOLDER SCAN FAILED: {e}")
         cached = _read_role_cache()
         if cached and cached.get("roles"):

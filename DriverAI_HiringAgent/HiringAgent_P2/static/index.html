@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- ADDED 2026-09-18: the page had no <title>, so the browser tab was blank. -->
+  <title>DriverAI Hiring Pipeline</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png?v=9.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/static/style.css?v=9.7">
+</head>
+<body class="dark-theme">
+  <!-- Glowing Animated Aurora Mesh Background -->
+  <div class="aurora-background">
+    <div class="aurora-orb orb-cyan"></div>
+    <div class="aurora-orb orb-purple"></div>
+    <div class="aurora-orb orb-emerald"></div>
+    <div class="aurora-orb orb-magenta"></div>
+    <div class="glass-noise-overlay"></div>
+  </div>
+
+  <!-- Interactive Optical Cursor Halo -->
+  <div class="cursor-spotlight" id="cursor-spotlight"></div>
+
+  <div class="app-layout">
+    
+    <!-- Frosted Glass Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand-container">
+        <div class="brand-logo-icon">
+          <img src="/static/driverai_logo.png" alt="DriverAI Logo" class="brand-logo-img" />
+        </div>
+        <div class="brand-text">
+          <div class="brand-title">Driver<span class="gradient-text">AI</span></div>
+          <div class="brand-subtitle">Hiring Intelligence</div>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <div class="nav-section-label">MAIN RECRUITING</div>
+        <button class="nav-item active" data-view="dashboard" id="nav-dashboard">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-item" data-view="analyzer" id="nav-analyzer">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>AI Resume Analyzer</span>
+          <span class="badge-pill pulse-badge">Gemini</span>
+        </button>
+        <button class="nav-item" data-view="candidates" id="nav-candidates">
+          <i class="fa-solid fa-users-viewfinder"></i>
+          <span>Candidate Pipeline</span>
+          <span class="badge-count" id="nav-candidate-count">0</span>
+        </button>
+        <button class="nav-item" data-view="compare" id="nav-compare">
+          <i class="fa-solid fa-code-compare"></i>
+          <span>Compare Matrix</span>
+          <span class="badge-pill pulse-badge">Radar</span>
+        </button>
+        <button class="nav-item" data-view="roles" id="nav-roles">
+          <i class="fa-solid fa-briefcase"></i>
+          <span data-jd-count="{n} Open Roles">105 Open Roles</span>
+        </button>
+
+        <div class="nav-section-label">AI COPILOT</div>
+        <button class="nav-item" data-view="copilot" id="nav-copilot">
+          <i class="fa-solid fa-comments"></i>
+          <span>Recruiter Copilot</span>
+          <span class="badge-pill ai-badge">Live</span>
+        </button>
+
+        <div class="nav-section-label">SYSTEM</div>
+        <button class="nav-item" data-view="settings" id="nav-settings">
+          <i class="fa-solid fa-sliders"></i>
+          <span>Diagnostics & Status</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="ai-status-card">
+          <div class="ai-status-indicator">
+            <span class="status-dot"></span>
+            <span class="status-label">Gemini 3.1 Flash-Lite</span>
+          </div>
+          <div class="ai-status-detail">Active & Verified • &lt;2.5s JD Match</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- GitHub Repository Header Bar -->
+      <div class="repo-header-bar">
+        <!-- CHANGED 2026-09-18: was a fake GitHub breadcrumb (driverai / hiring-agent-p2
+             / Public / main). None of it was real -- this is not a repo view, it is not
+             public, and there is no branch. Replaced with the product identity plus the
+             mailbox the pipeline actually watches, which is information a recruiter uses. -->
+        <div class="repo-breadcrumbs">
+          <i class="fa-solid fa-user-tie text-dim"></i>
+          <span class="repo-org">DriverAI</span>
+          <span class="repo-divider">/</span>
+          <span class="repo-name">Hiring Pipeline</span>
+          <span class="repo-meta-tag" id="intake-mailbox" title="Mailbox the intake pipeline watches">
+            <i class="fa-solid fa-inbox"></i> apply@driverai.io
+          </span>
+        </div>
+        <div class="repo-meta-tags">
+          <!-- ADDED 2026-09-18: data-source switch. Testing = local SQLite sandbox,
+               Developer = live SharePoint via Microsoft Graph. The badge beside it
+               is driven by a real Graph call, never a hardcoded string. -->
+          <select id="mode-select" class="repo-meta-tag" style="cursor: pointer; background: var(--bg-inset, #161b22); color: inherit; border: 1px solid var(--border, #30363d); border-radius: 6px; padding: 3px 6px;">
+            <option value="testing">🧪 Testing (local)</option>
+            <option value="developer">🛠 Developer (Microsoft)</option>
+          </select>
+          <span class="repo-meta-tag" id="ms-status" title="Microsoft Graph / SharePoint reachability">
+            <i class="fa-solid fa-circle text-dim" style="font-size: 7px;"></i> MS: checking…
+          </span>
+          <!-- CHANGED 2026-09-18: both of these were hardcoded and both were wrong.
+               "Gemini 3.1 Active" is not the model in use (config says gemini-2.5-flash)
+               and it read "Active" even while every call was returning 429; "105 JDs"
+               ignored the real cache count. Both are now painted from /api/health. -->
+          <span class="repo-meta-tag" id="ai-status" title="AI brain status">
+            <i class="fa-solid fa-circle text-dim" style="font-size: 7px;"></i> AI: checking…
+          </span>
+          <span class="repo-meta-tag" id="jd-count"><i class="fa-solid fa-briefcase"></i> … JDs</span>
+          <button class="repo-meta-tag" id="btn-open-palette" style="cursor: pointer;"><kbd class="kbd-badge">⌘K</kbd> Search</button>
+        </div>
+      </div>
+
+      <!-- Top Header -->
+      <header class="topbar">
+        <div class="header-left">
+          <h1 class="page-title" id="page-title">Executive Dashboard</h1>
+          <p class="page-subtitle" id="page-subtitle">Real-time candidate intelligence and 105-role matching</p>
+        </div>
+
+        <div class="header-right">
+          <div class="search-bar-wrap">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="global-search" placeholder="Search candidates, skills, roles..." />
+          </div>
+          <button class="btn btn-primary" id="btn-quick-upload">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>Upload Resume</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Views Container -->
+      <div class="views-wrapper">
+
+        <!-- 1. DASHBOARD VIEW -->
+        <section class="view-panel active" id="view-dashboard">
+          <!-- KPI Metrics Row -->
+          <div class="kpi-grid">
+            <div class="kpi-card glass-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Total Candidates</span>
+                <div class="kpi-icon icon-blue"><i class="fa-solid fa-user-group"></i></div>
+              </div>
+              <div class="kpi-value" id="kpi-total-candidates">0</div>
+              <div class="kpi-subtext"><i class="fa-solid fa-bolt text-emerald"></i> Real-time SQLite storage</div>
+            </div>
+
+            <div class="kpi-card glass-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Scored & Qualified</span>
+                <div class="kpi-icon icon-green"><i class="fa-solid fa-circle-check"></i></div>
+              </div>
+              <div class="kpi-value" id="kpi-scored-candidates">0</div>
+              <div class="kpi-subtext"><span class="text-emerald" id="kpi-scored-pct">100%</span> qualification rate</div>
+            </div>
+
+            <div class="kpi-card glass-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Average Match Score</span>
+                <div class="kpi-icon icon-purple"><i class="fa-solid fa-award"></i></div>
+              </div>
+              <div class="kpi-value" id="kpi-avg-score">0%</div>
+              <div class="kpi-subtext"><i class="fa-solid fa-sparkles text-purple"></i> Gemini JD matching engine</div>
+            </div>
+
+            <div class="kpi-card glass-card">
+              <div class="kpi-header">
+                <span class="kpi-title">Active Job Descriptions</span>
+                <div class="kpi-icon icon-cyan"><i class="fa-solid fa-layer-group"></i></div>
+              </div>
+              <div class="kpi-value" id="kpi-roles-count">105</div>
+              <div class="kpi-subtext"><i class="fa-solid fa-shield-halved text-cyan"></i> USA-only geo validation active</div>
+            </div>
+          </div>
+
+          <!-- Action & Trends Grid -->
+          <div class="dashboard-grid">
+            <!-- Quick Analyzer Dropzone Widget -->
+            <div class="glass-card dash-analyzer-widget">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-wand-magic-sparkles text-cyan"></i>
+                  <span>Instant Resume Analyzer</span>
+                </div>
+                <span class="badge-pill gemini-pill"><i class="fa-solid fa-bolt"></i> ~2.5s</span>
+              </div>
+              <p class="card-desc" data-jd-count="Drop a resume PDF or DOCX to run Gemini extraction and {n}-role matching immediately.">Drop a resume PDF or DOCX to run Gemini extraction and 105-role matching immediately.</p>
+              
+              <div class="dropzone dropzone-mini" id="dropzone-mini">
+                <input type="file" id="file-input-mini" accept=".pdf,.docx,.txt" class="file-input-hidden" />
+                <div class="dropzone-content">
+                  <div class="dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                  <div class="dropzone-text">
+                    <strong>Drag & drop resume</strong> or <span class="text-cyan">browse files</span>
+                  </div>
+                  <div class="dropzone-types">PDF, DOCX, TXT up to 25MB</div>
+                </div>
+              </div>
+
+              <!-- Live Resume Parsing Stepper -->
+              <div class="stepper-container" id="dash-stepper">
+                <div class="stepper-grid">
+                  <div class="stepper-step" id="step-ocr">
+                    <div class="step-icon"><i class="fa-solid fa-file-lines"></i></div>
+                    <span class="step-label">1. Text OCR</span>
+                  </div>
+                  <div class="stepper-step" id="step-geo">
+                    <div class="step-icon"><i class="fa-solid fa-earth-americas"></i></div>
+                    <span class="step-label">2. US Geo Filter</span>
+                  </div>
+                  <div class="stepper-step" id="step-match">
+                    <div class="step-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                    <span class="step-label" data-jd-count="3. {n}-JD Match">3. 105-JD Match</span>
+                  </div>
+                  <div class="stepper-step" id="step-radar">
+                    <div class="step-icon"><i class="fa-solid fa-chart-pie"></i></div>
+                    <span class="step-label">4. 6-Axis Radar</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Demo Samples -->
+              <div class="sample-resumes-bar">
+                <span class="sample-label">⚡ 1-Click Samples:</span>
+                <span class="sample-chip" data-sample="alex"><i class="fa-solid fa-user-astronaut text-cyan"></i> Alex (Senior ML)</span>
+                <span class="sample-chip" data-sample="sarah"><i class="fa-solid fa-server text-emerald"></i> Sarah (Staff Systems)</span>
+                <span class="sample-chip" data-sample="marco"><i class="fa-solid fa-earth-americas text-amber"></i> Marco (Non-USA)</span>
+              </div>
+            </div>
+
+            <!-- Top In-Demand Roles Widget -->
+            <div class="glass-card dash-roles-widget">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-fire text-amber"></i>
+                  <span>Top Matched Roles</span>
+                </div>
+                <button class="btn-link" id="btn-view-all-roles"><span data-jd-count="View all {n}">View all 105</span> <i class="fa-solid fa-arrow-right"></i></button>
+              </div>
+              <div class="top-roles-list" id="dashboard-top-roles">
+                <div class="empty-state-sm">No candidates processed yet. Upload a resume to see matching roles!</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Candidates Table -->
+          <div class="glass-card recent-candidates-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-clock-rotate-left text-blue"></i>
+                <span>Recent Candidate Applications</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-view-all-candidates">View Pipeline</button>
+            </div>
+            
+            <div class="table-container">
+              <table class="custom-table" id="dashboard-recent-table">
+                <thead>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>Top Matched Role</th>
+                    <th>Score</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Processed</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-recent-tbody">
+                  <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                      <i class="fa-solid fa-inbox me-2"></i> No candidate records found. Use the analyzer to score your first resume!
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. AI RESUME ANALYZER VIEW -->
+        <section class="view-panel" id="view-analyzer">
+          <div class="analyzer-container">
+            <!-- Upload Panel -->
+            <div class="glass-card upload-panel">
+              <div class="tab-pills">
+                <button class="tab-pill active" id="tab-upload-file"><i class="fa-solid fa-file-arrow-up me-2"></i>Upload Document</button>
+                <button class="tab-pill" id="tab-paste-text"><i class="fa-solid fa-keyboard me-2"></i>Paste Resume Text</button>
+              </div>
+
+              <!-- Tab 1: File Dropzone -->
+              <div class="tab-content active" id="content-upload-file">
+                <div class="dropzone dropzone-large" id="dropzone-main">
+                  <input type="file" id="file-input-main" accept=".pdf,.docx,.txt" class="file-input-hidden" />
+                  <div class="dropzone-content">
+                    <div class="dropzone-icon-lg"><i class="fa-solid fa-file-circle-plus"></i></div>
+                    <div class="dropzone-title">Drop candidate resume here</div>
+                    <p class="dropzone-subtitle">Supports PDF, Word (.docx), and plain text. Instant OCR and Gemini semantic parsing.</p>
+                    <button class="btn btn-primary btn-md mt-3" type="button" id="btn-browse-file">
+                      <i class="fa-solid fa-folder-open"></i> Select Resume File
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="selected-file-banner hidden" id="selected-file-banner">
+                  <div class="file-banner-info">
+                    <i class="fa-solid fa-file-pdf file-banner-icon"></i>
+                    <div>
+                      <div class="file-banner-name" id="file-banner-name">resume.pdf</div>
+                      <div class="file-banner-size" id="file-banner-size">1.2 MB</div>
+                    </div>
+                  </div>
+                  <button class="btn-icon" id="btn-remove-file"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <!-- Quick Demo Samples in Analyzer -->
+                <div class="sample-resumes-bar">
+                  <span class="sample-label">⚡ Quick 1-Click Samples:</span>
+                  <span class="sample-chip" data-sample="alex"><i class="fa-solid fa-user-astronaut text-cyan"></i> Alex Rivera (Senior ML Engineer)</span>
+                  <span class="sample-chip" data-sample="sarah"><i class="fa-solid fa-server text-emerald"></i> Sarah Chen (Staff Systems Engineer)</span>
+                  <span class="sample-chip" data-sample="marco"><i class="fa-solid fa-earth-americas text-amber"></i> Marco Rossi (Non-USA Applicant)</span>
+                </div>
+              </div>
+
+              <!-- Tab 2: Paste Text -->
+              <div class="tab-content" id="content-paste-text">
+                <textarea id="paste-resume-textarea" class="custom-textarea" placeholder="Paste candidate resume or cover letter text here (e.g. name, contact info, technical skills, work history, education)..." rows="10"></textarea>
+              </div>
+
+              <div class="analyzer-actions">
+                <div class="checkbox-label">
+                  <input type="checkbox" id="chk-save-candidate" checked />
+                  <label for="chk-save-candidate">Save candidate record to SQLite database</label>
+                </div>
+                <button class="btn btn-gradient btn-lg" id="btn-run-analysis" disabled>
+                  <i class="fa-solid fa-sparkles"></i>
+                  <span>Analyze & Match with Gemini</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Live Results Container (Hidden until scored) -->
+            <div class="analysis-results-container hidden" id="analysis-results">
+              
+              <!-- Loading Skeleton State -->
+              <div class="glass-card loading-card hidden" id="analysis-loader">
+                <div class="spinner-pulse"></div>
+                <div class="loading-title">Gemini 3.1 AI is parsing & scoring candidate...</div>
+                <p class="loading-subtitle">Extracting contact details, verifying US location, and ranking against the full Job Description catalog.</p>
+              </div>
+
+              <div class="glass-card hidden" id="analysis-error" role="alert"></div>
+
+              <!-- Scored Results Card -->
+              <div class="results-card-grid" id="analysis-content">
+                <!-- Left: Candidate Profile Card -->
+                <div class="glass-card candidate-profile-card">
+                  <div class="profile-header">
+                    <div class="candidate-avatar" id="res-avatar">AR</div>
+                    <div class="profile-info">
+                      <h2 class="candidate-name" id="res-name">Alex Rivera</h2>
+                      <div class="candidate-target-role" id="res-target-role">Senior Machine Learning Engineer</div>
+                      <div class="profile-badges" id="res-badges">
+                        <span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> USA Location Verified</span>
+                        <span class="badge badge-source">Gemini AI Tier 1</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="profile-details-grid">
+                    <div class="detail-item">
+                      <span class="detail-label"><i class="fa-solid fa-location-dot"></i> Location</span>
+                      <span class="detail-value" id="res-location">San Francisco, CA, USA</span>
+                    </div>
+                    <div class="detail-item">
+                      <span class="detail-label"><i class="fa-solid fa-phone"></i> Phone</span>
+                      <span class="detail-value" id="res-phone">(415) 555-0143</span>
+                    </div>
+                    <div class="detail-item">
+                      <span class="detail-label"><i class="fa-solid fa-graduation-cap"></i> Education</span>
+                      <span class="detail-value" id="res-education">MS in Computer Science, Stanford</span>
+                    </div>
+                    <div class="detail-item">
+                      <span class="detail-label"><i class="fa-solid fa-briefcase"></i> Experience</span>
+                      <span class="detail-value" id="res-experience">6+ years</span>
+                    </div>
+                  </div>
+
+                  <div class="skills-section">
+                    <div class="section-heading">
+                      <i class="fa-solid fa-microchip text-cyan"></i>
+                      <span>Extracted Skills</span>
+                      <span class="skill-count-badge" id="res-skills-count">0</span>
+                    </div>
+                    <div class="skills-chip-cloud" id="res-skills-cloud">
+                      <!-- Skills injected by JS -->
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right: Top Role Matches -->
+                <div class="glass-card role-matches-card">
+                  <div class="card-header">
+                    <div class="card-title">
+                      <i class="fa-solid fa-ranking-star text-amber"></i>
+                      <span data-jd-count="Top Role Matches ({n} Roles Evaluated)">Top Role Matches (105 Roles Evaluated)</span>
+                    </div>
+                    <span class="badge-pill gemini-pill" id="res-top-score-badge">Top Match: 80%</span>
+                  </div>
+
+                  <div class="matches-list" id="res-matches-list">
+                    <!-- Match items injected by JS -->
+                  </div>
+
+                  <div class="results-actions">
+                    <button class="btn btn-secondary" id="btn-copilot-ask-cand">
+                      <i class="fa-solid fa-comment-dots"></i> Ask Recruiter Copilot
+                    </button>
+                    <button class="btn btn-primary" id="btn-draft-invite">
+                      <i class="fa-solid fa-envelope"></i> Draft Interview Email
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 3. CANDIDATES PIPELINE VIEW -->
+        <section class="view-panel" id="view-candidates">
+          <div class="pipeline-header-bar glass-card">
+            <div class="filter-controls">
+              <div class="search-input-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="filter-candidate-search" placeholder="Filter by candidate, skill, role..." />
+              </div>
+
+              <div class="select-wrap">
+                <select id="filter-candidate-status">
+                  <option value="all">All Statuses</option>
+                  <option value="Scored">Scored & Ready</option>
+                  <option value="Needs Review">Needs Review</option>
+                  <option value="Rejected - Non-USA Location">Non-USA Rejected</option>
+                </select>
+              </div>
+
+              <div class="range-wrap">
+                <label>Min Score: <span id="score-slider-val">0%</span></label>
+                <input type="range" id="filter-min-score" min="0" max="100" value="0" step="5" />
+              </div>
+            </div>
+
+            <div class="pipeline-actions">
+              <button class="btn btn-secondary" id="btn-refresh-candidates"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            </div>
+          </div>
+
+          <div class="glass-card mt-3">
+            <div class="table-container">
+              <table class="custom-table" id="candidates-full-table">
+                <thead>
+                  <tr>
+                    <th>Application ID</th>
+                    <th>Candidate Name</th>
+                    <th>Suggested Role #1</th>
+                    <th>Match</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Education</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="candidates-table-tbody">
+                  <!-- Dynamic rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. SIDE-BY-SIDE CANDIDATE COMPARISON MATRIX & SKILL RADAR VIEW -->
+        <section class="view-panel" id="view-compare">
+          <!-- Comparison Controls Bar -->
+          <div class="compare-controls-bar glass-card">
+            <div class="compare-selector-group">
+              <div class="select-label-wrap">
+                <label><i class="fa-solid fa-crosshairs text-cyan"></i> Target Role Benchmark:</label>
+                <select id="compare-role-select" class="custom-select">
+                  <option value="SIN 2 AI ML ENg Job Announcement">SIN 2 AI ML ENg Job Announcement</option>
+                  <option value="SIN2 Software Developer AgAI ML CV 3D Job Announcement">SIN2 Software Developer AgAI ML CV 3D</option>
+                  <option value="Software Developer - AI/ML, Computer Vision">Software Developer - AI/ML, Computer Vision</option>
+                </select>
+              </div>
+
+              <div class="candidate-select-chips-wrap">
+                <label><i class="fa-solid fa-users text-purple"></i> Select 2-3 Candidates to Contrast:</label>
+                <div class="compare-candidate-chips" id="compare-candidate-chips">
+                  <!-- Injected by JS -->
+                </div>
+              </div>
+            </div>
+
+            <div class="compare-actions-bar">
+              <button class="btn btn-secondary btn-md" id="btn-demo-compare">
+                <i class="fa-solid fa-bolt text-cyan"></i> 1-Click Demo (Alex vs Sarah)
+              </button>
+              <button class="btn btn-secondary btn-md" id="btn-export-compare-md">
+                <i class="fa-brands fa-markdown text-purple"></i> Copy Markdown Report
+              </button>
+              <button class="btn btn-gradient btn-md" id="btn-run-compare">
+                <i class="fa-solid fa-code-compare"></i> Compare Selected
+              </button>
+            </div>
+          </div>
+
+          <!-- Comparison Results (Loaded by JS) -->
+          <div class="compare-results-wrapper mt-3" id="compare-results-wrapper">
+            
+            <!-- Top Row: Radar Chart + AI Head-to-Head Verdict -->
+            <div class="compare-top-grid">
+              <!-- Left: Interactive Skill Radar Chart -->
+              <div class="glass-card radar-chart-card">
+                <div class="card-header">
+                  <div class="card-title">
+                    <i class="fa-solid fa-chart-pie text-cyan"></i>
+                    <span>Multi-Candidate Technical Skill Radar</span>
+                  </div>
+                  <span class="badge-pill gemini-pill">6 Core Dimensions</span>
+                </div>
+                <p class="card-desc">Comparative analysis across AI & ML, Distributed Systems, Cloud, Languages, and JD Fit.</p>
+                
+                <div class="radar-svg-container" id="radar-svg-container">
+                  <!-- Dynamic SVG Radar Chart injected by JS -->
+                </div>
+
+                <div class="radar-legend" id="radar-legend">
+                  <!-- Legend items injected by JS -->
+                </div>
+              </div>
+
+              <!-- Right: Gemini AI Head-to-Head Verdict -->
+              <div class="glass-card ai-verdict-card">
+                <div class="card-header">
+                  <div class="card-title">
+                    <i class="fa-solid fa-scale-balanced text-amber"></i>
+                    <span>AI Head-to-Head Executive Verdict</span>
+                  </div>
+                  <span class="badge-pill ai-badge">Gemini 3.1 Intelligence</span>
+                </div>
+                <div class="verdict-content" id="compare-verdict-content">
+                  <div class="verdict-placeholder text-center py-4">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-2x text-cyan mb-2"></i>
+                    <p class="text-secondary">Click <strong>"1-Click Demo (Alex vs Sarah)"</strong> or select candidates to generate an AI comparative verdict.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom Row: Side-by-Side Comparison Matrix Grid -->
+            <div class="glass-card mt-3 compare-matrix-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-table-columns text-emerald"></i>
+                  <span>Detailed Side-by-Side Evaluation Matrix</span>
+                </div>
+              </div>
+              
+              <div class="matrix-grid-container" id="matrix-grid-container">
+                <!-- Multi-column comparison cards injected by JS -->
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 5. OPEN ROLES EXPLORER VIEW -->
+        <section class="view-panel" id="view-roles">
+          <div class="roles-explorer-header glass-card">
+            <div class="category-pills" id="roles-category-pills">
+              <button class="category-pill active" data-category="all"><span data-jd-count="All ({n})">All (105)</span></button>
+              <button class="category-pill" data-category="AI & Machine Learning">AI & Machine Learning</button>
+              <button class="category-pill" data-category="Software Engineering">Software Engineering</button>
+              <button class="category-pill" data-category="Systems & Hardware">Systems & Hardware</button>
+              <button class="category-pill" data-category="Cloud & Infrastructure">Cloud & Infra</button>
+              <button class="category-pill" data-category="Product & Operations">Product & Ops</button>
+            </div>
+
+            <div class="roles-search-wrap">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="filter-roles-search" id="filter-roles-search-ph" placeholder="Search 105 roles by title or required skill (e.g. PyTorch, Rust, AWS)..." />
+            </div>
+          </div>
+
+          <div class="roles-grid mt-3" id="roles-cards-grid">
+            <!-- Role Cards injected by JS -->
+          </div>
+        </section>
+
+        <!-- 5. RECRUITER COPILOT VIEW -->
+        <section class="view-panel" id="view-copilot">
+          <div class="copilot-container">
+            <div class="glass-card copilot-chat-card">
+              <div class="copilot-header">
+                <div class="copilot-title-group">
+                  <div class="copilot-avatar">
+                    <img src="/static/driverai_logo.png" alt="DriverAI Logo" class="copilot-logo-img" />
+                  </div>
+                  <div>
+                    <h2 class="copilot-title">DriverAI Recruiter Copilot</h2>
+                    <p class="copilot-subtitle">Powered by Gemini 3.1 Flash-Lite • Specialized Talent Intelligence</p>
+                  </div>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btn-clear-chat"><i class="fa-solid fa-trash-can"></i> Clear</button>
+              </div>
+
+              <!-- Quick Prompts Bar -->
+              <div class="quick-prompts-bar">
+                <span class="prompt-chip" data-prompt="Find the best candidate for Senior Machine Learning Engineer with PyTorch and RAG experience.">
+                  <i class="fa-solid fa-sparkles text-cyan"></i> Top ML Engineers
+                </span>
+                <span class="prompt-chip" data-prompt="Draft a polite and exciting interview invitation for a candidate with high match score.">
+                  <i class="fa-solid fa-envelope text-emerald"></i> Draft Interview Invite
+                </span>
+                <span class="prompt-chip" data-prompt="What are the top 5 most frequent skill gaps among our applicants?">
+                  <i class="fa-solid fa-chart-column text-purple"></i> Common Skill Gaps
+                </span>
+                <span class="prompt-chip" data-prompt="Draft a polite non-USA location decline email explaining DriverAI's strict US-only policy.">
+                  <i class="fa-solid fa-location-dot text-amber"></i> Location Decline Email
+                </span>
+              </div>
+
+              <!-- Chat History Scroll -->
+              <div class="chat-messages" id="copilot-messages">
+                <div class="chat-bubble assistant-bubble">
+                  <div class="bubble-avatar">
+                    <img src="/static/driverai_logo.png" alt="DriverAI Logo" class="copilot-bubble-logo" />
+                  </div>
+                  <div class="bubble-content">
+                    <p>Hello! I'm your <strong>DriverAI Recruiter Copilot</strong>. I can help you evaluate candidates, search matching qualifications across the full Job Description catalog, draft personalized candidate emails, or analyze talent skill gaps.</p>
+                    <p>How can I assist your hiring pipeline today?</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Chat Input Box -->
+              <div class="chat-input-area">
+                <textarea id="copilot-input" placeholder="Ask anything about candidates, roles, or draft emails (Press Enter to send)..." rows="2"></textarea>
+                <button class="btn btn-primary" id="btn-send-chat">
+                  <i class="fa-solid fa-paper-plane"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. SETTINGS & DIAGNOSTICS VIEW -->
+        <section class="view-panel" id="view-settings">
+          <div class="settings-grid">
+            <div class="glass-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-heart-pulse text-emerald"></i>
+                  <span>System Diagnostics & Engine Health</span>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btn-refresh-health"><i class="fa-solid fa-rotate"></i> Check Health</button>
+              </div>
+
+              <!-- CHANGED 2026-09-18: this whole panel was hardcoded HTML claiming
+                   "Gemini 3.1 Flash-Lite (Active)", "105 Roles", "candidates.db" and
+                   "Suppression Active (Safe Mode)" no matter what was true. The mail
+                   line was the dangerous one -- it would read Safe Mode while sending.
+                   renderDiagnostics() in app.js fills this from /api/health. -->
+              <div class="diagnostics-list" id="diagnostics-list">
+                <div class="diag-item">
+                  <span class="diag-label">Loading…</span>
+                  <span class="diag-status text-dim">reading /api/health</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-gear text-cyan"></i>
+                  <span>Engine Configuration</span>
+                </div>
+              </div>
+
+              <div class="config-summary">
+                <p>The system is operating with zero external server dependencies, running with direct Google Gemini Cloud AI for high-throughput candidate extraction and contextual role fit.</p>
+                <div class="code-block-preview">
+                  <code>
+                    AI Brain: gemini-2.5-flash<br>
+                    Geo Policy: USA-only (non-USA flagged)<br>
+                    Storage: SQLite decoupled backend<br>
+                    Admin Contact: akhilb@driverai.io
+                  </code>
+                </div>
+              </div>
+            </div>
+
+            <!-- Local Folder Batch Ingestion -->
+            <div class="glass-card mt-3">
+              <div class="card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-folder-open text-cyan"></i>
+                  <span>Local Directory / OneDrive Batch Ingestion</span>
+                </div>
+              </div>
+              <p class="card-desc">Zero-cloud-config intake: Automatically scan and score all PDF/DOCX resumes in a local or OneDrive folder without Azure admin permissions.</p>
+              <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <input type="text" id="local-ingest-path" class="custom-input" placeholder="./resumes or ~/OneDrive/Resumes" value="./resumes" style="flex: 1;" />
+                <button class="btn btn-primary" id="btn-trigger-local-ingest">
+                  <i class="fa-solid fa-play"></i> Scan & Ingest Folder
+                </button>
+              </div>
+              <div id="local-ingest-result" class="mt-2 text-dim font-mono" style="font-size: 12px;"></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Candidate Detail Slide-out Drawer Modal -->
+  <div class="drawer-overlay hidden" id="candidate-drawer-overlay">
+    <div class="drawer-content">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <h2 class="drawer-candidate-name" id="drawer-name">Candidate Profile</h2>
+          <span class="badge" id="drawer-status-badge">Scored</span>
+        </div>
+        <button class="btn-icon" id="btn-close-drawer"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="drawer-nav-tabs">
+        <button class="drawer-nav-tab active" data-dtab="overview"><i class="fa-solid fa-chart-column"></i> Overview</button>
+        <button class="drawer-nav-tab" data-dtab="resume"><i class="fa-solid fa-file-lines"></i> Resume Extract</button>
+        <button class="drawer-nav-tab" data-dtab="outreach"><i class="fa-solid fa-paper-plane"></i> 1-Click Outreach</button>
+        <button class="drawer-nav-tab" data-dtab="export"><i class="fa-brands fa-markdown"></i> Markdown</button>
+      </div>
+
+      <div class="drawer-body" id="drawer-body">
+        <!-- Injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Command Palette Modal (Cmd + K) -->
+  <div class="palette-overlay hidden" id="command-palette-overlay">
+    <div class="palette-dialog">
+      <div class="palette-input-box">
+        <i class="fa-solid fa-magnifying-glass text-cyan"></i>
+        <input type="text" class="palette-input" id="palette-search-input" placeholder="Type a command, candidate name, skill, or role title..." autocomplete="off" />
+        <kbd class="kbd-badge">ESC</kbd>
+      </div>
+      <div class="palette-results" id="palette-results-list">
+        <!-- Injected by JS -->
+      </div>
+      <div class="palette-footer">
+        <span>Use <kbd class="kbd-badge">↑</kbd> <kbd class="kbd-badge">↓</kbd> to navigate, <kbd class="kbd-badge">↵</kbd> to select</span>
+        <span>Press <kbd class="kbd-badge">?</kbd> for keyboard shortcuts</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=9.7"></script>
+</body>
+</html>

@@ -10,28 +10,25 @@ import json
 
 from hiring_agent.config import (
     OLLAMA_ENABLED, OLLAMA_SCORING, OLLAMA_MODEL, OLLAMA_HOST, OLLAMA_SCORING_TIMEOUT,
+    GEMINI_ENABLED, GEMINI_MODEL,
     AI_TEXT_LIMIT, logger,
 )
-
-_SCORE_SYSTEM = (
-    "You are a precise technical recruiter. You rate how well a candidate fits each open "
-    "role on a 0-100 scale, where 100 = an excellent match and 0 = no relevant overlap. "
-    "Base the score on overlap between the candidate's skills/experience and each role's "
-    "required skills, plus the role title the candidate says they want. Be strict and "
-    "consistent. Respond ONLY with a JSON object of the form "
-    '{"scores": [{"title": "<role title>", "score": <0-100 integer>, '
-    '"reason": "<max 12 words>"}]} '
-    "with one entry per role given, and nothing else."
-)
+# ponytail: same recruiter prompt for both brains, one definition.
+from hiring_agent.gemini_scorer import _SCORE_SYSTEM
 
 
 def ollama_health() -> tuple[bool, str]:
-    """Best-effort check that the Ollama brain is reachable and the model is present.
+    """Best-effort check that an AI brain (Gemini or Ollama) is reachable.
 
     Returns (ok, detail). Never raises — used only to log which scorer a run will use.
     """
+    if GEMINI_ENABLED:
+        from hiring_agent.gemini_scorer import gemini_health
+        ok, msg = gemini_health()
+        if ok:
+            return True, msg
     if not (OLLAMA_ENABLED and OLLAMA_SCORING):
-        return False, "Ollama scoring disabled - using keyword scorer"
+        return False, "AI scoring disabled - using keyword scorer"
     try:
         import requests
         resp = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
@@ -58,11 +55,24 @@ def _roles_brief(roles: list) -> str:
 
 def ai_score_roles(skills: str, role_pref: str = "", roles=None,
                    resume_text: str = "") -> list | None:
-    """Ask Ollama to rate the candidate against each role.
+    """Ask an AI brain (Gemini or Ollama) to rate the candidate against each role.
 
     Returns a list of {"title", "score", "reason"} sorted high-to-low, or None to fall back.
     """
-    if not roles or not (OLLAMA_ENABLED and OLLAMA_SCORING):
+    if not roles:
+        return None
+
+    if GEMINI_ENABLED:
+        try:
+            from hiring_agent.gemini_scorer import gemini_score_roles
+            res = gemini_score_roles(skills=skills, role_pref=role_pref, roles=roles, resume_text=resume_text)
+            if res:
+                logger.info(f"   scorer: Gemini Cloud AI ({GEMINI_MODEL}) rated {len(res)} role(s)")
+                return res
+        except Exception as e:
+            logger.warning("Gemini role scoring error (%s); falling back to local scorer.", e)
+
+    if not (OLLAMA_ENABLED and OLLAMA_SCORING):
         return None
 
     candidate_block = (

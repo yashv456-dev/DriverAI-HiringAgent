@@ -28,9 +28,32 @@ September 7 source review: use the [current architecture](../../CURRENT_ARCHITEC
 > the read-only preview (`--dry-run`, below) — it reports the same `Declines` and
 > `Info reqs` counts and sends nothing.
 
-## Option A: Run from the Desktop App
+## Option A: Run from the Modern Web Application (Recommended)
 
-This is the recommended method for clients.
+This is the fastest, cross-platform method for reviewing candidates, running live AI parsing, and managing outreach.
+
+### 1. Launch the Web Server
+```bat
+cd /d C:\HiringAgent\DriverAI_HiringAgent\HiringAgent_P2
+.\.venv\Scripts\python.exe bot.py --web --port 8000
+```
+*(On macOS / Linux: `python bot.py --web --port 8000`)*
+
+### 2. Open the Browser
+Open **[http://localhost:8000](http://localhost:8000)** in Chrome, Edge, or Firefox.
+
+### 3. Key Web App Features:
+- **Global Command Palette (`Cmd+K` / `Ctrl+K`)**: Instantly search candidates, filter by skill, or jump directly to views (`g d` Dashboard, `g c` Candidates, `g m` Matrix, `g r` Roles, `g a` Live Analyzer).
+- **Live 4-Step Resume Parsing Stepper**: Drag & drop any PDF or DOCX file into the Live Analyzer to watch the multi-tier extraction in real-time (`OCR & Parsing` ➔ `US Geo Verification` ➔ `105-JD Role Match` ➔ `6-Axis Skill Radar`).
+- **Tabbed Candidate Dossier Drawer & 1-Click Outreach**: Click any candidate card or table row to open the 4-tab slide-out dossier (*Overview*, *Resume Extract*, *1-Click Outreach*, *Markdown Export*). Use 1-click pre-composed email templates (*Interview Invite*, *Non-USA Decline*, *5 Deep Probing Questions*) with direct `mailto:` triggers.
+- **Comparison Matrix & Scorecard Export**: Compare shortlisted candidates side-by-side on 6-axis competencies and click **Export GitHub Markdown Scorecard** for team review.
+- **Local Directory Ingestion**: Ingest batches of resumes from `./resumes` or any synced OneDrive folder directly from the **Settings** view.
+
+---
+
+## Option B: Run from the Desktop App (Windows)
+
+This is the legacy desktop method for Windows machines.
 
 ### Open the app
 
@@ -107,7 +130,7 @@ To stop using the schedule:
 2. Turn off **Turn on daily schedule**.
 3. Close the Schedule window.
 
-## Option B: Run from Command Prompt
+## Option C: Run from Command Prompt
 
 Use these steps when the desktop app is unavailable or when technical staff
 need a direct command.

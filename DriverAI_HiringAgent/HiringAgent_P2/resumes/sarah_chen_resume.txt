@@ -1,0 +1,22 @@
+SARAH CHEN
+Email: sarah.chen@techmail.io | Phone: (206) 555-0892 | Location: Seattle, WA, USA
+GitHub: github.com/schen-distributed
+
+SUMMARY
+Staff Distributed Systems & Infrastructure Engineer with 8+ years experience architecting high-throughput, low-latency microservices, consensus protocols (Raft), and distributed storage systems in Rust and Go.
+
+EXPERIENCE
+Staff Infrastructure Engineer — CloudMesh Systems, Seattle, WA (2021 – Present)
+- Designed low-latency distributed event streaming engine in Rust processing 2M+ events/sec with sub-millisecond p99 latency.
+- Led migration of 140+ microservices to Kubernetes service mesh with Envoy and Istio.
+- Implemented distributed consensus and raft-based state replication for multi-region active-active clusters.
+
+Senior Backend Engineer — DataStream Inc, San Jose, CA (2018 – 2021)
+- Built distributed key-value cache layer in Go and Redis handling 500k QPS.
+- Developed gRPC microservices and optimized serialization protocols.
+
+EDUCATION
+Bachelor of Science in Computer Science — University of Washington
+
+SKILLS
+Rust, Go, C++, Python, SQL, Raft, Consensus, Kafka, gRPC, Protocol Buffers, Redis, Cassandra, Kubernetes, Docker, Terraform, AWS, Linux Kernel eBPF, Prometheus, Grafana

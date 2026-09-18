@@ -12,6 +12,8 @@ unrepresentable, so it gets an explicit, named test rather than being implied by
 import os
 # Legacy orchestration checks use Excel stubs; local SQLite integration has its own suite.
 os.environ['HIRING_STORAGE_BACKEND'] = 'excel'
+# Section G pins the Ollama transport; a GEMINI_API_KEY in .env would route it to Gemini.
+os.environ['HIRING_GEMINI_ENABLED'] = 'false'
 from hiring_agent.store import (
     ExcelCandidateStore, CandidateRow, RowVanished, APP_ID_COL,
 )
@@ -333,7 +335,7 @@ ok(_ex.EXTRACTION_SOURCE["value"] == "offline (ConnectionError)",
 
 with _patch.object(_ex, "OLLAMA_ENABLED", False):
     _ex.extract_with_ollama(_TXT)
-ok(_ex.EXTRACTION_SOURCE["value"] == "offline (Ollama disabled)",
+ok(_ex.EXTRACTION_SOURCE["value"] == "offline (AI disabled)",
    "a deliberately disabled model is distinguished from a failure")
 
 # Reset per call, or a healthy candidate inherits the previous one stalling.

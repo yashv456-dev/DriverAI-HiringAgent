@@ -24,7 +24,7 @@ _temp_files: list = []
 from hiring_agent.excel_output import _parse_received
 from hiring_agent.extraction import (
     extract_text_from_bytes, extract_candidate_details, extract_candidate_details_smart,
-    resolve_full_name,
+    resolve_full_name, resolve_email,
     merge_mail_body_fallback, ai_recheck_fields, html_to_text,
     infer_looking_for_role, infer_missing_portfolios, _GAP_LITERALS, MISSING_VALUE,
     _looks_like_url, _normalize_link_artifacts, _clean_url, format_phone, sanitize_phone,
@@ -3281,6 +3281,16 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
 
             full_name = resolve_full_name(details.get("full_name"),
                                           str(vals.get("Full Name", "")), text)
+            # ADDED 2026-09-18: the CV's own address, kept beside the envelope
+            # address rather than replacing it - Email is the identity key every
+            # dedupe/retry/rejection set is built on. Empty unless the two differ.
+            _contact_email, resume_email = resolve_email(
+                details.get("email", ""), str(vals.get("Email", "")), text)
+            if resume_email:
+                logger.warning(
+                    "%s: CV lists %s but the application arrived from %s - "
+                    "contacting the sender address, CV address recorded only",
+                    app_id, resume_email, _contact_email)
             skills = normalize_skills(details.get("skills", "Not extracted"))
             role_pref = details.get("looking_for_role", "Not extracted")
             education = details.get("education", "Not extracted")
@@ -3349,6 +3359,12 @@ def score_from_sharepoint(dry_run: bool = False, scorecards: bool = False, *, _l
 
             fields = {
                 "Full Name": full_name,
+                # ADDED 2026-09-18. Note there is deliberately no "Email" key here:
+                # that column stays P1's. The SQLite backend stores row values as
+                # JSON, so this key persists with no schema change; the Excel
+                # backend has no such column and drops it, which is why the
+                # divergence is also logged as a warning above.
+                **({"Resume Email": resume_email} if resume_email else {}),
                 "Phone": phone,
                 "Location": location,
                 "Country": country,

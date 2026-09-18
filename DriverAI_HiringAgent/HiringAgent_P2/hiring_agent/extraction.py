@@ -366,6 +366,48 @@ def resolve_full_name(parsed_name: str, sender_name: str, resume_text: str) -> s
     return "Not extracted"
 
 
+# ADDED 2026-09-18 - closes the gap where a CV's own address was extracted and
+# then thrown away (see the 'email' note in extract_candidate_details_smart).
+def resolve_email(parsed_email: str, sender_email: str, resume_text: str) -> tuple[str, str]:
+    """Return (contact_email, resume_email).
+
+    Deliberately NOT modelled on resolve_full_name, which is CV-first. Email cannot
+    be, because it is this system's identity key: duplicate detection, retry pairing,
+    the rejection reconciliation sets and P1's own 90-day duplicate window all key on
+    the envelope address. Overwriting it with a CV-derived address would silently
+    re-partition every one of those sets and split a candidate's history in two.
+
+    So the envelope address always stays the contact address, and the CV address is
+    returned ALONGSIDE it, never instead of it:
+
+      contact_email - the sender address, unchanged. Proven deliverable: mail from it
+                      arrived. This is what stays in the Email column.
+      resume_email  - the address printed on the CV, but only when it differs from the
+                      sender. Empty string when it matches or was not found.
+
+    The CV address is taken only from the header region (first 15 non-blank lines),
+    where a candidate's own contact block sits. Scanning the whole document would
+    start returning referees', former managers' and past employers' addresses, which
+    is how you end up mailing the wrong person about someone else's application.
+    """
+    sender = (sender_email or "").strip().lower()
+
+    cv = (parsed_email or "").strip().lower()
+    if cv in _GAP_LITERALS or "@" not in cv:
+        cv = ""
+
+    # Confirm the parsed address actually sits in the header block, not further down.
+    if cv:
+        header = "\n".join(
+            [ln for ln in (resume_text or "").splitlines() if ln.strip()][:15]).lower()
+        if header and cv not in header:
+            cv = ""
+
+    if not cv or cv == sender:
+        return sender, ""
+    return sender, cv
+
+
 # ── Title / location helpers ─────────────────────────────────────────────────
 
 def clean_role_text(s: str) -> str:
@@ -3003,21 +3045,29 @@ def _post_ollama_extraction(url: str, **kwargs):
 
 
 def extract_with_ollama(text: str, hints: dict | None = None) -> dict | None:
-    """FREE local-LLM extraction via Ollama (no API key). None to fall back.
+    """AI extraction via Gemini Cloud AI (if configured) or Ollama local LLM. None to fall back.
 
-    Off unless ai_extraction.ollama.enabled (config.yaml) / HIRING_OLLAMA_ENABLED.
-    Any failure (Ollama not running, model missing, bad JSON) returns None so the
-    caller falls through to the offline parser - nothing breaks.
-
-    `hints`, if given, are the deterministic parser's own guesses for full_name/
-    location/country/looking_for_role - passed into the prompt so Ollama confirms or
-    corrects a real candidate value instead of deriving the field from a blank slate
-    (anchoring reduces hallucination/drift versus an unconstrained guess).
+    Off unless GEMINI_ENABLED or OLLAMA_ENABLED.
+    Any failure returns None so the caller falls through to the offline parser - nothing breaks.
     """
     text = (text or "").strip()
-    if not text or not OLLAMA_ENABLED:
-        EXTRACTION_SOURCE["value"] = ("offline (Ollama disabled)" if not OLLAMA_ENABLED
-                                      else "offline (no resume text)")
+    if not text:
+        EXTRACTION_SOURCE["value"] = "offline (no resume text)"
+        return None
+
+    from hiring_agent.config import GEMINI_ENABLED
+    if GEMINI_ENABLED:
+        try:
+            from hiring_agent.gemini_scorer import gemini_extract_candidate
+            g_data = gemini_extract_candidate(text, hints)
+            if g_data and isinstance(g_data, dict):
+                EXTRACTION_SOURCE["value"] = "gemini"
+                return g_data
+        except Exception as e:
+            logger.warning("Gemini extraction failed (%s); trying local extractor.", e)
+
+    if not OLLAMA_ENABLED:
+        EXTRACTION_SOURCE["value"] = "offline (AI disabled)"
         return None
     EXTRACTION_SOURCE["value"] = "ollama"
     hint_block = ""
@@ -3262,12 +3312,19 @@ def extract_candidate_details_smart(text: str) -> dict:
         # "6+ years of experience" is a literal read, not a judgement call, and a work-
         # history span is arithmetic. Neither is something to route through an LLM.
         "experience": baseline.get("experience", ""),
+        # CHANGED 2026-09-18: was missing entirely. The offline parser has always
+        # regexed an address out of the CV, but this dict never carried it across,
+        # so every caller saw a result with no 'email' key and the resume address
+        # was silently discarded. Deterministic-only, same tier as the portfolios:
+        # an address is a literal match, never an LLM judgement call.
+        "email": baseline.get("email", "Not extracted"),
         "notes": baseline.get("notes", text[:800]),
     }
     tier2_fields = ("full_name", "location", "country", "looking_for_role", "education")
 
-    if not OLLAMA_ENABLED:
-        logger.info("   extractor: offline parser (Ollama disabled)")
+    from hiring_agent.config import GEMINI_ENABLED, GEMINI_MODEL
+    if not OLLAMA_ENABLED and not GEMINI_ENABLED:
+        logger.info("   extractor: offline parser (AI disabled)")
         result["phone"] = baseline.get("phone", "Not extracted")
         result["skills"] = baseline.get("skills", "Not extracted")
         for f in tier2_fields:
@@ -3279,14 +3336,17 @@ def extract_candidate_details_smart(text: str) -> dict:
 
     ollama = extract_with_ollama(text, hints)
     if ollama is None:
-        logger.info("   extractor: offline parser (Ollama unavailable)")
+        logger.info("   extractor: offline parser (AI unavailable)")
         result["phone"] = baseline.get("phone", "Not extracted")
         result["skills"] = baseline.get("skills", "Not extracted")
         for f in tier2_fields:
             result[f] = baseline.get(f, "" if f == "country" else "Not extracted")
         return result
 
-    logger.info(f"   extractor: Ollama ({OLLAMA_MODEL}, free local LLM) + deterministic Tier 1")
+    if EXTRACTION_SOURCE.get("value") == "gemini":
+        logger.info(f"   extractor: Gemini Cloud AI ({GEMINI_MODEL}) + deterministic Tier 1")
+    else:
+        logger.info(f"   extractor: Ollama ({OLLAMA_MODEL}, free local LLM) + deterministic Tier 1")
 
     # Tier 1 phone: deterministic wins outright if it found something; Ollama's answer
     # only fills a genuine gap, it never overrides a real regex match.

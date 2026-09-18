@@ -34,3 +34,11 @@ __pycache__/
 # jd_roles_cache.json is deliberately NOT ignored: it is the cached job-description
 # set the scorer matches against, it carries no personal data, and shipping it means a
 # fresh clone can score without first fetching every JD.
+p2.db*
+hiring_agent.db*
+screenshot_preview.png
+
+# Local test sandbox built by make_sandbox.py: fake workbook, fake resumes,
+# scratch db. Regenerate with "python make_sandbox.py" -- never commit it.
+sandbox/
+.agents/

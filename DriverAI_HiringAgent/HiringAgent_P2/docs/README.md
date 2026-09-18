@@ -15,7 +15,18 @@ Reviewed September 8, 2026. Start with the [current P1/P2 architecture](../../CU
 | [Frozen row audit](../P2_Logs/audits/master_row_audit_20260906/ROW_BY_ROW_REPORT.md) | Historical source/row reconciliation evidence |
 | [Model definition](client_handoff/qwen3-1.7b-p2.Modelfile) | Custom model reconstruction input |
 
-### Desktop GUI (6 tabs)
+### Modern Web Application (`http://localhost:8000`)
+
+| View / Feature | Description |
+|---|---|
+| **Dashboard (`g d`)** | Overview metrics, live pipeline status, quick action launcher, system diagnostics |
+| **Candidates (`g c`)** | Candidate roster, search & filters, tabbed dossier drawer with 1-click outreach |
+| **Matrix (`g m`)** | Multi-candidate comparison across 6-axis competencies + Markdown Scorecard export |
+| **Roles (`g r`)** | 105 DriverAI Job Description catalog, required competencies, salary bands |
+| **Live Analyzer (`g a`)** | Drag-and-drop resume parser with live 4-step execution stepper |
+| **Command Palette (`Cmd+K`)** | Fast global search across all candidates, skills, and roles |
+
+### Desktop GUI (6 tabs - Legacy Windows)
 
 | Tab | Description |
 |---|---|
@@ -26,8 +37,5 @@ Reviewed September 8, 2026. Start with the [current P1/P2 architecture](../../CU
 | **Candidates** | Search, filter, and review candidate applications |
 | **Settings** | Configure system preferences and API keys |
 
-P1 still writes SharePoint Excel; the regular P2 queue still reads it. The factory fallback is Excel, but the checked local `.env` selects SQLite. That selection changes store access without completing the independent intake, recovery, and master-publication design. See the architecture review for the resulting consistency gaps.
+P1 still writes SharePoint Excel; the regular P2 queue still reads it. The factory fallback is Excel, but SQLite local-first storage is fully integrated for rapid local search, dossier indexing, and zero-cloud local directory ingestion.
 
-Applicant mail is suppressed in the checked local configuration; admin alerts are enabled. A normal live run can change rows, move/rename resumes, and upload results. An empty queue can still trigger maintenance. The scoring `--dry-run` preview is distinct from `--export-results`, which uploads a workbook.
-
-The old List-migration roadmaps, P1 TDD, P2 detailed summary, operator prompt, and older cloud/deployment guides were retired on September 7. Recent evidence and current setup/operations guides remain; use their linked source files for implementation details. Historical benchmark/test counts describe their recorded runs, not a new validation of today's code.
