@@ -208,22 +208,83 @@ pip install -r requirements-docker.txt
 
 ---
 
-## 🍎 macOS Setup Guide
+## 🍎 macOS Setup Guide (Apple Silicon M1/M2/M3/M4 & Intel)
 
-1. **Prerequisites (via Homebrew)**:
+DriverAI Hiring Agent runs natively and with full hardware acceleration on macOS (Sonoma, Ventura, Sequoia). Both **Apple Silicon** (ARM64) and **Intel** (x86_64) Macs are fully supported.
+
+### Method A: Docker Desktop for Mac (Recommended)
+1. **Install Docker Desktop**:
+   Download [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) (select **Apple Silicon** or **Intel Chip**).
+2. **Clone & Launch in Terminal**:
    ```bash
-   brew install python@3.12 tesseract
-   # Optional: brew install ollama
+   git clone https://github.com/akhil15123/DriverAI-HiringAgent.git
+   cd DriverAI-HiringAgent
+   docker compose up --build
    ```
-2. **Setup & Run**:
-   ```bash
-   cd DriverAI_HiringAgent/HiringAgent_P2
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements-docker.txt
-   python web_server.py
-   ```
-   Open **[http://localhost:8000](http://localhost:8000)**.
+3. Open **[http://localhost:8000](http://localhost:8000)** in Safari, Chrome, or any browser.
+
+> **Ollama on Mac with Docker**: Docker Desktop automatically maps `host.docker.internal:11434` to your host Mac. If you run Ollama natively on macOS, the Docker container connects to your Mac's Metal-accelerated Ollama instance with zero configuration.
+
+---
+
+### Method B: Native macOS Setup (Terminal / zsh)
+
+#### Step 1: Install Homebrew & System Prerequisites
+If you don't have Homebrew installed, open Terminal and run:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Then install Python 3.12, Tesseract OCR, and optionally Ollama:
+```bash
+# Core Python runtime and OCR fallback
+brew install python@3.12 tesseract tesseract-lang
+
+# Optional: Install Ollama for local offline AI
+brew install --cask ollama
+```
+
+#### Step 2: Set Up Virtual Environment & Dependencies
+```bash
+cd DriverAI_HiringAgent/HiringAgent_P2
+
+# Create virtual environment with Python 3.12
+python3.12 -m venv .venv
+source .venv/bin/activate
+
+# Upgrade pip and install dependencies
+pip install --upgrade pip
+pip install -r requirements-docker.txt
+```
+
+#### Step 3: Run the Application on macOS
+* **Start Web Server & Recruiter Dashboard**:
+  ```bash
+  python web_server.py
+  # or specify a custom port:
+  # PORT=8080 python web_server.py
+  ```
+  Open **[http://localhost:8000](http://localhost:8000)** in your browser.
+
+* **Run CLI Diagnostics & Processing**:
+  ```bash
+  # Check environment readiness
+  python bot.py --doctor
+
+  # Score a local folder of candidate resumes
+  python bot.py --score-folder ./resumes
+
+  # Run SharePoint scoring dry-run
+  python bot.py --score-sharepoint --dry-run
+  ```
+
+#### ⚡ Apple Silicon Performance Tip (Metal GPU Acceleration)
+On Apple Silicon Macs (M1/M2/M3/M4), running Ollama natively on macOS leverages unified memory architecture (UMA) and Metal GPU acceleration for lightning-fast token generation:
+```bash
+# Pull model and launch server in background
+ollama run qwen3:1.7b
+```
+DriverAI Hiring Agent detects `http://localhost:11434` automatically and executes local candidate scoring with near-zero latency.
 
 ---
 
