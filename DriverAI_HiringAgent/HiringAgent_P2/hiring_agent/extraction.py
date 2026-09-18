@@ -1851,6 +1851,17 @@ def _normalize_edu_date_token(token: str) -> str:
     return t
 
 
+def _continues_degree_row(line: str) -> bool:
+    """True when ``line``, printed beside a degree line, can belong to that degree's entry.
+
+    Not another degree, not a section heading, and either names a school or at least does
+    not name a job - so a work entry printed next to a date-less degree ('Software Engineer,
+    Intel | Jan 2020 - Present') can never donate its range to the education columns.
+    """
+    return (not _DEGREE_RE.search(line) and not _is_section_heading(line)
+            and bool(_INSTITUTION_RE.search(line) or not _EMPLOYMENT_ROLE_RE.search(line)))
+
+
 def _extract_education_dates(text: str) -> tuple[str, str]:
     """Best-effort (start, end) date for the SAME education entry _extract_education just
     read - scanned from the identical 'Education' header + next-5-lines window, so the
@@ -1948,10 +1959,22 @@ def _extract_education_dates(text: str) -> tuple[str, str]:
     # or employment range (live: Pragya Mittal's 2023-2024 fellowship displaced the
     # Aug 2023-May 2025 dates printed on her master's row).
     degree_pairs = []
-    for line in lines:
+    for i, line in enumerate(lines):
         if not _DEGREE_RE.search(line):
             continue
         found = _best_effort(_EDU_GLUED_MONTH_RE.sub(" ", line))
+        # A long degree row wraps, and its dates land on the second visual line: 'M.S.,
+        # Information Systems Management - Arizona State' / 'University (W. P. Carey),
+        # Tempe, AZ | Aug 2024 - Jul 2025'. Skipping it let the older B.Sc. row, whose range
+        # fit on one line, publish its dates beside the M.S. (APP-20260918-0712-JVDA).
+        # Not in a school-above-degree layout ('University of Texas Arlington  Aug 23-May
+        # 25' / 'Master of Science'): there the line below is the NEXT entry's school line,
+        # and the later passes already pair the degree with the dated school line above it.
+        dated_above = (i and _continues_degree_row(lines[i - 1])
+                       and _best_effort(_EDU_GLUED_MONTH_RE.sub(" ", lines[i - 1])))
+        if (not found and not dated_above and i + 1 < len(lines)
+                and _continues_degree_row(lines[i + 1])):
+            found = _best_effort(_EDU_GLUED_MONTH_RE.sub(" ", line + "\n" + lines[i + 1]))
         if found:
             degree_pairs.append(found)
     same_row = _latest(degree_pairs)
@@ -1981,17 +2004,17 @@ def _extract_education_dates(text: str) -> tuple[str, str]:
             # A school/date line can precede the degree line in multi-column templates.
             if i:
                 previous = lines[i - 1]
-                if not _is_section_heading(previous):
+                if _continues_degree_row(previous):
                     found = _best_effort(_EDU_GLUED_MONTH_RE.sub(
                         " ", previous + "\n" + line))
                     if found:
                         return found
-            # Or the school and range can follow it.  Stop at the next degree or section so
-            # a sibling education entry cannot donate its dates.
+            # Or the school and range can follow it.  Stop at the next degree, section or
+            # job line so neither a sibling education entry nor a work entry can donate
+            # its dates.
             entry = [line]
             for candidate in lines[i + 1:i + 3]:
-                if (_is_section_heading(candidate)
-                        or _DEGREE_RE.search(candidate)):
+                if not _continues_degree_row(candidate):
                     break
                 entry.append(candidate)
                 found = _best_effort(_EDU_GLUED_MONTH_RE.sub(" ", "\n".join(entry)))
@@ -2024,11 +2047,19 @@ def _extract_education_dates(text: str) -> tuple[str, str]:
     # the common "School Name .......... Date" / "Degree Name .......... Location" resume
     # layout states the date on the school line, not the degree line - plus two lines
     # after, so a work history range elsewhere can never be mistaken for education dates.
+    # Neighbours that are a heading or a job line are left out of the window: a date-less
+    # 'B.S. Computer Science' followed by 'EXPERIENCE' / 'Software Engineer, Intel | Jan
+    # 2020 - Present' used to publish Jan 2020 - Present as the education dates.
     for i, line in enumerate(lines):
         if not _DEGREE_RE.search(line):
             continue
-        degree_window = "\n".join(lines[max(0, i - 1):i + 3])
-        degree_window = _EDU_GLUED_MONTH_RE.sub(" ", degree_window)
+        window = [lines[i - 1]] if i and _continues_degree_row(lines[i - 1]) else []
+        window.append(line)
+        for candidate in lines[i + 1:i + 3]:
+            if not _continues_degree_row(candidate):
+                break
+            window.append(candidate)
+        degree_window = _EDU_GLUED_MONTH_RE.sub(" ", "\n".join(window))
         found = _best_effort(degree_window)
         if found:
             return found
@@ -2628,7 +2659,11 @@ _RAW_URL_RE = re.compile(
     r'https?://[^\s<>"\')\]]+|'
     r'(?:[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\.)'      # domain labels
     r'+(?:com|io|dev|me|co|net|org|info|tech|design|art|'
-    r'work|site|app|portfolio|edu|uk|in|au|ca|de|fr|jp)'
+    r'work|site|app|portfolio|edu|uk|in|au|ca|de|fr|jp|'
+    # Newer personal-site endings. Without these a header site like 'milon.live' was never
+    # even seen, so its slot was left open for a skills-line token to fill (2026-09-18,
+    # APP-20260918-0712-JVDA). A bare match still has to pass the contact-line test.
+    r'live|ai|xyz|online|blog|page|studio|website)'
     r'(?:/[^\s<>"\')\]]*)?',
     re.I,
 )
@@ -2698,7 +2733,26 @@ def _looks_like_url(value: str) -> bool:
         return False
     if host in _DEGREE_LIKE_HOSTS and not has_path:
         return False
+    if _is_technology_name(host) and not has_path:
+        return False
     return True
+
+
+#: Technology names whose dotted form is also a syntactically valid domain. A skills line
+#: lists them bare ('C#/.NET, VB.NET, VBA') and one was published as a candidate's
+#: Portfolio 3 as 'https://VB.NET' (2026-09-18, APP-20260918-0712-JVDA).
+_TECHNOLOGY_HOSTS = frozenset({
+    "vb.net", "asp.net", "ado.net", "ml.net", "dot.net", "socket.io",
+})
+
+
+def _is_technology_name(host: str) -> bool:
+    """True when a bare host is a technology name rather than a website.
+
+    '.js' is not a real top-level domain, so every '<name>.js' is a library.
+    """
+    h = re.sub(r"^www\.", "", str(host or "").strip().lower().rstrip("/"))
+    return h in _TECHNOLOGY_HOSTS or h in _SKILL_KEYWORD_SET or h.endswith(".js")
 
 
 #: Degree abbreviations whose dotted form is also a syntactically valid domain.
@@ -2832,12 +2886,20 @@ def _bare_site_in_contact_header(token: str, header: list[str]) -> bool:
     and the header must be a real contact block (an email or a profile link in it).
     """
     host = re.sub(r"^www\.", "", str(token or "").strip().lower().rstrip(".,;:!?)>\"'/"))
-    if not host or "/" in host or host in _SKILL_KEYWORD_SET:
+    if not host or "/" in host or _is_technology_name(host):
         return False
     block = "\n".join(header).lower()
     if not (_EMAIL_ADDRESS_RE.search(block) or re.search(r"(?:linkedin|github)\.com/", block)):
         return False
-    for line in header:
+    # Only the contact line itself, or a line directly beside it (a site wrapped onto its
+    # own line). The header can run twelve lines deep into a summary or a skills list whose
+    # comma-separated items look exactly like header items - that is how 'VB.NET' from
+    # 'Programming / Data: Python, SQL, C#/.NET, VB.NET' became a portfolio (2026-09-18).
+    contact = [bool(_EMAIL_ADDRESS_RE.search(line)
+                    or re.search(r"(?i)(?:linkedin|github)\.com/", line)) for line in header]
+    for i, line in enumerate(header):
+        if not any(contact[max(0, i - 1):i + 2]):
+            continue
         items = re.split(r"\s*[|•·,;]\s*|\s{2,}", line.lower())
         if any(re.sub(r"^www\.", "", item.strip().rstrip("/")) == host for item in items):
             return True

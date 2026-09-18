@@ -7480,6 +7480,52 @@ ok(_c13_complete("Master of Science in Data Science", _c13_degree_first)
    == "Master of Science in Data Science, Arizona State University",
    "degree-first layout: the degree still takes the school below it")
 
+# Test application APP-20260918-0712-JVDA (2026-09-18) published Portfolio 3 'https://VB.NET'
+# from a skills line, missed the header site 'milon.live', and paired the M.S. with the
+# B.Sc.'s dates because the M.S. row wrapped its range onto a second line.
+from hiring_agent.extraction import (_extract_education_dates as _d18_dates,
+                                     extract_portfolios as _d18_ports,
+                                     _looks_like_url as _d18_url)
+_d18_header = ("Yash Verma\nSENIOR UIPATH RPA DEVELOPER | AUTOMATION ENGINEERING LEAD\n"
+               "San Francisco Bay Area, CA | (480) 809-1749 | jane@example.com | "
+               "linkedin.com/in/jane | github.com/janedoe | milon.live\nPROFESSIONAL SUMMARY\n"
+               "Senior RPA developer.\nCORE TECHNICAL SKILLS\n"
+               "Programming / Data: Python, SQL, C#/.NET, VB.NET, VBA, FastAPI\n")
+ok(_d18_ports(_d18_header) == ("https://linkedin.com/in/jane", "https://github.com/janedoe",
+                               "https://milon.live"),
+   "a '.live' header site is found and a skills-line 'VB.NET' is never a portfolio")
+ok(_d18_ports("Jane Doe\njane@example.com | linkedin.com/in/jane\nSummary\nmore\n"
+              "Stack: C#, VB.NET, ASP.NET, Node.js\n")[2] == "N/A",
+   "technology names further down the header are not sites")
+ok(_d18_ports("Jane Doe\njane@example.com | ASP.NET | linkedin.com/in/jane\nSUMMARY")[2] == "N/A",
+   "a technology name on the contact line itself is not a site")
+ok(_d18_ports("Jane Doe\njane@example.com | linkedin.com/in/jane\njanedoe.xyz\nSUMMARY")[2]
+   == "https://janedoe.xyz", "a site wrapped onto the line under the contact line is kept")
+ok(_d18_ports("Jane Doe\njane@example.com | linkedin.com/in/jane\nSummary\nmore\n"
+              "Clients: acme.live, beta.ai\nSKILLS")[2] == "N/A",
+   "a bare domain away from the contact line is not the candidate's site")
+for _d18_tech in ("VB.NET", "https://VB.NET", "asp.net", "node.js", "vue.js", "socket.io"):
+    ok(not _d18_url(_d18_tech), f"'{_d18_tech}' is a technology name, not a URL")
+ok(_d18_url("https://milon.live") and _d18_url("https://janedoe.ai"),
+   "'.live' and '.ai' personal sites are URLs")
+ok(_d18_dates("EDUCATION\nM.S., Information Systems Management - Arizona State\n"
+              "University (W. P. Carey), Tempe, AZ | Aug 2024 - Jul 2025 | GPA: 3.97\n"
+              "B.Sc., Computer Science - Guru Gobind Singh Indraprastha University, Delhi, "
+              "India | Jul 2012 - Jun 2015\n") == ("Aug 2024", "Jul 2025"),
+   "a degree row wrapped onto a second line keeps its own dates, not the next degree's")
+ok(_d18_dates("EDUCATION\nM.S. Data Science, Stanford | Sep 2023 - Jun 2025\nB.E., Mechanical "
+              "Engineering - Visvesvaraya Technological\nUniversity, India | Aug 2012 - Jul 2016\n")
+   == ("Sep 2023", "Jun 2025"), "a wrapped OLDER degree does not displace the newer one")
+ok(_d18_dates("EDUCATION\nB.S. Computer Science, ASU\nEXPERIENCE\n"
+              "Software Engineer, Intel | Jan 2020 - Present\n") == ("", ""),
+   "a date-less degree never takes a job's range across a section heading")
+ok(_d18_dates("B.S. Computer Science\nSoftware Engineer, Intel | Jan 2020 - Present\n") == ("", ""),
+   "a date-less degree never takes the range of the job line under it")
+ok(_d18_dates("Software Engineer, Intel | Jan 2020 - Present\nB.S. Computer Science\n") == ("", ""),
+   "a date-less degree never takes the range of the job line above it")
+ok(_d18_dates("M.S. Physics\nResearch Assistant, University of Utah | 2019 - 2021\n")
+   == ("2019", "2021"), "a line naming a school still counts as the degree's own entry")
+
 print(f"\n{'='*64}")
 print(f"  P2 RESULT: {P} passed, {F} failed")
 print(f"{'='*64}")
