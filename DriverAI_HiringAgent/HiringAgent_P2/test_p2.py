@@ -7526,6 +7526,25 @@ ok(_d18_dates("Software Engineer, Intel | Jan 2020 - Present\nB.S. Computer Scie
 ok(_d18_dates("M.S. Physics\nResearch Assistant, University of Utah | 2019 - 2021\n")
    == ("2019", "2021"), "a line naming a school still counts as the degree's own entry")
 
+# A re-score of APP-20260817-0617-MCVA replaced 'Charu Sneha Laguduva Ravi' with the model's
+# 'Charusneha Laguduva Ravitha': four-word names were never read offline, and the model's
+# name was accepted without checking it against the CV.
+from hiring_agent.extraction import (name_grounded_in_text as _d18_grounded,
+                                     _looks_like_name as _d18_is_name,
+                                     extract_candidate_details as _d18_details)
+_d18_cv = ("CHARU SNEHA LAGUDUVA RAVI\n\nTempe, AZ | +1 (623) 271-5755 | charusneha266@gmail.com | "
+           "linkedin.com/in/charusnehalr26\nSUMMARY\nSoftware engineer.\n")
+ok(_d18_details(_d18_cv)["full_name"] == "Charu Sneha Laguduva Ravi",
+   "a four-word all-caps name on the first line is read offline")
+ok(_d18_is_name("Samarth Agasthya Mandya Subramanya"), "four-word names are names")
+ok(not _d18_is_name("Senior UiPath RPA Developer"), "a four-word job title is still not a name")
+ok(not _d18_is_name("One Two Three Four Five"), "five words is still not a name")
+ok(not _d18_grounded("Charusneha Laguduva Ravitha", _d18_cv),
+   "a model name with a word the CV never contains is rejected")
+ok(_d18_grounded("Charu Sneha Laguduva Ravi", _d18_cv) and _d18_grounded("Charusneha Ravi", _d18_cv),
+   "a model name whose words all occur in the CV (or its email) is accepted")
+ok(_d18_grounded("José Núñez", "JOSE NUNEZ\njose@x.com"), "accents are ignored when grounding a name")
+
 print(f"\n{'='*64}")
 print(f"  P2 RESULT: {P} passed, {F} failed")
 print(f"{'='*64}")

@@ -227,7 +227,11 @@ def _name_is_sentence_fragment(s: str) -> bool:
 
 
 def _looks_like_name(s: str) -> bool:
-    """True if s looks like a real person's name: 2-3 alpha tokens, none a section word.
+    """True if s looks like a real person's name: 2-4 alpha tokens, none a section word.
+
+    Four tokens since 2026-09-18: 'CHARU SNEHA LAGUDUVA RAVI' (APP-20260817-0617-MCVA)
+    and 'Samarth Agasthya Mandya Subramanya' were never read offline, so the model alone
+    supplied the name - and on one re-score invented 'Charusneha Laguduva Ravitha'.
 
     A single-character token is allowed as a MIDDLE INITIAL ('Christopher L. Feld',
     'Jane Q Public') - fixed 2026-08-01, found by the offline dry-run harness: the old
@@ -245,7 +249,7 @@ def _looks_like_name(s: str) -> bool:
             or _looks_like_tech_phrase(s) or _is_document_artifact_name(s)):
         return False
     tokens = s.split()
-    if not (2 <= len(tokens) <= 3):
+    if not (2 <= len(tokens) <= 4):
         return False
     _cores = [t.replace(".", "").replace("'", "").replace("-", "") for t in tokens]
     if sum(1 for c in _cores if len(c) >= 2) < 2:
@@ -255,6 +259,26 @@ def _looks_like_name(s: str) -> bool:
         if len(core) < 1 or not core.isalpha() or t.lower() in SECTION_WORDS:
             return False
     return True
+
+
+def name_grounded_in_text(name: str, text: str) -> bool:
+    """True when every word of ``name`` occurs somewhere in ``text`` (case/accent-blind).
+
+    The model may reshape a name but must not invent part of it: 'Charusneha Laguduva
+    Ravitha' for a CV headed 'CHARU SNEHA LAGUDUVA RAVI' (APP-20260817-0617-MCVA, 2026-09-18)
+    fails on 'Ravitha', while 'Charusneha' passes because the email carries it. Substring
+    matching keeps a joined or split spelling acceptable, which is what the CV evidences.
+    """
+    import unicodedata
+
+    def fold(s: str) -> str:
+        return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
+
+    words = re.findall(r"[^\W\d_]{2,}", strip_parenthetical_nickname(name or ""))
+    if not words:
+        return False
+    hay = fold(text or "")
+    return all(fold(w) in hay for w in words)
 
 
 #: Name particles that are conventionally lowercase INSIDE a full name ('Maria de la Cruz',
@@ -4580,6 +4604,9 @@ def extract_candidate_details_smart(text: str) -> dict:
     # itself a gap literal.
     for f in tier2_fields:
         v = str(ollama.get(f, "") or "").strip()
+        if f == "full_name" and v and not name_grounded_in_text(v, text):
+            logger.info(f"       Name      : model proposed {v!r}, not found in the CV; ignored")
+            v = ""
         if v and v.lower() not in _GAP_LITERALS:
             result[f] = v
         else:
@@ -4748,6 +4775,10 @@ def ai_recheck_fields(fields: dict, resume_text: str, mail_body: str) -> dict:
         if key == "phone" and new_val and sum(ch.isdigit() for ch in new_val) < 7:
             new_val = ""
         _both_texts = f"{resume_text or ''}\n{mail_body or ''}"
+        if key == "full_name" and new_val and not name_grounded_in_text(new_val, _both_texts):
+            logger.info(f"       Recheck   : model proposed name {new_val!r}, not found in "
+                        f"the CV or mail; kept {old_val!r}")
+            new_val = ""
         if key == "skills" and new_val:
             new_val = _split_fused_skills(new_val, _both_texts)
         if key == "skills" and new_val and old_val:
